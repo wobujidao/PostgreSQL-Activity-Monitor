@@ -62,6 +62,7 @@
    Сделайте скрипты исполняемыми:
    ```bash
    chmod +x create_stats_db.sh stats_collection.sh
+   cp stats_collection.sh /usr/local/bin/stats_collection.sh
    ```
 3. **Инициализация базы данных:**
    Запустите скрипт для создания базы данных и таблицы:
@@ -69,7 +70,7 @@
    ./create_stats_db.sh
    ```
 4. **Настройка сбора статистики:**
-   Добавьте в `cron` задание для регулярного сбора статистики:
+   Добавьте в `cron` задание для регулярного сбора статистики: crontab -u postgres -e
    ```cron
    */10 * * * * /usr/local/bin/stats_collection.sh
    ```
