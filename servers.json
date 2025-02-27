@@ -1,0 +1,11 @@
+{
+    "servers": [
+        {
+            "name": "s00-dbs06",
+            "host": "10.110.125.61",
+            "user": "postgres",
+            "password": "",
+            "port": 5432
+        }
+    ]
+}
