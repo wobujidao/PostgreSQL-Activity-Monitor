@@ -1,0 +1,35 @@
+.App {
+  font-family: Arial, sans-serif;
+}
+
+.login-form {
+  display: inline-block;
+  text-align: left;
+  margin-top: 20px;
+  width: 300px;
+}
+
+.table {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+th {
+  cursor: pointer;
+}
+
+.sorted-asc::after { content: ' ↑'; }
+.sorted-desc::after { content: ' ↓'; }
+
+.chart-container {
+  max-width: 1200px;
+  margin: 20px auto;
+}
+
+.shadow-sm {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.text-danger {
+  color: red;
+}
