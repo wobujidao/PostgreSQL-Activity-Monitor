@@ -8,25 +8,48 @@ function ServerList() {
   const [showModal, setShowModal] = useState(false);
   const [editServer, setEditServer] = useState(null);
   const [formData, setFormData] = useState({
-    name: '', host: '', user: '', password: '', port: 5432
+    name: '',
+    host: '',
+    user: '',
+    password: '',
+    port: 5432,
+    ssh_user: '',
+    ssh_password: '',
+    ssh_port: 22
   });
 
   useEffect(() => {
-    fetchServers();
-    const interval = setInterval(fetchServers, 10000); // Автообновление каждые 10 секунд
-    return () => clearInterval(interval);
-  }, []);
+    const loginAndFetch = async () => {
+      try {
+        // Получение токена
+        const loginResponse = await axios.post(
+          'http://10.110.20.55:8000/token',
+          'username=admin&password=admin',
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+        localStorage.setItem('token', loginResponse.data.access_token);
 
-  const fetchServers = async () => {
-    try {
-      const response = await axios.get('http://10.110.20.55:8000/servers', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setServers(response.data);
-    } catch (error) {
-      console.error('Ошибка загрузки серверов:', error);
-    }
-  };
+        // Запрос серверов
+        const fetchServers = async () => {
+          try {
+            const response = await axios.get('http://10.110.20.55:8000/servers', {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            setServers(response.data);
+          } catch (error) {
+            console.error('Ошибка загрузки серверов:', error);
+          }
+        };
+
+        fetchServers();
+        const interval = setInterval(fetchServers, 10000); // Обновление каждые 10 секунд
+        return () => clearInterval(interval);
+      } catch (error) {
+        console.error('Ошибка авторизации:', error);
+      }
+    };
+    loginAndFetch();
+  }, []);
 
   const handleAddEdit = async (e) => {
     e.preventDefault();
@@ -43,7 +66,16 @@ function ServerList() {
       fetchServers();
       setShowModal(false);
       setEditServer(null);
-      setFormData({ name: '', host: '', user: '', password: '', port: 5432 });
+      setFormData({
+        name: '',
+        host: '',
+        user: '',
+        password: '',
+        port: 5432,
+        ssh_user: '',
+        ssh_password: '',
+        ssh_port: 22
+      });
     } catch (error) {
       console.error('Ошибка при сохранении сервера:', error);
     }
@@ -62,6 +94,12 @@ function ServerList() {
     }
   };
 
+  const formatBytes = (bytes) => {
+    if (!bytes && bytes !== 0) return 'N/A';
+    const gb = bytes / 1073741824; // Перевод в ГБ
+    return `${gb.toFixed(2)} ГБ`;
+  };
+
   return (
     <div>
       <h2 className="mb-4">Список серверов</h2>
@@ -70,7 +108,9 @@ function ServerList() {
           <tr>
             <th>Сервер</th>
             <th>IP</th>
+            <th>Версия PostgreSQL</th>
             <th>Свободное место</th>
+            <th>Соединения</th>
             <th>Uptime</th>
             <th>Действия</th>
           </tr>
@@ -80,7 +120,9 @@ function ServerList() {
             <tr key={server.name}>
               <td><Link to={`/server/${server.name}`}>{server.name}</Link></td>
               <td>{server.host}</td>
-              <td>{server.free_space || 'N/A'}</td>
+              <td>{server.version || 'N/A'}</td>
+              <td>{formatBytes(server.free_space)}</td>
+              <td>{server.connections ? `${server.connections.active} активных, ${server.connections.idle} простаивающих` : 'N/A'}</td>
               <td>{server.uptime_hours ? `${server.uptime_hours} ч.` : 'N/A'}</td>
               <td>
                 <Button
@@ -88,10 +130,21 @@ function ServerList() {
                   size="sm"
                   onClick={() => {
                     setEditServer(server);
-                    setFormData({ ...server, port: server.port || 5432 });
+                    setFormData({
+                      name: server.name,
+                      host: server.host,
+                      user: server.user,
+                      password: server.password,
+                      port: server.port || 5432,
+                      ssh_user: server.ssh_user || '',
+                      ssh_password: server.ssh_password || '',
+                      ssh_port: server.ssh_port || 22
+                    });
                     setShowModal(true);
                   }}
-               DET>Редактировать</Button>{' '}
+                >
+                  Редактировать
+                </Button>{' '}
                 <Button variant="danger" size="sm" onClick={() => handleDelete(server.name)}>
                   Удалить
                 </Button>
@@ -129,7 +182,7 @@ function ServerList() {
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Пользователь</Form.Label>
+              <Form.Label>Пользователь PostgreSQL</Form.Label>
               <Form.Control
                 name="user"
                 value={formData.user}
@@ -138,7 +191,7 @@ function ServerList() {
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Пароль</Form.Label>
+              <Form.Label>Пароль PostgreSQL</Form.Label>
               <Form.Control
                 type="password"
                 name="password"
@@ -147,12 +200,41 @@ function ServerList() {
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Порт</Form.Label>
+              <Form.Label>Порт PostgreSQL</Form.Label>
               <Form.Control
                 type="number"
                 name="port"
                 value={formData.port}
                 onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Пользователь SSH</Form.Label>
+              <Form.Control
+                name="ssh_user"
+                value={formData.ssh_user}
+                onChange={(e) => setFormData({ ...formData, ssh_user: e.target.value })}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Пароль SSH</Form.Label>
+              <Form.Control
+                type="password"
+                name="ssh_password"
+                value={formData.ssh_password}
+                onChange={(e) => setFormData({ ...formData, ssh_password: e.target.value })}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Порт SSH</Form.Label>
+              <Form.Control
+                type="number"
+                name="ssh_port"
+                value={formData.ssh_port}
+                onChange={(e) => setFormData({ ...formData, ssh_port: parseInt(e.target.value) })}
                 required
               />
             </Form.Group>
