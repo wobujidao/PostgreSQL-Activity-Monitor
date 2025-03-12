@@ -11,7 +11,13 @@ import jwt
 import bcrypt
 from datetime import datetime, timedelta, timezone
 import paramiko
-from cryptography.fernet import Fernet  # Добавлен импорт Fernet
+from cryptography.fernet import Fernet
+import logging
+import socket
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 app.add_middleware(
@@ -42,7 +48,7 @@ except Exception as e:
 class Server(BaseModel):
     name: str
     host: str
-    stats_db: Optional[str]
+    stats_db: Optional[str] = None
     user: str
     password: str
     port: int
@@ -58,6 +64,7 @@ def load_users():
         with USERS_FILE.open("r") as f:
             return json.load(f)
     except Exception as e:
+        logger.error(f"Ошибка загрузки пользователей: {e}")
         raise Exception(f"Ошибка загрузки пользователей: {e}")
 
 def verify_password(plain_password, hashed_password):
@@ -92,6 +99,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 def load_servers() -> List[Server]:
     try:
+        if not SERVERS_FILE.exists() or SERVERS_FILE.stat().st_size == 0:
+            logger.info("Файл servers.json пуст или отсутствует, возвращаем пустой список")
+            return []
         with SERVERS_FILE.open("r") as f:
             data = json.load(f)
         servers = []
@@ -101,44 +111,126 @@ def load_servers() -> List[Server]:
             servers.append(Server(**item))
         return servers
     except Exception as e:
+        logger.error(f"Ошибка загрузки серверов: {e}")
         raise Exception(f"Ошибка загрузки серверов: {e}")
 
-def connect_to_server(server: Server):
+def is_host_reachable(host, port, timeout=2):
     try:
-        conn = psycopg2.connect(host=server.host, database="postgres", user=server.user, password=server.password, port=server.port, connect_timeout=3)
-        with conn.cursor() as cur:
-            cur.execute("SHOW server_version;")
-            version = cur.fetchone()[0]
-            cur.execute("SELECT state, COUNT(*) FROM pg_stat_activity GROUP BY state;")
-            connections = dict(cur.fetchall())
-            cur.execute("SELECT pg_postmaster_start_time();")
-            start_time = cur.fetchone()[0]
-            now_utc = datetime.now(timezone.utc)
-            uptime = (now_utc - start_time).total_seconds() / 3600
-            cur.execute("SHOW data_directory;")
-            data_dir = cur.fetchone()[0]
-        conn.close()
-
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(server.host, username=server.ssh_user, password=server.ssh_password, port=server.ssh_port)
-        stdin, stdout, stderr = ssh.exec_command(f"df -B1 {data_dir}")
-        df_output = stdout.read().decode().splitlines()
-        free_space = int(df_output[1].split()[3]) if len(df_output) > 1 else None
-        ssh.close()
-
-        return {
-            "name": server.name,
-            "host": server.host,
-            "version": version,
-            "free_space": free_space,
-            "connections": {"active": connections.get("active", 0), "idle": connections.get("idle", 0)},
-            "uptime_hours": round(uptime, 2),
-            "stats_db": server.stats_db,
-            "status": "ok"
-        }
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return result == 0
     except Exception as e:
-        return {"name": server.name, "host": server.host, "version": None, "free_space": None, "status": str(e)}
+        logger.error(f"Ошибка проверки доступности {host}:{port}: {e}")
+        return False
+
+def connect_to_server(server: Server):
+    result = {
+        "name": server.name,
+        "host": server.host,
+        "user": server.user,
+        "port": server.port,
+        "ssh_user": server.ssh_user,
+        "ssh_port": server.ssh_port,
+        "has_password": bool(server.password),
+        "has_ssh_password": bool(server.ssh_password),
+        "version": None,
+        "free_space": None,
+        "connections": None,
+        "uptime_hours": None,
+        "stats_db": server.stats_db,
+        "status": "pending"
+    }
+
+    # Проверка доступности PostgreSQL
+    if not is_host_reachable(server.host, server.port):
+        logger.warning(f"Хост {server.host}:{server.port} недоступен для PostgreSQL")
+        result["status"] = "PostgreSQL: host unreachable"
+    else:
+        try:
+            logger.info(f"Попытка подключения к PostgreSQL на {server.name} ({server.host}:{server.port})")
+            conn = psycopg2.connect(
+                host=server.host,
+                database="postgres",
+                user=server.user,
+                password=server.password,
+                port=server.port,
+                connect_timeout=5
+            )
+            with conn.cursor() as cur:
+                cur.execute("SHOW server_version;")
+                result["version"] = cur.fetchone()[0]
+                cur.execute("SELECT state, COUNT(*) FROM pg_stat_activity GROUP BY state;")
+                result["connections"] = dict(cur.fetchall())
+                cur.execute("SELECT pg_postmaster_start_time();")
+                start_time = cur.fetchone()[0]
+                now_utc = datetime.now(timezone.utc)
+                result["uptime_hours"] = round((now_utc - start_time).total_seconds() / 3600, 2)
+                cur.execute("SHOW data_directory;")
+                result["data_dir"] = cur.fetchone()[0]
+            conn.close()
+            logger.info(f"Успешное подключение к PostgreSQL на {server.name}")
+            result["status"] = "ok" if result["status"] == "pending" else result["status"]
+        except socket.timeout:
+            logger.error(f"Тайм-аут PostgreSQL для {server.name}")
+            result["status"] = "PostgreSQL: timeout"
+        except Exception as e:
+            logger.error(f"Ошибка PostgreSQL для {server.name}: {e}")
+            result["status"] = f"PostgreSQL: {str(e)}"
+
+    # Проверка доступности SSH
+    if not is_host_reachable(server.host, server.ssh_port):
+        logger.warning(f"Хост {server.host}:{server.ssh_port} недоступен для SSH")
+        result["status"] = f"{result['status']} (SSH: host unreachable)" if result["status"] != "pending" else "SSH: host unreachable"
+    else:
+        try:
+            logger.info(f"Попытка подключения к SSH на {server.name} ({server.host}:{server.ssh_port})")
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                server.host,
+                username=server.ssh_user,
+                password=server.ssh_password,
+                port=server.ssh_port,
+                timeout=5,
+                banner_timeout=5,
+                auth_timeout=5
+            )
+            data_dir = result.get('data_dir', '/var/lib/postgresql')
+            # Используем родительский путь /mnt/hdd для s00-dbs10, иначе data_dir
+            if server.host == "10.110.23.69":  # Для s00-dbs10
+                cmd = "df -B1 /mnt/hdd"
+            else:
+                cmd = f"df -B1 {data_dir}"
+            stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
+            df_output = stdout.read().decode().strip().splitlines()
+            error_output = stderr.read().decode().strip()
+            logger.info(f"Вывод df для {server.name} с командой '{cmd}': {df_output}")
+            if error_output:
+                logger.warning(f"Ошибка при выполнении df для {server.name}: {error_output}")
+                result["status"] = f"{result['status']} (SSH: df error: {error_output})"
+            elif len(df_output) > 1:
+                columns = df_output[1].split()
+                if len(columns) >= 4:
+                    result["free_space"] = int(columns[3])  # Available space in bytes
+                else:
+                    logger.warning(f"Некорректный вывод df для {server.name}: {df_output[1]}")
+                    result["status"] = f"{result['status']} (SSH: invalid df output)"
+            else:
+                logger.warning(f"Пустой или недостаточный вывод df для {server.name}: {df_output}")
+                result["status"] = f"{result['status']} (SSH: no df data)"
+            ssh.close()
+            logger.info(f"Успешное подключение к SSH на {server.name}")
+            result["status"] = "ok" if result["status"] == "pending" else f"{result['status']} (SSH ok)"
+        except socket.timeout:
+            logger.error(f"Тайм-аут SSH для {server.name}")
+            result["status"] = f"{result['status']} (SSH: timeout)" if result["status"] != "pending" else "SSH: timeout"
+        except Exception as e:
+            logger.error(f"Ошибка SSH для {server.name}: {e}")
+            result["status"] = f"{result['status']} (SSH: {str(e)})" if result["status"] != "pending" else f"SSH: {str(e)}"
+
+    return result
 
 @app.get("/servers", response_model=List[dict])
 async def get_servers(current_user: dict = Depends(get_current_user)):
@@ -153,7 +245,7 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=404, detail="Server not found")
     
     try:
-        conn = psycopg2.connect(host=server.host, database="postgres", user=server.user, password=server.password, port=server.port, connect_timeout=3)
+        conn = psycopg2.connect(host=server.host, database="postgres", user=server.user, password=server.password, port=server.port, connect_timeout=5)
         with conn.cursor() as cur:
             cur.execute("SELECT pid, usename, datname, query, state FROM pg_stat_activity WHERE state IS NOT NULL;")
             queries = [{"pid": row[0], "usename": row[1], "datname": row[2], "query": row[3], "state": row[4]} for row in cur.fetchall()]
@@ -161,6 +253,81 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
         return {"queries": queries}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/servers/{server_name}")
+async def delete_server(server_name: str, current_user: dict = Depends(get_current_user)):
+    servers = load_servers()
+    updated_servers = [s for s in servers if s.name != server_name]
+    if len(updated_servers) == len(servers):
+        raise HTTPException(status_code=404, detail="Server not found")
+    with SERVERS_FILE.open("w") as f:
+        json.dump([{
+            "name": s.name,
+            "host": s.host,
+            "stats_db": s.stats_db,
+            "user": s.user,
+            "password": fernet.encrypt(s.password.encode()).decode(),
+            "port": s.port,
+            "ssh_user": s.ssh_user,
+            "ssh_password": fernet.encrypt(s.ssh_password.encode()).decode(),
+            "ssh_port": s.ssh_port
+        } for s in updated_servers], f)
+    return {"message": f"Server {server_name} deleted"}
+
+@app.put("/servers/{server_name}", response_model=dict)
+async def update_server(server_name: str, updated_server: Server, current_user: dict = Depends(get_current_user)):
+    try:
+        servers = load_servers()
+        server_index = next((i for i, s in enumerate(servers) if s.name == server_name), None)
+        if server_index is None:
+            raise HTTPException(status_code=404, detail="Server not found")
+        
+        # Обновляем данные сервера
+        servers[server_index] = updated_server
+        with SERVERS_FILE.open("w") as f:
+            json.dump([{
+                "name": s.name,
+                "host": s.host,
+                "stats_db": s.stats_db,
+                "user": s.user,
+                "password": fernet.encrypt(s.password.encode()).decode(),
+                "port": s.port,
+                "ssh_user": s.ssh_user,
+                "ssh_password": fernet.encrypt(s.ssh_password.encode()).decode(),
+                "ssh_port": s.ssh_port
+            } for s in servers], f)
+        logger.info(f"Сервер {server_name} успешно обновлён в servers.json")
+        return connect_to_server(updated_server)
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении сервера {server_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при обновлении сервера: {str(e)}")
+
+@app.post("/servers", response_model=dict)
+async def add_server(server: Server, current_user: dict = Depends(get_current_user)):
+    try:
+        servers = load_servers()
+        if any(s.name == server.name for s in servers):
+            logger.warning(f"Попытка добавить уже существующий сервер: {server.name}")
+            raise HTTPException(status_code=400, detail="Server with this name already exists")
+        logger.info(f"Добавление сервера {server.name} с хостом {server.host}")
+        servers.append(server)
+        with SERVERS_FILE.open("w") as f:
+            json.dump([{
+                "name": s.name,
+                "host": s.host,
+                "stats_db": s.stats_db,
+                "user": s.user,
+                "password": fernet.encrypt(s.password.encode()).decode(),
+                "port": s.port,
+                "ssh_user": s.ssh_user,
+                "ssh_password": fernet.encrypt(s.ssh_password.encode()).decode(),
+                "ssh_port": s.ssh_port
+            } for s in servers], f)
+        logger.info(f"Сервер {server.name} успешно добавлен в servers.json")
+        return connect_to_server(server)
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении сервера {server.name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при добавлении сервера: {str(e)}")
 
 @app.get("/favicon.ico")
 async def favicon():

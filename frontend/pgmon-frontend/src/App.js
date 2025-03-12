@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Navbar, Button } from 'react-bootstrap';
@@ -12,6 +12,29 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [backendStatus, setBackendStatus] = useState('unknown'); // Статус бэкенда
+
+  useEffect(() => {
+    const checkBackendStatus = async () => {
+      try {
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          await axios.get('http://10.110.20.55:8000/servers', {
+            headers: { Authorization: `Bearer ${storedToken}` }
+          });
+          setBackendStatus('available');
+        }
+      } catch (error) {
+        setBackendStatus('unavailable');
+      }
+    };
+
+    if (token) {
+      checkBackendStatus();
+      const interval = setInterval(checkBackendStatus, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [token]);
 
   const login = async () => {
     try {
@@ -68,7 +91,12 @@ function App() {
       <div className="App">
         <Navbar bg="dark" variant="dark">
           <Container>
-            <Navbar.Brand>PostgreSQL Monitor</Navbar.Brand>
+            <Navbar.Brand>
+              PostgreSQL Monitor
+              <span className={`backend-status ml-2 ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
+                {backendStatus === 'available' ? 'Бэкэнд доступен' : 'Бэкэнд недоступен'}
+              </span>
+            </Navbar.Brand>
             <Button variant="secondary" onClick={logout}>
               Выход
             </Button>

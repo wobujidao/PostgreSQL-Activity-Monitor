@@ -33,3 +33,20 @@ th {
 .text-danger {
   color: red;
 }
+
+.backend-status {
+  font-size: 0.9rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+
+.backend-status.available {
+  background-color: #28a745; /* Зелёный фон */
+  color: white;
+}
+
+.backend-status.unavailable {
+  background-color: #dc3545; /* Красный фон */
+  color: white;
+}

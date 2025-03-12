@@ -1,0 +1,51 @@
+.refresh-label {
+  font-size: 1.2rem;
+  margin-right: 10px;
+}
+
+.progress-circle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #4caf50 var(--progress),
+    #e0e0e0 var(--progress)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+}
+
+.progress-circle::before {
+  content: '';
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+}
+
+.progress-circle span {
+  position: relative;
+  font-size: 12px;
+  color: #333;
+}
+
+.backend-status {
+  font-size: 0.9rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+
+.backend-status.available {
+  background-color: #28a745; /* Зелёный фон */
+  color: white;
+}
+
+.backend-status.unavailable {
+  background-color: #dc3545; /* Красный фон */
+  color: white;
+}
