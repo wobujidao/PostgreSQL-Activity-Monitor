@@ -254,6 +254,81 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/server/{server_name}/stats")
+async def get_server_stats_details(server_name: str, current_user: dict = Depends(get_current_user)):
+    servers = load_servers()
+    server = next((s for s in servers if s.name == server_name), None)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    stats_db = server.stats_db or "stats_db"  # Используем stats_db из конфигурации или по умолчанию
+    result = {
+        "last_stat_update": None,
+        "total_connections": 0,
+        "total_size_mb": 0,
+        "databases": []
+    }
+
+    try:
+        # Подключаемся к stats_db для получения статистики
+        conn = psycopg2.connect(
+            host=server.host,
+            database=stats_db,
+            user=server.user,
+            password=server.password,
+            port=server.port,
+            connect_timeout=5
+        )
+        with conn.cursor() as cur:
+            # Время последнего обновления из pg_statistics
+            cur.execute("SELECT MAX(ts) FROM pg_statistics;")
+            last_update = cur.fetchone()[0]
+            result["last_stat_update"] = last_update.isoformat() if last_update else None
+
+            # Общая статистика по серверу за последний замер
+            cur.execute("""
+                SELECT SUM(numbackends), SUM(db_size::float / 1048576)
+                FROM pg_statistics
+                WHERE ts = (SELECT MAX(ts) FROM pg_statistics);
+            """)
+            stats = cur.fetchone()
+            result["total_connections"] = stats[0] or 0
+            result["total_size_mb"] = stats[1] or 0
+
+            # Список баз из статистики за последний замер
+            cur.execute("""
+                SELECT DISTINCT datname
+                FROM pg_statistics
+                WHERE ts = (SELECT MAX(ts) FROM pg_statistics);
+            """)
+            stats_dbs = [row[0] for row in cur.fetchall()]
+        conn.close()
+
+        # Проверяем существующие базы на сервере
+        conn = psycopg2.connect(
+            host=server.host,
+            database="postgres",
+            user=server.user,
+            password=server.password,
+            port=server.port,
+            connect_timeout=5
+        )
+        with conn.cursor() as cur:
+            cur.execute("SELECT datname FROM pg_database WHERE datistemplate = false;")
+            active_dbs = [row[0] for row in cur.fetchall()]
+        conn.close()
+
+        # Формируем список баз с флагом существования
+        result["databases"] = [
+            {"name": db, "exists": db in active_dbs}
+            for db in stats_dbs
+        ]
+
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики для {server_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/servers/{server_name}")
 async def delete_server(server_name: str, current_user: dict = Depends(get_current_user)):
     servers = load_servers()
