@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Container, Navbar, Button } from 'react-bootstrap';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
+import DatabaseDetails from './components/DatabaseDetails';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -12,7 +13,7 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
-  const [backendStatus, setBackendStatus] = useState('unknown'); // Статус бэкенда
+  const [backendStatus, setBackendStatus] = useState('unknown');
 
   useEffect(() => {
     const checkBackendStatus = async () => {
@@ -106,6 +107,7 @@ function App() {
           <Routes>
             <Route exact path="/" element={<ServerList />} />
             <Route path="/server/:name" element={<ServerDetails />} />
+            <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Container>

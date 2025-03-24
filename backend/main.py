@@ -143,7 +143,6 @@ def connect_to_server(server: Server):
         "status": "pending"
     }
 
-    # Проверка доступности PostgreSQL
     if not is_host_reachable(server.host, server.port):
         logger.warning(f"Хост {server.host}:{server.port} недоступен для PostgreSQL")
         result["status"] = "PostgreSQL: host unreachable"
@@ -179,7 +178,6 @@ def connect_to_server(server: Server):
             logger.error(f"Ошибка PostgreSQL для {server.name}: {e}")
             result["status"] = f"PostgreSQL: {str(e)}"
 
-    # Проверка доступности SSH
     if not is_host_reachable(server.host, server.ssh_port):
         logger.warning(f"Хост {server.host}:{server.ssh_port} недоступен для SSH")
         result["status"] = f"{result['status']} (SSH: host unreachable)" if result["status"] != "pending" else "SSH: host unreachable"
@@ -198,7 +196,6 @@ def connect_to_server(server: Server):
                 auth_timeout=5
             )
             data_dir = result.get('data_dir', '/var/lib/postgresql')
-            # Используем родительский путь /mnt/hdd для s00-dbs10, иначе data_dir
             if server.host == "10.110.23.69":  # Для s00-dbs10
                 cmd = "df -B1 /mnt/hdd"
             else:
@@ -255,22 +252,22 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/server/{server_name}/stats")
-async def get_server_stats_details(server_name: str, current_user: dict = Depends(get_current_user)):
+async def get_server_stats_details(server_name: str, start_date: Optional[str] = None, end_date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     servers = load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
 
-    stats_db = server.stats_db or "stats_db"  # Используем stats_db из конфигурации или по умолчанию
+    stats_db = server.stats_db or "stats_db"
     result = {
         "last_stat_update": None,
         "total_connections": 0,
-        "total_size_mb": 0,
-        "databases": []
+        "total_size_gb": 0,
+        "databases": [],
+        "connection_timeline": []
     }
 
     try:
-        # Подключаемся к stats_db для получения статистики
         conn = psycopg2.connect(
             host=server.host,
             database=stats_db,
@@ -280,28 +277,48 @@ async def get_server_stats_details(server_name: str, current_user: dict = Depend
             connect_timeout=5
         )
         with conn.cursor() as cur:
-            # Время последнего обновления из pg_statistics
+            # Устанавливаем диапазон дат (по умолчанию последние 7 дней)
+            if not start_date or not end_date:
+                end_date_dt = datetime.now(timezone.utc)
+                start_date_dt = end_date_dt - timedelta(days=7)
+            else:
+                start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+                end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+
+            # Время последнего обновления
             cur.execute("SELECT MAX(ts) FROM pg_statistics;")
             last_update = cur.fetchone()[0]
             result["last_stat_update"] = last_update.isoformat() if last_update else None
 
-            # Общая статистика по серверу за последний замер
+            # Общая статистика за период
             cur.execute("""
-                SELECT SUM(numbackends), SUM(db_size::float / 1048576)
+                SELECT SUM(numbackends), SUM(db_size::float / (1048576 * 1024))
                 FROM pg_statistics
-                WHERE ts = (SELECT MAX(ts) FROM pg_statistics);
-            """)
+                WHERE ts BETWEEN %s AND %s;
+            """, (start_date_dt, end_date_dt))
             stats = cur.fetchone()
             result["total_connections"] = stats[0] or 0
-            result["total_size_mb"] = stats[1] or 0
+            result["total_size_gb"] = stats[1] or 0
 
-            # Список баз из статистики за последний замер
+            # Список баз за период
             cur.execute("""
                 SELECT DISTINCT datname
                 FROM pg_statistics
-                WHERE ts = (SELECT MAX(ts) FROM pg_statistics);
-            """)
+                WHERE ts BETWEEN %s AND %s;
+            """, (start_date_dt, end_date_dt))
             stats_dbs = [row[0] for row in cur.fetchall()]
+
+            # График подключений и размеров по времени
+            cur.execute("""
+                SELECT ts, SUM(numbackends) as total_connections, SUM(db_size::float / (1048576 * 1024)) as total_size_gb
+                FROM pg_statistics
+                WHERE ts BETWEEN %s AND %s
+                GROUP BY ts
+                ORDER BY ts;
+            """, (start_date_dt, end_date_dt))
+            timeline = [{"ts": row[0].isoformat(), "total_connections": row[1], "total_size_gb": row[2] or 0} for row in cur.fetchall()]
+            result["connection_timeline"] = timeline
+
         conn.close()
 
         # Проверяем существующие базы на сервере
@@ -318,7 +335,6 @@ async def get_server_stats_details(server_name: str, current_user: dict = Depend
             active_dbs = [row[0] for row in cur.fetchall()]
         conn.close()
 
-        # Формируем список баз с флагом существования
         result["databases"] = [
             {"name": db, "exists": db in active_dbs}
             for db in stats_dbs
@@ -327,6 +343,64 @@ async def get_server_stats_details(server_name: str, current_user: dict = Depend
         return result
     except Exception as e:
         logger.error(f"Ошибка получения статистики для {server_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/server/{server_name}/db/{db_name}")
+async def get_database_stats(server_name: str, db_name: str, current_user: dict = Depends(get_current_user)):
+    servers = load_servers()
+    server = next((s for s in servers if s.name == server_name), None)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    stats_db = server.stats_db or "stats_db"
+    result = {
+        "size_mb": 0,
+        "connections": 0,
+        "commits": 0,
+        "last_update": None
+    }
+
+    try:
+        conn = psycopg2.connect(
+            host=server.host,
+            database=stats_db,
+            user=server.user,
+            password=server.password,
+            port=server.port,
+            connect_timeout=5
+        )
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT numbackends, db_size::float / 1048576, xact_commit, ts
+                FROM pg_statistics
+                WHERE datname = %s AND ts = (SELECT MAX(ts) FROM pg_statistics WHERE datname = %s);
+            """, (db_name, db_name))
+            stats = cur.fetchone()
+            if stats:
+                result["connections"] = stats[0] or 0
+                result["size_mb"] = stats[1] or 0
+                result["commits"] = stats[2] or 0
+                result["last_update"] = stats[3].isoformat() if stats[3] else None
+        conn.close()
+
+        if result["size_mb"] == 0:
+            conn = psycopg2.connect(
+                host=server.host,
+                database="postgres",
+                user=server.user,
+                password=server.password,
+                port=server.port,
+                connect_timeout=5
+            )
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_database_size(%s) / 1048576.0 AS size_mb;", (db_name,))
+                real_size = cur.fetchone()[0]
+                result["size_mb"] = real_size or 0
+            conn.close()
+
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики для базы {db_name} на сервере {server_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/servers/{server_name}")
@@ -357,7 +431,6 @@ async def update_server(server_name: str, updated_server: Server, current_user: 
         if server_index is None:
             raise HTTPException(status_code=404, detail="Server not found")
         
-        # Обновляем данные сервера
         servers[server_index] = updated_server
         with SERVERS_FILE.open("w") as f:
             json.dump([{

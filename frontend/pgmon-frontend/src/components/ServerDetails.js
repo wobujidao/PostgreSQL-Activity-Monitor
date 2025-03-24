@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Card, Table, Form, Alert, Button } from 'react-bootstrap';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip, Legend } from 'chart.js';
+import 'chartjs-adapter-date-fns';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link } from 'react-router-dom';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip, Legend);
 
 function ServerDetails() {
   const { name } = useParams();
@@ -13,8 +16,17 @@ function ServerDetails() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [hideDeleted, setHideDeleted] = useState(true);
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)); // 7 дней назад
+  const [endDate, setEndDate] = useState(new Date());
+  const connectionsChartRef = useRef(null);
+  const sizeChartRef = useRef(null);
+  const connectionsCanvasRef = useRef(null);
+  const sizeCanvasRef = useRef(null);
+  const isMounted = useRef(true);
 
   useEffect(() => {
+    isMounted.current = true;
+
     const fetchData = async () => {
       try {
         console.log('Полученный name:', name);
@@ -33,32 +45,75 @@ function ServerDetails() {
           console.log('Новый токен получен:', token);
         }
 
-        // Загрузка данных сервера
         console.log('Загрузка данных сервера...');
         const serverResponse = await axios.get('http://10.110.20.55:8000/servers', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const server = serverResponse.data.find(s => s.name === name);
         if (!server) throw new Error(`Сервер ${name} не найден`);
-        setServerData(server);
+        if (isMounted.current) setServerData(server);
         console.log('Данные сервера:', server);
 
-        // Загрузка статистики из stat_db
         console.log('Загрузка статистики для', name);
         const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
+          params: {
+            start_date: startDate.toISOString(),
+            end_date: endDate.toISOString()
+          }
         });
-        setStats(statsResponse.data);
+        if (isMounted.current) setStats(statsResponse.data);
         console.log('Статистика:', statsResponse.data);
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
-        setError(error.message || 'Неизвестная ошибка');
+        if (isMounted.current) setError(error.message || 'Неизвестная ошибка');
       }
     };
+
     fetchData();
     const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [name]);
+
+    return () => {
+      isMounted.current = false;
+      clearInterval(interval);
+    };
+  }, [name, startDate, endDate]);
+
+  useEffect(() => {
+    if (!stats || !connectionsCanvasRef.current || !sizeCanvasRef.current) return;
+
+    if (connectionsChartRef.current) {
+      connectionsChartRef.current.destroy();
+      connectionsChartRef.current = null;
+    }
+    if (sizeChartRef.current) {
+      sizeChartRef.current.destroy();
+      sizeChartRef.current = null;
+    }
+
+    connectionsChartRef.current = new Chart(connectionsCanvasRef.current.getContext('2d'), {
+      type: 'line',
+      data: connectionsChartData,
+      options: connectionsChartOptions
+    });
+
+    sizeChartRef.current = new Chart(sizeCanvasRef.current.getContext('2d'), {
+      type: 'line',
+      data: sizeChartData,
+      options: sizeChartOptions
+    });
+
+    return () => {
+      if (connectionsChartRef.current) {
+        connectionsChartRef.current.destroy();
+        connectionsChartRef.current = null;
+      }
+      if (sizeChartRef.current) {
+        sizeChartRef.current.destroy();
+        sizeChartRef.current = null;
+      }
+    };
+  }, [stats]);
 
   const formatBytes = (bytes) => bytes ? `${(bytes / 1073741824).toFixed(2)} ГБ` : 'N/A';
 
@@ -75,26 +130,88 @@ function ServerDetails() {
 
   const filteredDatabases = hideDeleted ? stats.databases.filter(db => db.exists) : stats.databases;
 
-  const chartData = {
-    labels: ['Соединения', 'Размер (МБ)'],
+  const connectionsChartData = {
     datasets: [
       {
-        label: 'Статистика сервера',
-        data: [stats.total_connections, stats.total_size_mb],
-        backgroundColor: ['rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)'],
-        borderColor: ['rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)'],
-        borderWidth: 1,
-      },
-    ],
+        label: 'Общие подключения',
+        data: stats.connection_timeline.map(data => ({
+          x: new Date(data.ts),
+          y: data.total_connections
+        })),
+        fill: false,
+        borderColor: 'rgba(75, 192, 192, 1)',
+        tension: 0.1
+      }
+    ]
   };
 
-  const chartOptions = {
+  // Фильтруем нулевые значения для графика размера баз
+  const sizeChartData = {
+    datasets: [
+      {
+        label: 'Общий размер баз (ГБ)',
+        data: stats.connection_timeline
+          .filter(data => data.total_size_gb > 0) // Оставляем только ненулевые значения
+          .map(data => ({
+            x: new Date(data.ts),
+            y: data.total_size_gb
+          })),
+        fill: false,
+        borderColor: 'rgba(153, 102, 255, 1)',
+        tension: 0.1
+      }
+    ]
+  };
+
+  const connectionsChartOptions = {
     responsive: true,
     plugins: {
       legend: { position: 'top' },
-      title: { display: true, text: `Общая статистика ${name}` },
+      title: { display: true, text: `Подключения к серверу ${name} за период` }
     },
+    scales: {
+      x: {
+        type: 'time',
+        time: {
+          unit: 'day',
+          tooltipFormat: 'dd.MM.yyyy HH:mm'
+        },
+        title: { display: true, text: 'Дата и время' }
+      },
+      y: {
+        type: 'linear',
+        title: { display: true, text: 'Количество подключений' }
+      }
+    },
+    animation: false
   };
+
+  const sizeChartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top' },
+      title: { display: true, text: `Общий размер баз ${name} за период` }
+    },
+    scales: {
+      x: {
+        type: 'time',
+        time: {
+          unit: 'day',
+          tooltipFormat: 'dd.MM.yyyy HH:mm'
+        },
+        title: { display: true, text: 'Дата и время' }
+      },
+      y: {
+        type: 'linear',
+        title: { display: true, text: 'Размер (ГБ)' }
+      }
+    },
+    animation: false
+  };
+
+  const currentConnections = serverData.connections ? (serverData.connections.active || 0) + (serverData.connections.idle || 0) : 'N/A';
+  const lastNonZeroSize = stats.connection_timeline.slice().reverse().find(entry => entry.total_size_gb > 0);
+  const currentSizeGB = lastNonZeroSize ? lastNonZeroSize.total_size_gb.toFixed(2) : 'N/A';
 
   return (
     <div className="container mt-5">
@@ -104,8 +221,39 @@ function ServerDetails() {
       <Card className="mb-4">
         <Card.Header>Статистика {name}</Card.Header>
         <Card.Body>
+          <div className="mb-3">
+            <label>Диапазон дат: </label>
+            <DatePicker
+              selected={startDate}
+              onChange={date => setStartDate(date)}
+              selectsStart
+              startDate={startDate}
+              endDate={endDate}
+              className="form-control d-inline-block mx-2"
+              dateFormat="dd.MM.yyyy"
+            />
+            <DatePicker
+              selected={endDate}
+              onChange={date => setEndDate(date)}
+              selectsEnd
+              startDate={startDate}
+              endDate={endDate}
+              minDate={startDate}
+              className="form-control d-inline-block mx-2"
+              dateFormat="dd.MM.yyyy"
+            />
+          </div>
           <p>Последнее обновление stat_db: {stats.last_stat_update || 'Нет данных'}</p>
-          <Bar data={chartData} options={chartOptions} />
+          <p>Текущие подключения: {currentConnections}</p>
+          <p>Текущий размер баз (ГБ): {currentSizeGB}</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ width: '48%' }}>
+              <canvas ref={connectionsCanvasRef} id="connectionsChart" />
+            </div>
+            <div style={{ width: '48%' }}>
+              <canvas ref={sizeCanvasRef} id="sizeChart" />
+            </div>
+          </div>
         </Card.Body>
       </Card>
 
@@ -147,7 +295,7 @@ function ServerDetails() {
             <tbody>
               {filteredDatabases.map(db => (
                 <tr key={db.name}>
-                  <td>{db.name}</td>
+                  <td><Link to={`/server/${name}/db/${db.name}`}>{db.name}</Link></td>
                   <td>{db.exists ? 'Существует' : 'Удалена'}</td>
                 </tr>
               ))}
