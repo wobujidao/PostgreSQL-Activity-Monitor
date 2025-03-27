@@ -8,7 +8,7 @@ import DatabaseDetails from './components/DatabaseDetails';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
-function App() {
+function AppContent() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -154,50 +154,54 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="App">
-        <Navbar bg="dark" variant="dark">
-          <Container>
-            <Navbar.Brand>
-              PostgreSQL Monitor
-              <span className={`backend-status ml-2 ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
-                {backendStatus === 'available' ? 'Бэкэнд доступен' : 'Бэкэнд недоступен'}
-              </span>
-            </Navbar.Brand>
-            <Button variant="secondary" onClick={logout}>
-              Выход
-            </Button>
-          </Container>
-        </Navbar>
-        <Container className="mt-5">
-          <Routes>
-            <Route exact path="/" element={<ServerList />} />
-            <Route path="/server/:name" element={<ServerDetails />} />
-            <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
+    <div className="App">
+      <Navbar bg="dark" variant="dark">
+        <Container>
+          <Navbar.Brand>
+            PostgreSQL Monitor
+            <span className={`backend-status ml-2 ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
+              {backendStatus === 'available' ? 'Бэкэнд доступен' : 'Бэкэнд недоступен'}
+            </span>
+          </Navbar.Brand>
+          <Button variant="secondary" onClick={logout}>
+            Выход
+          </Button>
         </Container>
+      </Navbar>
+      <Container className="mt-5">
+        <Routes>
+          <Route exact path="/" element={<ServerList />} />
+          <Route path="/server/:name" element={<ServerDetails />} />
+          <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Container>
 
-        {/* Модальное окно для сессии */}
-        <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false}>
-          <Modal.Header>
-            <Modal.Title>Сессия истекает</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            Время вашей сессии истекает через 5 минут. Хотите продлить сессию или выйти?
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="primary" onClick={refreshToken}>
-              Продолжить
-            </Button>
-            <Button variant="secondary" onClick={handleLogout}>
-              Выйти
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      </div>
-    </Router>
+      {/* Модальное окно для сессии */}
+      <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false}>
+        <Modal.Header>
+          <Modal.Title>Сессия истекает</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Время вашей сессии истекает через 5 минут. Хотите продлить сессию или выйти?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="primary" onClick={refreshToken}>
+            Продолжить
+          </Button>
+          <Button variant="secondary" onClick={handleLogout}>
+            Выйти
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
