@@ -1,28 +1,68 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap'; // Добавляем OverlayTrigger и Tooltip
+import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Modal } from 'react-bootstrap';
 import { Chart } from 'chart.js';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom'; // Добавляем useNavigate для редиректа
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
 function ServerDetails() {
   const { name } = useParams();
+  const navigate = useNavigate(); // Для редиректа на страницу логина
   const [serverData, setServerData] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [hideDeleted, setHideDeleted] = useState(true);
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)); // 7 дней назад
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
+  const [showSessionModal, setShowSessionModal] = useState(false); // Для модального окна
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
   const sizeCanvasRef = useRef(null);
   const isMounted = useRef(true);
+
+  // Функция декодирования JWT-токена
+  const decodeToken = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Ошибка декодирования токена:', e);
+      return null;
+    }
+  };
+
+  // Функция продления токена
+  const refreshToken = async () => {
+    try {
+      const response = await axios.post(
+        'http://10.110.20.55:8000/token',
+        'username=admin&password=admin',
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      const newToken = response.data.access_token;
+      localStorage.setItem('token', newToken);
+      setShowSessionModal(false); // Закрываем модалку после продления
+      console.log('Токен успешно продлён:', newToken);
+    } catch (error) {
+      console.error('Ошибка продления токена:', error);
+      handleLogout(); // Если не удалось продлить, выходим
+    }
+  };
+
+  // Функция выхода
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setShowSessionModal(false);
+    navigate('/login'); // Предполагаем, что страница логина на '/login'
+  };
 
   useEffect(() => {
     isMounted.current = true;
@@ -66,18 +106,43 @@ function ServerDetails() {
         console.log('Статистика:', statsResponse.data);
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
-        if (isMounted.current) setError(error.message || 'Неизвестная ошибка');
+        if (error.response && error.response.status === 401) {
+          handleLogout(); // Автоматический выход при 401
+        } else if (isMounted.current) {
+          setError(error.message || 'Неизвестная ошибка');
+        }
       }
     };
 
     fetchData();
     const interval = setInterval(fetchData, 10000);
 
+    // Проверка истечения токена
+    const checkTokenExpiration = () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const decoded = decodeToken(token);
+        if (decoded && decoded.exp) {
+          const expTime = decoded.exp * 1000; // В миллисекундах
+          const now = Date.now();
+          const fiveMinutes = 5 * 60 * 1000; // 5 минут в миллисекундах
+          if (expTime - now <= fiveMinutes && expTime > now) {
+            setShowSessionModal(true); // Показываем модалку за 5 минут до истечения
+          } else if (expTime <= now) {
+            handleLogout(); // Выходим, если токен уже истёк
+          }
+        }
+      }
+    };
+
+    const tokenCheckInterval = setInterval(checkTokenExpiration, 60000); // Проверяем каждую минуту
+
     return () => {
       isMounted.current = false;
       clearInterval(interval);
+      clearInterval(tokenCheckInterval);
     };
-  }, [name, startDate, endDate]);
+  }, [name, startDate, endDate, navigate]);
 
   useEffect(() => {
     if (!stats || !connectionsCanvasRef.current || !sizeCanvasRef.current) return;
@@ -362,6 +427,24 @@ function ServerDetails() {
           </Table>
         </Card.Body>
       </Card>
+
+      {/* Модальное окно для сессии */}
+      <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false}>
+        <Modal.Header>
+          <Modal.Title>Сессия истекает</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Время вашей сессии истекает через 5 минут. Хотите продлить сессию или выйти?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="primary" onClick={refreshToken}>
+            Продолжить
+          </Button>
+          <Button variant="secondary" onClick={handleLogout}>
+            Выйти
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }
