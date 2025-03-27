@@ -15,6 +15,7 @@ function AppContent() {
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState('unknown');
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(300); // 5 минут в секундах для отсчёта
   const navigate = useNavigate();
 
   // Декодирование JWT-токена
@@ -43,6 +44,7 @@ function AppContent() {
       setToken(newToken);
       setShowSessionModal(false);
       setBackendStatus('available');
+      setTimeLeft(300); // Сбрасываем отсчёт
       console.log('Токен успешно продлён:', newToken);
     } catch (error) {
       console.error('Ошибка продления токена:', error);
@@ -79,7 +81,9 @@ function AppContent() {
       const interval = setInterval(checkBackendStatus, 5000);
       return () => clearInterval(interval);
     }
+  }, [token]);
 
+  useEffect(() => {
     const checkTokenExpiration = () => {
       const currentToken = localStorage.getItem('token');
       if (currentToken) {
@@ -88,9 +92,11 @@ function AppContent() {
           const expTime = decoded.exp * 1000;
           const now = Date.now();
           const fiveMinutes = 5 * 60 * 1000;
-          if (expTime - now <= fiveMinutes && expTime > now) {
+          const timeRemaining = Math.floor((expTime - now) / 1000); // В секундах
+          if (timeRemaining <= 300 && timeRemaining > 0) {
             setShowSessionModal(true);
-          } else if (expTime <= now) {
+            setTimeLeft(timeRemaining);
+          } else if (timeRemaining <= 0) {
             handleLogout();
           }
         }
@@ -98,10 +104,15 @@ function AppContent() {
     };
 
     checkTokenExpiration();
-    const tokenCheckInterval = setInterval(checkTokenExpiration, 60000);
+    const tokenCheckInterval = setInterval(() => {
+      checkTokenExpiration();
+      if (showSessionModal && timeLeft > 0) {
+        setTimeLeft(prev => prev - 1); // Уменьшаем отсчёт каждую секунду
+      }
+    }, 1000); // Проверка каждую секунду для точного отсчёта
 
     return () => clearInterval(tokenCheckInterval);
-  }, [token, navigate]);
+  }, [timeLeft, showSessionModal]);
 
   const login = async () => {
     try {
@@ -121,6 +132,12 @@ function AppContent() {
   const logout = () => {
     setToken(null);
     localStorage.removeItem('token');
+  };
+
+  const formatTimeLeft = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs < 10 ? '0' + secs : secs}`;
   };
 
   if (!token) {
@@ -177,19 +194,19 @@ function AppContent() {
         </Routes>
       </Container>
 
-      {/* Модальное окно для сессии */}
+      {/* Улучшенное модальное окно */}
       <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false}>
         <Modal.Header>
           <Modal.Title>Сессия истекает</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Время вашей сессии истекает через 5 минут. Хотите продлить сессию или выйти?
+          Время вашей сессии истекает через {formatTimeLeft(timeLeft)}. Хотите продлить сессию или выйти?
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="primary" onClick={refreshToken}>
+          <Button variant="success" onClick={refreshToken}>
             Продолжить
           </Button>
-          <Button variant="secondary" onClick={handleLogout}>
+          <Button variant="danger" onClick={handleLogout}>
             Выйти
           </Button>
         </Modal.Footer>
