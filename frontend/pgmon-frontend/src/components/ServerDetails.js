@@ -125,6 +125,30 @@ function ServerDetails() {
     return `${days} д. ${hoursLeft} ч. ${minutes} мин.`;
   };
 
+  // Форматирование времени в читаемый вид
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(timestamp);
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'Europe/Moscow'
+    });
+  };
+
+  // Проверка, старше ли данные часа
+  const isDataStale = (timestamp) => {
+    if (!timestamp) return false;
+    const lastUpdate = new Date(timestamp).getTime();
+    const now = new Date().getTime();
+    const oneHourInMs = 60 * 60 * 1000; // 1 час в миллисекундах
+    return (now - lastUpdate) > oneHourInMs;
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return <div>Загрузка...</div>;
 
@@ -145,13 +169,12 @@ function ServerDetails() {
     ]
   };
 
-  // Фильтруем нулевые значения для графика размера баз
   const sizeChartData = {
     datasets: [
       {
         label: 'Общий размер баз (ГБ)',
         data: stats.connection_timeline
-          .filter(data => data.total_size_gb > 0) // Оставляем только ненулевые значения
+          .filter(data => data.total_size_gb > 0)
           .map(data => ({
             x: new Date(data.ts),
             y: data.total_size_gb
@@ -212,6 +235,9 @@ function ServerDetails() {
   const currentConnections = serverData.connections ? (serverData.connections.active || 0) + (serverData.connections.idle || 0) : 'N/A';
   const lastNonZeroSize = stats.connection_timeline.slice().reverse().find(entry => entry.total_size_gb > 0);
   const currentSizeGB = lastNonZeroSize ? lastNonZeroSize.total_size_gb.toFixed(2) : 'N/A';
+  const sizeTimestamp = lastNonZeroSize ? formatTimestamp(lastNonZeroSize.ts) : 'N/A';
+  const lastUpdateFormatted = formatTimestamp(stats.last_stat_update);
+  const isLastUpdateStale = isDataStale(stats.last_stat_update);
 
   return (
     <div className="container mt-5">
@@ -243,9 +269,11 @@ function ServerDetails() {
               dateFormat="dd.MM.yyyy"
             />
           </div>
-          <p>Последнее обновление stat_db: {stats.last_stat_update || 'Нет данных'}</p>
+          <p style={{ color: isLastUpdateStale ? 'red' : 'inherit' }}>
+            Последнее обновление stat_db: ({lastUpdateFormatted})
+          </p>
           <p>Текущие подключения: {currentConnections}</p>
-          <p>Текущий размер баз (ГБ): {currentSizeGB}</p>
+          <p>Текущий размер баз (ГБ): {currentSizeGB} (на {sizeTimestamp})</p>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={{ width: '48%' }}>
               <canvas ref={connectionsCanvasRef} id="connectionsChart" />
