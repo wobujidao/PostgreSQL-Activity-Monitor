@@ -137,6 +137,7 @@ def connect_to_server(server: Server):
         "has_ssh_password": bool(server.ssh_password),
         "version": None,
         "free_space": None,
+        "total_space": None,  # Добавляем total_space
         "connections": None,
         "uptime_hours": None,
         "stats_db": server.stats_db,
@@ -210,7 +211,8 @@ def connect_to_server(server: Server):
             elif len(df_output) > 1:
                 columns = df_output[1].split()
                 if len(columns) >= 4:
-                    result["free_space"] = int(columns[3])  # Available space in bytes
+                    result["total_space"] = int(columns[1])  # Общая ёмкость в байтах
+                    result["free_space"] = int(columns[3])   # Доступное место в байтах
                 else:
                     logger.warning(f"Некорректный вывод df для {server.name}: {df_output[1]}")
                     result["status"] = f"{result['status']} (SSH: invalid df output)"
@@ -277,7 +279,6 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
             connect_timeout=5
         )
         with conn.cursor() as cur:
-            # Устанавливаем диапазон дат (по умолчанию последние 7 дней)
             if not start_date or not end_date:
                 end_date_dt = datetime.now(timezone.utc)
                 start_date_dt = end_date_dt - timedelta(days=7)
@@ -285,12 +286,10 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
                 start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
                 end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
 
-            # Время последнего обновления
             cur.execute("SELECT MAX(ts) FROM pg_statistics;")
             last_update = cur.fetchone()[0]
             result["last_stat_update"] = last_update.isoformat() if last_update else None
 
-            # Общая статистика за период
             cur.execute("""
                 SELECT SUM(numbackends), SUM(db_size::float / (1048576 * 1024))
                 FROM pg_statistics
@@ -300,7 +299,6 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
             result["total_connections"] = stats[0] or 0
             result["total_size_gb"] = stats[1] or 0
 
-            # Список баз за период
             cur.execute("""
                 SELECT DISTINCT datname
                 FROM pg_statistics
@@ -308,7 +306,6 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
             """, (start_date_dt, end_date_dt))
             stats_dbs = [row[0] for row in cur.fetchall()]
 
-            # График подключений и размеров по времени
             cur.execute("""
                 SELECT ts, SUM(numbackends) as total_connections, SUM(db_size::float / (1048576 * 1024)) as total_size_gb
                 FROM pg_statistics
@@ -321,7 +318,6 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
 
         conn.close()
 
-        # Проверяем существующие базы на сервере
         conn = psycopg2.connect(
             host=server.host,
             database="postgres",

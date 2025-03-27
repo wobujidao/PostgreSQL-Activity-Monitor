@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Card, Table, Form, Alert, Button } from 'react-bootstrap';
+import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap'; // Добавляем OverlayTrigger и Tooltip
 import { Chart } from 'chart.js';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link } from 'react-router-dom';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
 function ServerDetails() {
   const { name } = useParams();
@@ -125,7 +125,6 @@ function ServerDetails() {
     return `${days} д. ${hoursLeft} ч. ${minutes} мин.`;
   };
 
-  // Форматирование времени в читаемый вид
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return 'N/A';
     const date = new Date(timestamp);
@@ -140,12 +139,11 @@ function ServerDetails() {
     });
   };
 
-  // Проверка, старше ли данные часа
   const isDataStale = (timestamp) => {
     if (!timestamp) return false;
     const lastUpdate = new Date(timestamp).getTime();
     const now = new Date().getTime();
-    const oneHourInMs = 60 * 60 * 1000; // 1 час в миллисекундах
+    const oneHourInMs = 60 * 60 * 1000;
     return (now - lastUpdate) > oneHourInMs;
   };
 
@@ -239,6 +237,10 @@ function ServerDetails() {
   const lastUpdateFormatted = formatTimestamp(stats.last_stat_update);
   const isLastUpdateStale = isDataStale(stats.last_stat_update);
 
+  const freeSpacePercent = serverData.free_space && serverData.total_space
+    ? (serverData.free_space / serverData.total_space * 100).toFixed(2)
+    : 0;
+
   return (
     <div className="container mt-5">
       <h2>Сервер: {serverData.name}</h2>
@@ -292,7 +294,36 @@ function ServerDetails() {
             <tbody>
               <tr><td>IP</td><td>{serverData.host}</td></tr>
               <tr><td>Версия PostgreSQL</td><td>{serverData.version || 'N/A'}</td></tr>
-              <tr><td>Свободное место</td><td>{formatBytes(serverData.free_space)}</td></tr>
+              <tr>
+                <td>Свободное место</td>
+                <td>
+                  {serverData.free_space && serverData.total_space ? (
+                    <OverlayTrigger
+                      placement="top"
+                      overlay={
+                        <Tooltip>
+                          {formatBytes(serverData.free_space)} свободно из {formatBytes(serverData.total_space)}
+                        </Tooltip>
+                      }
+                    >
+                      <ProgressBar style={{ height: '20px' }}>
+                        <ProgressBar
+                          variant="danger"
+                          now={100 - freeSpacePercent}
+                          label={`${formatBytes(serverData.total_space - serverData.free_space)} занято`}
+                        />
+                        <ProgressBar
+                          variant="success"
+                          now={freeSpacePercent}
+                          label={`${formatBytes(serverData.free_space)} свободно`}
+                        />
+                      </ProgressBar>
+                    </OverlayTrigger>
+                  ) : (
+                    formatBytes(serverData.free_space) || 'N/A'
+                  )}
+                </td>
+              </tr>
               <tr><td>Соединения</td><td>{serverData.connections ? `${serverData.connections.active} активных, ${serverData.connections.idle} простаивающих` : 'N/A'}</td></tr>
               <tr><td>Uptime</td><td>{formatUptime(serverData.uptime_hours)}</td></tr>
             </tbody>
@@ -302,7 +333,7 @@ function ServerDetails() {
 
       <Card>
         <Card.Header>
-          <div className="d-flex justify-content-between align-items-center">
+          <div className="d-flex justifyContent-between align-items-center">
             <span>Список баз данных</span>
             <Form.Check
               type="checkbox"
