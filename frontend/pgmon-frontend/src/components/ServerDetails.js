@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Dropdown, Spinner } from 'react-bootstrap';
+import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Dropdown, Spinner, Pagination } from 'react-bootstrap';
 import { Chart } from 'chart.js';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link } from 'react-router-dom';
-import debounce from 'lodash/debounce'; // Добавляем lodash для debounce
+import debounce from 'lodash/debounce';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
@@ -26,52 +26,57 @@ function ServerDetails() {
   const [nameFilter, setNameFilter] = useState('');
   const [filterType, setFilterType] = useState('contains');
   const [dateRangeLabel, setDateRangeLabel] = useState('7 дней');
-  const [loading, setLoading] = useState(false); // Индикатор загрузки
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
   const sizeCanvasRef = useRef(null);
   const isMounted = useRef(true);
 
-  // Дебounced версия fetchData
-  const debouncedFetchData = useCallback(
-    debounce(async () => {
-      try {
-        setLoading(true);
-        console.log('Полученный name:', name);
-        if (!name) throw new Error('name не определён');
+  const serverCacheKey = `serverData_${name}`;
 
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('Токен отсутствует');
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Токен отсутствует');
 
-        console.log('Загрузка данных сервера...');
+      // Проверка кэша для serverData
+      const cachedServerData = localStorage.getItem(serverCacheKey);
+      if (cachedServerData) {
+        setServerData(JSON.parse(cachedServerData));
+      } else {
         const serverResponse = await axios.get('http://10.110.20.55:8000/servers', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const server = serverResponse.data.find(s => s.name === name);
         if (!server) throw new Error(`Сервер ${name} не найден`);
-        if (isMounted.current) setServerData(server);
-        console.log('Данные сервера:', server);
-
-        console.log('Загрузка статистики для', name);
-        const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString()
-          }
-        });
-        if (isMounted.current) setStats(statsResponse.data);
-        console.log('Статистика:', statsResponse.data);
-      } catch (error) {
-        console.error('Ошибка загрузки данных:', error);
-        if (isMounted.current) setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
-      } finally {
-        if (isMounted.current) setLoading(false);
+        if (isMounted.current) {
+          setServerData(server);
+          localStorage.setItem(serverCacheKey, JSON.stringify(server));
+        }
       }
-    }, 500), // Задержка 500 мс
-    [name, startDate, endDate]
-  );
+
+      // Stats не кэшируем из-за большого размера
+      const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString()
+        }
+      });
+      if (isMounted.current) setStats(statsResponse.data);
+    } catch (error) {
+      console.error('Ошибка загрузки данных:', error);
+      if (isMounted.current) setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
+  }, [name, startDate, endDate, serverCacheKey]);
+
+  const debouncedFetchData = useCallback(debounce(fetchData, 500), [fetchData]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -79,7 +84,7 @@ function ServerDetails() {
 
     return () => {
       isMounted.current = false;
-      debouncedFetchData.cancel(); // Отмена debounce при размонтировании
+      debouncedFetchData.cancel();
     };
   }, [debouncedFetchData]);
 
@@ -195,6 +200,7 @@ function ServerDetails() {
       setSortColumn(column);
       setSortDirection('asc');
     }
+    setCurrentPage(1);
   };
 
   const setDateRange = (days, label) => {
@@ -251,6 +257,12 @@ function ServerDetails() {
 
   const activeCount = filteredDatabases.filter(db => getDatabaseConnections(db.name).length > 0).length;
   const unusedCount = filteredDatabases.filter(db => getDatabaseConnections(db.name).length === 0).length;
+
+  const totalPages = Math.ceil(filteredDatabases.length / itemsPerPage);
+  const paginatedDatabases = filteredDatabases.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const connectionsChartData = {
     datasets: [
@@ -344,6 +356,9 @@ function ServerDetails() {
     <div className="container mt-5">
       <h2>Сервер: {serverData.name}</h2>
       <Link to="/" className="btn btn-secondary mb-4">Назад к серверам</Link>
+      <Button variant="outline-primary" size="sm" className="ml-2" onClick={fetchData}>
+        Обновить данные
+      </Button>
 
       <Card className="mb-4">
         <Card.Header>Статистика {name} {loading && <Spinner animation="border" size="sm" className="ml-2" />}</Card.Header>
@@ -462,6 +477,7 @@ function ServerDetails() {
                   onClick={() => {
                     setShowNoConnections(!showNoConnections);
                     setShowStaticConnections(false);
+                    setCurrentPage(1);
                   }}
                   style={{ color: showNoConnections ? 'white' : 'inherit' }}
                 >
@@ -476,6 +492,7 @@ function ServerDetails() {
                   onClick={() => {
                     setShowStaticConnections(!showStaticConnections);
                     setShowNoConnections(false);
+                    setCurrentPage(1);
                   }}
                   style={{ color: showStaticConnections ? 'white' : 'inherit' }}
                 >
@@ -494,7 +511,7 @@ function ServerDetails() {
                   type="text"
                   placeholder="Фильтр по имени"
                   value={nameFilter}
-                  onChange={(e) => setNameFilter(e.target.value)}
+                  onChange={(e) => { setNameFilter(e.target.value); setCurrentPage(1); }}
                   style={{ width: '200px', marginRight: '10px' }}
                 />
               </OverlayTrigger>
@@ -505,10 +522,10 @@ function ServerDetails() {
                    filterType === 'endsWith' ? 'Заканчивается на' : 'Точное совпадение'}
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
-                  <Dropdown.Item onClick={() => setFilterType('startsWith')}>Начинается с</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setFilterType('contains')}>Содержит</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setFilterType('endsWith')}>Заканчивается на</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setFilterType('exact')}>Точное совпадение</Dropdown.Item>
+                  <Dropdown.Item onClick={() => { setFilterType('startsWith'); setCurrentPage(1); }}>Начинается с</Dropdown.Item>
+                  <Dropdown.Item onClick={() => { setFilterType('contains'); setCurrentPage(1); }}>Содержит</Dropdown.Item>
+                  <Dropdown.Item onClick={() => { setFilterType('endsWith'); setCurrentPage(1); }}>Заканчивается на</Dropdown.Item>
+                  <Dropdown.Item onClick={() => { setFilterType('exact'); setCurrentPage(1); }}>Точное совпадение</Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
               <OverlayTrigger placement="top" overlay={<Tooltip>Очистить фильтр по имени</Tooltip>}>
@@ -516,7 +533,7 @@ function ServerDetails() {
                   variant="outline-danger"
                   size="sm"
                   className="ml-2"
-                  onClick={() => setNameFilter('')}
+                  onClick={() => { setNameFilter(''); setCurrentPage(1); }}
                 >
                   Очистить
                 </Button>
@@ -538,7 +555,7 @@ function ServerDetails() {
               </tr>
             </thead>
             <tbody>
-              {filteredDatabases.map(db => (
+              {paginatedDatabases.map(db => (
                 <tr key={db.name}>
                   <td><Link to={`/server/${name}/db/${db.name}`}>{db.name}</Link></td>
                   <td>{formatSize(getDatabaseSize(db.name))}</td>
@@ -547,6 +564,23 @@ function ServerDetails() {
               ))}
             </tbody>
           </Table>
+          {totalPages > 1 && (
+            <Pagination className="justify-content-center mt-3">
+              <Pagination.First onClick={() => setCurrentPage(1)} disabled={currentPage === 1} />
+              <Pagination.Prev onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} />
+              {[...Array(totalPages)].map((_, i) => (
+                <Pagination.Item
+                  key={i + 1}
+                  active={i + 1 === currentPage}
+                  onClick={() => setCurrentPage(i + 1)}
+                >
+                  {i + 1}
+                </Pagination.Item>
+              ))}
+              <Pagination.Next onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} />
+              <Pagination.Last onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} />
+            </Pagination>
+          )}
         </Card.Body>
       </Card>
     </div>
