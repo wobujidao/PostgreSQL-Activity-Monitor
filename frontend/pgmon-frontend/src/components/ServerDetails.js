@@ -20,8 +20,8 @@ function ServerDetails() {
   const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
-  const [sortColumn, setSortColumn] = useState('name'); // Столбец сортировки
-  const [sortDirection, setSortDirection] = useState('asc'); // Направление: 'asc' или 'desc'
+  const [sortColumn, setSortColumn] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -162,7 +162,7 @@ function ServerDetails() {
       connections: data.connections,
       size_gb: data.size_gb
     }));
-職場
+  };
 
   // Функция проверки активности подключений для базы
   const getDatabaseConnections = (dbName) => {
