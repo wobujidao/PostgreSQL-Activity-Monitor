@@ -43,7 +43,6 @@ function ServerDetails() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Токен отсутствует');
 
-      // Проверка кэша для serverData
       const cachedServerData = localStorage.getItem(serverCacheKey);
       if (cachedServerData) {
         setServerData(JSON.parse(cachedServerData));
@@ -59,7 +58,6 @@ function ServerDetails() {
         }
       }
 
-      // Stats не кэшируем из-за большого размера
       const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
@@ -356,12 +354,16 @@ function ServerDetails() {
     <div className="container mt-5">
       <h2>Сервер: {serverData.name}</h2>
       <Link to="/" className="btn btn-secondary mb-4">Назад к серверам</Link>
-      <Button variant="outline-primary" size="sm" className="ml-2" onClick={fetchData}>
-        Обновить данные
-      </Button>
 
       <Card className="mb-4">
-        <Card.Header>Статистика {name} {loading && <Spinner animation="border" size="sm" className="ml-2" />}</Card.Header>
+        <Card.Header>
+          <div className="d-flex justify-content-between align-items-center">
+            <span>Статистика {name} {loading && <Spinner animation="border" size="sm" className="ml-2" />}</span>
+            <Button variant="outline-primary" size="sm" onClick={fetchData}>
+              Обновить данные
+            </Button>
+          </div>
+        </Card.Header>
         <Card.Body>
           <div className="mb-3">
             <label>Диапазон дат: </label>
