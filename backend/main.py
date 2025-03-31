@@ -32,7 +32,7 @@ app.add_middleware(
 # Конфигурация
 SECRET_KEY = "mtttDjjZ4VlgntKph8mI3eSVFEgGDVfiVlGyGfXOq9I"
 ALGORITHM = "HS256"
-TOKEN_EXPIRATION = 30
+TOKEN_EXPIRATION = 60
 CONFIG_DIR = Path("/etc/pg_activity_monitor")
 SERVERS_FILE = CONFIG_DIR / "servers.json"
 USERS_FILE = CONFIG_DIR / "users.json"

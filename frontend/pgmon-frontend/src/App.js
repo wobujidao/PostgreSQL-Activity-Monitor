@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Navbar, Button, Modal } from 'react-bootstrap';
+import { Container, Navbar, Button, Modal, Spinner } from 'react-bootstrap';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
 import DatabaseDetails from './components/DatabaseDetails';
@@ -16,7 +16,11 @@ function AppContent() {
   const [backendStatus, setBackendStatus] = useState('unknown');
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 минут в секундах для отсчёта
+  const [isRefreshing, setIsRefreshing] = useState(false); // Индикатор загрузки
   const navigate = useNavigate();
+
+  const TOKEN_EXPIRATION_MS = 60 * 60 * 1000; // 60 минут
+  const WARNING_TIME_MS = 5 * 60 * 1000; // 5 минут до истечения
 
   // Декодирование JWT-токена
   const decodeToken = (token) => {
@@ -33,22 +37,24 @@ function AppContent() {
 
   // Продление токена
   const refreshToken = async () => {
+    setIsRefreshing(true);
     try {
-      const response = await axios.post(
-        'http://10.110.20.55:8000/token',
-        `username=${username}&password=${password}`,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
+      const currentToken = localStorage.getItem('token');
+      const response = await axios.post('http://10.110.20.55:8000/token', {}, {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
       const newToken = response.data.access_token;
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setShowSessionModal(false);
+      setTimeLeft(300);
       setBackendStatus('available');
-      setTimeLeft(300); // Сбрасываем отсчёт
       console.log('Токен успешно продлён:', newToken);
     } catch (error) {
       console.error('Ошибка продления токена:', error);
       handleLogout();
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -91,7 +97,6 @@ function AppContent() {
         if (decoded && decoded.exp) {
           const expTime = decoded.exp * 1000;
           const now = Date.now();
-          const fiveMinutes = 5 * 60 * 1000;
           const timeRemaining = Math.floor((expTime - now) / 1000); // В секундах
           if (timeRemaining <= 300 && timeRemaining > 0) {
             setShowSessionModal(true);
@@ -107,11 +112,32 @@ function AppContent() {
     const tokenCheckInterval = setInterval(() => {
       checkTokenExpiration();
       if (showSessionModal && timeLeft > 0) {
-        setTimeLeft(prev => prev - 1); // Уменьшаем отсчёт каждую секунду
+        setTimeLeft(prev => prev - 1);
       }
-    }, 1000); // Проверка каждую секунду для точного отсчёта
+    }, 1000);
 
-    return () => clearInterval(tokenCheckInterval);
+    // Автоматическое продление при активности
+    const handleActivity = () => {
+      const currentToken = localStorage.getItem('token');
+      if (currentToken) {
+        const decoded = decodeToken(currentToken);
+        if (decoded && decoded.exp) {
+          const expTime = decoded.exp * 1000;
+          const now = Date.now();
+          if (expTime - now < WARNING_TIME_MS) {
+            refreshToken();
+          }
+        }
+      }
+    };
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+
+    return () => {
+      clearInterval(tokenCheckInterval);
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+    };
   }, [timeLeft, showSessionModal]);
 
   const login = async () => {
@@ -127,11 +153,6 @@ function AppContent() {
     } catch (err) {
       setError('Ошибка авторизации: ' + (err.response?.data?.detail || 'Неизвестная ошибка'));
     }
-  };
-
-  const logout = () => {
-    setToken(null);
-    localStorage.removeItem('token');
   };
 
   const formatTimeLeft = (seconds) => {
@@ -180,7 +201,7 @@ function AppContent() {
               {backendStatus === 'available' ? 'Бэкэнд доступен' : 'Бэкэнд недоступен'}
             </span>
           </Navbar.Brand>
-          <Button variant="secondary" onClick={logout}>
+          <Button variant="secondary" onClick={handleLogout}>
             Выход
           </Button>
         </Container>
@@ -194,7 +215,6 @@ function AppContent() {
         </Routes>
       </Container>
 
-      {/* Улучшенное модальное окно */}
       <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false}>
         <Modal.Header>
           <Modal.Title>Сессия истекает</Modal.Title>
@@ -203,8 +223,8 @@ function AppContent() {
           Время вашей сессии истекает через {formatTimeLeft(timeLeft)}. Хотите продлить сессию или выйти?
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="success" onClick={refreshToken}>
-            Продолжить
+          <Button variant="success" onClick={refreshToken} disabled={isRefreshing}>
+            {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Продолжить'}
           </Button>
           <Button variant="danger" onClick={handleLogout}>
             Выйти
