@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Dropdown } from 'react-bootstrap';
+import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Dropdown, Spinner } from 'react-bootstrap';
 import { Chart } from 'chart.js';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link } from 'react-router-dom';
+import debounce from 'lodash/debounce'; // Добавляем lodash для debounce
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
@@ -24,18 +25,19 @@ function ServerDetails() {
   const [sortDirection, setSortDirection] = useState('desc');
   const [nameFilter, setNameFilter] = useState('');
   const [filterType, setFilterType] = useState('contains');
-  const [dateRangeLabel, setDateRangeLabel] = useState('7 дней'); // По умолчанию
+  const [dateRangeLabel, setDateRangeLabel] = useState('7 дней');
+  const [loading, setLoading] = useState(false); // Индикатор загрузки
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
   const sizeCanvasRef = useRef(null);
   const isMounted = useRef(true);
 
-  useEffect(() => {
-    isMounted.current = true;
-
-    const fetchData = async () => {
+  // Дебounced версия fetchData
+  const debouncedFetchData = useCallback(
+    debounce(async () => {
       try {
+        setLoading(true);
         console.log('Полученный name:', name);
         if (!name) throw new Error('name не определён');
 
@@ -64,17 +66,22 @@ function ServerDetails() {
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         if (isMounted.current) setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
+      } finally {
+        if (isMounted.current) setLoading(false);
       }
-    };
+    }, 500), // Задержка 500 мс
+    [name, startDate, endDate]
+  );
 
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
+  useEffect(() => {
+    isMounted.current = true;
+    debouncedFetchData();
 
     return () => {
       isMounted.current = false;
-      clearInterval(interval);
+      debouncedFetchData.cancel(); // Отмена debounce при размонтировании
     };
-  }, [name, startDate, endDate]);
+  }, [debouncedFetchData]);
 
   useEffect(() => {
     if (!stats || !connectionsCanvasRef.current || !sizeCanvasRef.current) return;
@@ -190,7 +197,6 @@ function ServerDetails() {
     }
   };
 
-  // Быстрые диапазоны дат
   const setDateRange = (days, label) => {
     const end = new Date();
     const start = new Date();
@@ -201,7 +207,13 @@ function ServerDetails() {
   };
 
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
-  if (!serverData || !stats) return <div>Загрузка...</div>;
+  if (!serverData || !stats) return (
+    <div className="text-center mt-5">
+      <Spinner animation="border" role="status">
+        <span className="sr-only">Загрузка...</span>
+      </Spinner>
+    </div>
+  );
 
   const aggregatedTimeline = getAggregatedTimeline();
   const allDatabases = stats.databases;
@@ -236,6 +248,9 @@ function ServerDetails() {
     }
     return 0;
   });
+
+  const activeCount = filteredDatabases.filter(db => getDatabaseConnections(db.name).length > 0).length;
+  const unusedCount = filteredDatabases.filter(db => getDatabaseConnections(db.name).length === 0).length;
 
   const connectionsChartData = {
     datasets: [
@@ -331,7 +346,7 @@ function ServerDetails() {
       <Link to="/" className="btn btn-secondary mb-4">Назад к серверам</Link>
 
       <Card className="mb-4">
-        <Card.Header>Статистика {name}</Card.Header>
+        <Card.Header>Статистика {name} {loading && <Spinner animation="border" size="sm" className="ml-2" />}</Card.Header>
         <Card.Body>
           <div className="mb-3">
             <label>Диапазон дат: </label>
@@ -395,11 +410,7 @@ function ServerDetails() {
                   {serverData.free_space && serverData.total_space ? (
                     <OverlayTrigger
                       placement="top"
-                      overlay={
-                        <Tooltip>
-                          {formatBytes(serverData.free_space)} свободно из {formatBytes(serverData.total_space)}
-                        </Tooltip>
-                      }
+                      overlay={<Tooltip>{formatBytes(serverData.free_space)} свободно из {formatBytes(serverData.total_space)}</Tooltip>}
                     >
                       <ProgressBar style={{ height: '20px' }}>
                         <ProgressBar
@@ -433,70 +444,85 @@ function ServerDetails() {
               Список баз данных ({allDatabases.length} всего, {filteredDatabases.length} отфильтровано)
             </span>
             <div>
-              <Form.Check
-                inline
-                type="checkbox"
-                label="Не показывать удалённые базы"
-                checked={hideDeleted}
-                onChange={(e) => setHideDeleted(e.target.checked)}
-                className="ml-2"
-              />
-              <Button
-                variant={showNoConnections ? 'primary' : 'outline-primary'}
-                size="sm"
-                className="ml-2"
-                onClick={() => {
-                  setShowNoConnections(!showNoConnections);
-                  setShowStaticConnections(false);
-                }}
-              >
-                Без подключений
-              </Button>
-              <Button
-                variant={showStaticConnections ? 'primary' : 'outline-primary'}
-                size="sm"
-                className="ml-2"
-                onClick={() => {
-                  setShowStaticConnections(!showStaticConnections);
-                  setShowNoConnections(false);
-                }}
-              >
-                Неизменные подключения
-              </Button>
+              <OverlayTrigger placement="top" overlay={<Tooltip>Скрыть удалённые базы</Tooltip>}>
+                <Form.Check
+                  inline
+                  type="checkbox"
+                  label="Не показывать удалённые базы"
+                  checked={hideDeleted}
+                  onChange={(e) => setHideDeleted(e.target.checked)}
+                  className="ml-2"
+                />
+              </OverlayTrigger>
+              <OverlayTrigger placement="top" overlay={<Tooltip>Показать базы без активных подключений</Tooltip>}>
+                <Button
+                  variant={showNoConnections ? 'primary' : 'outline-primary'}
+                  size="sm"
+                  className="ml-2"
+                  onClick={() => {
+                    setShowNoConnections(!showNoConnections);
+                    setShowStaticConnections(false);
+                  }}
+                  style={{ color: showNoConnections ? 'white' : 'inherit' }}
+                >
+                  Без подключений
+                </Button>
+              </OverlayTrigger>
+              <OverlayTrigger placement="top" overlay={<Tooltip>Показать базы с неизменным числом подключений</Tooltip>}>
+                <Button
+                  variant={showStaticConnections ? 'primary' : 'outline-primary'}
+                  size="sm"
+                  className="ml-2"
+                  onClick={() => {
+                    setShowStaticConnections(!showStaticConnections);
+                    setShowNoConnections(false);
+                  }}
+                  style={{ color: showStaticConnections ? 'white' : 'inherit' }}
+                >
+                  Неизменные подключения
+                </Button>
+              </OverlayTrigger>
             </div>
           </div>
         </Card.Header>
         <Card.Body>
-          <Form inline className="mb-3 d-flex align-items-center">
-            <Form.Control
-              type="text"
-              placeholder="Фильтр по имени"
-              value={nameFilter}
-              onChange={(e) => setNameFilter(e.target.value)}
-              style={{ width: '200px', marginRight: '10px' }}
-            />
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-secondary" size="sm">
-                {filterType === 'startsWith' ? 'Начинается с' : 
-                 filterType === 'contains' ? 'Содержит' : 
-                 filterType === 'endsWith' ? 'Заканчивается на' : 'Точное совпадение'}
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                <Dropdown.Item onClick={() => setFilterType('startsWith')}>Начинается с</Dropdown.Item>
-                <Dropdown.Item onClick={() => setFilterType('contains')}>Содержит</Dropdown.Item>
-                <Dropdown.Item onClick={() => setFilterType('endsWith')}>Заканчивается на</Dropdown.Item>
-                <Dropdown.Item onClick={() => setFilterType('exact')}>Точное совпадение</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              className="ml-2"
-              onClick={() => setNameFilter('')}
-            >
-              Очистить
-            </Button>
-          </Form>
+          <div className="mb-3">
+            <p>Итоги: Всего баз: {filteredDatabases.length}, Активных: {activeCount}, Неиспользуемых: {unusedCount}</p>
+            <Form inline className="d-flex align-items-center">
+              <OverlayTrigger placement="top" overlay={<Tooltip>Введите имя базы для фильтрации</Tooltip>}>
+                <Form.Control
+                  type="text"
+                  placeholder="Фильтр по имени"
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  style={{ width: '200px', marginRight: '10px' }}
+                />
+              </OverlayTrigger>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" size="sm">
+                  {filterType === 'startsWith' ? 'Начинается с' : 
+                   filterType === 'contains' ? 'Содержит' : 
+                   filterType === 'endsWith' ? 'Заканчивается на' : 'Точное совпадение'}
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item onClick={() => setFilterType('startsWith')}>Начинается с</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setFilterType('contains')}>Содержит</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setFilterType('endsWith')}>Заканчивается на</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setFilterType('exact')}>Точное совпадение</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+              <OverlayTrigger placement="top" overlay={<Tooltip>Очистить фильтр по имени</Tooltip>}>
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  className="ml-2"
+                  onClick={() => setNameFilter('')}
+                >
+                  Очистить
+                </Button>
+              </OverlayTrigger>
+            </Form>
+          </div>
           <Table striped bordered hover>
             <thead>
               <tr>
