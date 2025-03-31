@@ -177,7 +177,7 @@ function ServerDetails() {
     const sizes = stats.connection_timeline
       .filter(entry => entry.datname === dbName)
       .map(entry => entry.size_gb);
-    return sizes.length > 0 ? Math.max(...sizes) : null; // Берем максимальный размер за период
+    return sizes.length > 0 ? Math.max(...sizes) : null;
   };
 
   const handleSort = (column) => {
@@ -407,7 +407,9 @@ function ServerDetails() {
       <Card>
         <Card.Header>
           <div className="d-flex justify-content-between align-items-center">
-            <span>Список баз данных ({allDatabases.length} всего, {filteredDatabases.length} отфильтровано)</span>
+            <span style={{ color: nameFilter ? 'blue' : 'inherit' }}>
+              Список баз данных ({allDatabases.length} всего, {filteredDatabases.length} отфильтровано)
+            </span>
             <div>
               <Form inline className="d-flex align-items-center">
                 <Form.Control
