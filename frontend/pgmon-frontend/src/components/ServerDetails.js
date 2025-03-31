@@ -20,6 +20,8 @@ function ServerDetails() {
   const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
+  const [sortColumn, setSortColumn] = useState('name'); // Столбец сортировки
+  const [sortDirection, setSortDirection] = useState('asc'); // Направление: 'asc' или 'desc'
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -160,7 +162,7 @@ function ServerDetails() {
       connections: data.connections,
       size_gb: data.size_gb
     }));
-  };
+職場
 
   // Функция проверки активности подключений для базы
   const getDatabaseConnections = (dbName) => {
@@ -179,6 +181,16 @@ function ServerDetails() {
     return lastEntry ? lastEntry.size_gb : null;
   };
 
+  // Обработчик сортировки
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return <div>Загрузка...</div>;
 
@@ -193,6 +205,17 @@ function ServerDetails() {
       return connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0);
     }
     return true;
+  }).sort((a, b) => {
+    if (sortColumn === 'name') {
+      return sortDirection === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    } else if (sortColumn === 'size') {
+      const sizeA = getDatabaseSize(a.name) || 0;
+      const sizeB = getDatabaseSize(b.name) || 0;
+      return sortDirection === 'asc' ? sizeA - sizeB : sizeB - sizeA;
+    } else if (sortColumn === 'status') {
+      return sortDirection === 'asc' ? (a.exists === b.exists ? 0 : a.exists ? -1 : 1) : (a.exists === b.exists ? 0 : a.exists ? 1 : -1);
+    }
+    return 0;
   });
 
   const connectionsChartData = {
@@ -414,9 +437,15 @@ function ServerDetails() {
           <Table striped bordered hover>
             <thead>
               <tr>
-                <th>Название базы</th>
-                <th>Размер</th>
-                <th>Статус</th>
+                <th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>
+                  Название базы {sortColumn === 'name' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th onClick={() => handleSort('size')} style={{ cursor: 'pointer' }}>
+                  Размер {sortColumn === 'size' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
+                  Статус {sortColumn === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </th>
               </tr>
             </thead>
             <tbody>
