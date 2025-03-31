@@ -132,6 +132,8 @@ function ServerDetails() {
     });
   };
 
+  const formatSize = (sizeGb) => sizeGb !== null && sizeGb !== undefined ? `${sizeGb.toFixed(2)} ГБ` : 'N/A';
+
   const isDataStale = (timestamp) => {
     if (!timestamp) return false;
     const lastUpdate = new Date(timestamp).getTime();
@@ -168,12 +170,22 @@ function ServerDetails() {
       .map(entry => entry.connections);
   };
 
+  // Функция для получения текущего размера базы
+  const getDatabaseSize = (dbName) => {
+    if (!stats || !stats.connection_timeline) return null;
+    const lastEntry = stats.connection_timeline
+      .filter(entry => entry.datname === dbName)
+      .sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
+    return lastEntry ? lastEntry.size_gb : null;
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return <div>Загрузка...</div>;
 
   // Агрегированные данные для графиков и текущего размера
   const aggregatedTimeline = getAggregatedTimeline();
-  const filteredDatabases = stats.databases.filter(db => {
+  const allDatabases = stats.databases;
+  const filteredDatabases = allDatabases.filter(db => {
     const connections = getDatabaseConnections(db.name);
     if (hideDeleted && !db.exists) return false;
     if (showNoConnections) return connections.length === 0 || connections.every(conn => conn === 0);
@@ -364,18 +376,14 @@ function ServerDetails() {
       <Card>
         <Card.Header>
           <div className="d-flex justify-content-between align-items-center">
-            <span>Список баз данных</span>
+            <span>Список баз данных ({allDatabases.length} всего, {filteredDatabases.length} отфильтровано)</span>
             <div>
               <Form.Check
                 inline
                 type="checkbox"
                 label="Не показывать удалённые базы"
                 checked={hideDeleted}
-                onChange={(e) => {
-                  setHideDeleted(e.target.checked);
-                  setShowNoConnections(false);
-                  setShowStaticConnections(false);
-                }}
+                onChange={(e) => setHideDeleted(e.target.checked)}
               />
               <Button
                 variant={showNoConnections ? 'primary' : 'outline-primary'}
@@ -384,7 +392,6 @@ function ServerDetails() {
                 onClick={() => {
                   setShowNoConnections(!showNoConnections);
                   setShowStaticConnections(false);
-                  setHideDeleted(false);
                 }}
               >
                 Без подключений
@@ -396,7 +403,6 @@ function ServerDetails() {
                 onClick={() => {
                   setShowStaticConnections(!showStaticConnections);
                   setShowNoConnections(false);
-                  setHideDeleted(false);
                 }}
               >
                 Неизменные подключения
@@ -409,6 +415,7 @@ function ServerDetails() {
             <thead>
               <tr>
                 <th>Название базы</th>
+                <th>Размер</th>
                 <th>Статус</th>
               </tr>
             </thead>
@@ -416,7 +423,8 @@ function ServerDetails() {
               {filteredDatabases.map(db => (
                 <tr key={db.name}>
                   <td><Link to={`/server/${name}/db/${db.name}`}>{db.name}</Link></td>
-                  <td>{db.exists ? 'Существует' : 'Удалена'}</td>
+                  <td>{formatSize(getDatabaseSize(db.name))}</td>
+                  <td>{db.exists ? '✅' : '❌'}</td>
                 </tr>
               ))}
             </tbody>
