@@ -20,10 +20,10 @@ function ServerDetails() {
   const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
-  const [sortColumn, setSortColumn] = useState('size'); // По умолчанию сортировка по размеру
-  const [sortDirection, setSortDirection] = useState('desc'); // По убыванию
-  const [nameFilter, setNameFilter] = useState(''); // Фильтр по имени
-  const [filterType, setFilterType] = useState('contains'); // Тип фильтрации
+  const [sortColumn, setSortColumn] = useState('size');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [nameFilter, setNameFilter] = useState('');
+  const [filterType, setFilterType] = useState('contains');
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -174,10 +174,10 @@ function ServerDetails() {
 
   const getDatabaseSize = (dbName) => {
     if (!stats || !stats.connection_timeline) return null;
-    const lastEntry = stats.connection_timeline
+    const sizes = stats.connection_timeline
       .filter(entry => entry.datname === dbName)
-      .sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
-    return lastEntry ? lastEntry.size_gb : null;
+      .map(entry => entry.size_gb);
+    return sizes.length > 0 ? Math.max(...sizes) : null; // Берем максимальный размер за период
   };
 
   const handleSort = (column) => {
