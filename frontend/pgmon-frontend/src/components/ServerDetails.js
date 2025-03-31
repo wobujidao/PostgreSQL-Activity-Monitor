@@ -16,6 +16,8 @@ function ServerDetails() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [hideDeleted, setHideDeleted] = useState(true);
+  const [showNoConnections, setShowNoConnections] = useState(false);
+  const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
   const connectionsChartRef = useRef(null);
@@ -56,7 +58,7 @@ function ServerDetails() {
         console.log('Статистика:', statsResponse.data);
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
-        if (isMounted.current) setError(error.message || 'Неизвестная ошибка');
+        if (isMounted.current) setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
       }
     };
 
@@ -138,18 +140,56 @@ function ServerDetails() {
     return (now - lastUpdate) > oneHourInMs;
   };
 
+  // Функция для получения агрегированных данных по времени
+  const getAggregatedTimeline = () => {
+    if (!stats || !stats.connection_timeline) return [];
+    const timelineMap = new Map();
+    stats.connection_timeline.forEach(entry => {
+      const ts = entry.ts;
+      if (!timelineMap.has(ts)) {
+        timelineMap.set(ts, { connections: 0, size_gb: 0 });
+      }
+      const agg = timelineMap.get(ts);
+      agg.connections += entry.connections || 0;
+      agg.size_gb += entry.size_gb || 0;
+    });
+    return Array.from(timelineMap.entries()).map(([ts, data]) => ({
+      ts,
+      connections: data.connections,
+      size_gb: data.size_gb
+    }));
+  };
+
+  // Функция проверки активности подключений для базы
+  const getDatabaseConnections = (dbName) => {
+    if (!stats || !stats.connection_timeline) return [];
+    return stats.connection_timeline
+      .filter(entry => entry.datname === dbName)
+      .map(entry => entry.connections);
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return <div>Загрузка...</div>;
 
-  const filteredDatabases = hideDeleted ? stats.databases.filter(db => db.exists) : stats.databases;
+  // Агрегированные данные для графиков и текущего размера
+  const aggregatedTimeline = getAggregatedTimeline();
+  const filteredDatabases = stats.databases.filter(db => {
+    const connections = getDatabaseConnections(db.name);
+    if (hideDeleted && !db.exists) return false;
+    if (showNoConnections) return connections.length === 0 || connections.every(conn => conn === 0);
+    if (showStaticConnections) {
+      return connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0);
+    }
+    return true;
+  });
 
   const connectionsChartData = {
     datasets: [
       {
         label: 'Общие подключения',
-        data: stats.connection_timeline.map(data => ({
+        data: aggregatedTimeline.map(data => ({
           x: new Date(data.ts),
-          y: data.total_connections
+          y: data.connections
         })),
         fill: false,
         borderColor: 'rgba(75, 192, 192, 1)',
@@ -162,11 +202,11 @@ function ServerDetails() {
     datasets: [
       {
         label: 'Общий размер баз (ГБ)',
-        data: stats.connection_timeline
-          .filter(data => data.total_size_gb > 0)
+        data: aggregatedTimeline
+          .filter(data => data.size_gb > 0)
           .map(data => ({
             x: new Date(data.ts),
-            y: data.total_size_gb
+            y: data.size_gb
           })),
         fill: false,
         borderColor: 'rgba(153, 102, 255, 1)',
@@ -222,8 +262,8 @@ function ServerDetails() {
   };
 
   const currentConnections = serverData.connections ? (serverData.connections.active || 0) + (serverData.connections.idle || 0) : 'N/A';
-  const lastNonZeroSize = stats.connection_timeline.slice().reverse().find(entry => entry.total_size_gb > 0);
-  const currentSizeGB = lastNonZeroSize ? lastNonZeroSize.total_size_gb.toFixed(2) : 'N/A';
+  const lastNonZeroSize = aggregatedTimeline.slice().reverse().find(entry => entry.size_gb > 0);
+  const currentSizeGB = lastNonZeroSize ? lastNonZeroSize.size_gb.toFixed(2) : 'N/A';
   const sizeTimestamp = lastNonZeroSize ? formatTimestamp(lastNonZeroSize.ts) : 'N/A';
   const lastUpdateFormatted = formatTimestamp(stats.last_stat_update);
   const isLastUpdateStale = isDataStale(stats.last_stat_update);
@@ -325,12 +365,43 @@ function ServerDetails() {
         <Card.Header>
           <div className="d-flex justify-content-between align-items-center">
             <span>Список баз данных</span>
-            <Form.Check
-              type="checkbox"
-              label="Не показывать удалённые базы"
-              checked={hideDeleted}
-              onChange={(e) => setHideDeleted(e.target.checked)}
-            />
+            <div>
+              <Form.Check
+                inline
+                type="checkbox"
+                label="Не показывать удалённые базы"
+                checked={hideDeleted}
+                onChange={(e) => {
+                  setHideDeleted(e.target.checked);
+                  setShowNoConnections(false);
+                  setShowStaticConnections(false);
+                }}
+              />
+              <Button
+                variant={showNoConnections ? 'primary' : 'outline-primary'}
+                size="sm"
+                className="ml-2"
+                onClick={() => {
+                  setShowNoConnections(!showNoConnections);
+                  setShowStaticConnections(false);
+                  setHideDeleted(false);
+                }}
+              >
+                Без подключений
+              </Button>
+              <Button
+                variant={showStaticConnections ? 'primary' : 'outline-primary'}
+                size="sm"
+                className="ml-2"
+                onClick={() => {
+                  setShowStaticConnections(!showStaticConnections);
+                  setShowNoConnections(false);
+                  setHideDeleted(false);
+                }}
+              >
+                Неизменные подключения
+              </Button>
+            </div>
           </div>
         </Card.Header>
         <Card.Body>
