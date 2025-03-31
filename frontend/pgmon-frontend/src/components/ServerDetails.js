@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Dropdown } from 'react-bootstrap';
 import { Chart } from 'chart.js';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
@@ -20,8 +20,10 @@ function ServerDetails() {
   const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
-  const [sortColumn, setSortColumn] = useState('name');
-  const [sortDirection, setSortDirection] = useState('asc');
+  const [sortColumn, setSortColumn] = useState('size'); // По умолчанию сортировка по размеру
+  const [sortDirection, setSortDirection] = useState('desc'); // По убыванию
+  const [nameFilter, setNameFilter] = useState(''); // Фильтр по имени
+  const [filterType, setFilterType] = useState('contains'); // Тип фильтрации
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -144,7 +146,6 @@ function ServerDetails() {
     return (now - lastUpdate) > oneHourInMs;
   };
 
-  // Функция для получения агрегированных данных по времени
   const getAggregatedTimeline = () => {
     if (!stats || !stats.connection_timeline) return [];
     const timelineMap = new Map();
@@ -164,7 +165,6 @@ function ServerDetails() {
     }));
   };
 
-  // Функция проверки активности подключений для базы
   const getDatabaseConnections = (dbName) => {
     if (!stats || !stats.connection_timeline) return [];
     return stats.connection_timeline
@@ -172,7 +172,6 @@ function ServerDetails() {
       .map(entry => entry.connections);
   };
 
-  // Функция для получения текущего размера базы
   const getDatabaseSize = (dbName) => {
     if (!stats || !stats.connection_timeline) return null;
     const lastEntry = stats.connection_timeline
@@ -181,7 +180,6 @@ function ServerDetails() {
     return lastEntry ? lastEntry.size_gb : null;
   };
 
-  // Обработчик сортировки
   const handleSort = (column) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -194,17 +192,27 @@ function ServerDetails() {
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return <div>Загрузка...</div>;
 
-  // Агрегированные данные для графиков и текущего размера
   const aggregatedTimeline = getAggregatedTimeline();
   const allDatabases = stats.databases;
   const filteredDatabases = allDatabases.filter(db => {
     const connections = getDatabaseConnections(db.name);
-    if (hideDeleted && !db.exists) return false;
-    if (showNoConnections) return connections.length === 0 || connections.every(conn => conn === 0);
-    if (showStaticConnections) {
-      return connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0);
+    const nameLower = db.name.toLowerCase();
+    const filterLower = nameFilter.toLowerCase();
+    let nameMatch = true;
+
+    if (nameFilter) {
+      if (filterType === 'startsWith') nameMatch = nameLower.startsWith(filterLower);
+      else if (filterType === 'contains') nameMatch = nameLower.includes(filterLower);
+      else if (filterType === 'endsWith') nameMatch = nameLower.endsWith(filterLower);
+      else if (filterType === 'exact') nameMatch = nameLower === filterLower;
     }
-    return true;
+
+    return (
+      nameMatch &&
+      (!hideDeleted || db.exists) &&
+      (!showNoConnections || (connections.length === 0 || connections.every(conn => conn === 0))) &&
+      (!showStaticConnections || (connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0)))
+    );
   }).sort((a, b) => {
     if (sortColumn === 'name') {
       return sortDirection === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
@@ -401,12 +409,35 @@ function ServerDetails() {
           <div className="d-flex justify-content-between align-items-center">
             <span>Список баз данных ({allDatabases.length} всего, {filteredDatabases.length} отфильтровано)</span>
             <div>
+              <Form inline className="d-flex align-items-center">
+                <Form.Control
+                  type="text"
+                  placeholder="Фильтр по имени"
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  style={{ width: '150px', marginRight: '10px' }}
+                />
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-secondary" size="sm">
+                    {filterType === 'startsWith' ? 'Начинается с' : 
+                     filterType === 'contains' ? 'Содержит' : 
+                     filterType === 'endsWith' ? 'Заканчивается на' : 'Точное совпадение'}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Item onClick={() => setFilterType('startsWith')}>Начинается с</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setFilterType('contains')}>Содержит</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setFilterType('endsWith')}>Заканчивается на</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setFilterType('exact')}>Точное совпадение</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              </Form>
               <Form.Check
                 inline
                 type="checkbox"
                 label="Не показывать удалённые базы"
                 checked={hideDeleted}
                 onChange={(e) => setHideDeleted(e.target.checked)}
+                className="ml-2"
               />
               <Button
                 variant={showNoConnections ? 'primary' : 'outline-primary'}
