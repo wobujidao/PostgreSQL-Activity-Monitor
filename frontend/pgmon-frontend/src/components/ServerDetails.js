@@ -24,6 +24,7 @@ function ServerDetails() {
   const [sortDirection, setSortDirection] = useState('desc');
   const [nameFilter, setNameFilter] = useState('');
   const [filterType, setFilterType] = useState('contains');
+  const [dateRangeLabel, setDateRangeLabel] = useState('7 дней'); // По умолчанию
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -190,12 +191,13 @@ function ServerDetails() {
   };
 
   // Быстрые диапазоны дат
-  const setDateRange = (days) => {
+  const setDateRange = (days, label) => {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - days);
     setStartDate(start);
     setEndDate(end);
+    setDateRangeLabel(label);
   };
 
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
@@ -354,13 +356,13 @@ function ServerDetails() {
             />
             <Dropdown className="d-inline-block mx-2">
               <Dropdown.Toggle variant="outline-secondary" size="sm">
-                Быстрый диапазон
+                {dateRangeLabel}
               </Dropdown.Toggle>
               <Dropdown.Menu>
-                <Dropdown.Item onClick={() => setDateRange(7)}>7 дней</Dropdown.Item>
-                <Dropdown.Item onClick={() => setDateRange(14)}>2 недели</Dropdown.Item>
-                <Dropdown.Item onClick={() => setDateRange(30)}>Месяц</Dropdown.Item>
-                <Dropdown.Item onClick={() => setDateRange(90)}>3 месяца</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(7, '7 дней')}>7 дней</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(14, '2 недели')}>2 недели</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(30, 'Месяц')}>Месяц</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(90, '3 месяца')}>3 месяца</Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
           </div>
