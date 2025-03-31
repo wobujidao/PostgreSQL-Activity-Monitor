@@ -14,6 +14,7 @@ import paramiko
 from cryptography.fernet import Fernet
 import logging
 import socket
+from functools import lru_cache
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,9 @@ CONFIG_DIR = Path("/etc/pg_activity_monitor")
 SERVERS_FILE = CONFIG_DIR / "servers.json"
 USERS_FILE = CONFIG_DIR / "users.json"
 ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
+
+# Кэш для SSH-данных
+ssh_cache = {}
 
 # Загрузка ключа шифрования
 try:
@@ -137,7 +141,7 @@ def connect_to_server(server: Server):
         "has_ssh_password": bool(server.ssh_password),
         "version": None,
         "free_space": None,
-        "total_space": None,  # Добавляем total_space
+        "total_space": None,
         "connections": None,
         "uptime_hours": None,
         "stats_db": server.stats_db,
@@ -179,55 +183,67 @@ def connect_to_server(server: Server):
             logger.error(f"Ошибка PostgreSQL для {server.name}: {e}")
             result["status"] = f"PostgreSQL: {str(e)}"
 
-    if not is_host_reachable(server.host, server.ssh_port):
-        logger.warning(f"Хост {server.host}:{server.ssh_port} недоступен для SSH")
-        result["status"] = f"{result['status']} (SSH: host unreachable)" if result["status"] != "pending" else "SSH: host unreachable"
+    # Кэширование SSH-данных
+    cache_key = f"{server.host}:{server.ssh_port}"
+    if cache_key in ssh_cache and (datetime.now(timezone.utc) - ssh_cache[cache_key]["timestamp"]).total_seconds() < 60:
+        result["free_space"] = ssh_cache[cache_key]["free_space"]
+        result["total_space"] = ssh_cache[cache_key]["total_space"]
+        result["status"] = f"{result['status']} (SSH cached)"
     else:
-        try:
-            logger.info(f"Попытка подключения к SSH на {server.name} ({server.host}:{server.ssh_port})")
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                server.host,
-                username=server.ssh_user,
-                password=server.ssh_password,
-                port=server.ssh_port,
-                timeout=5,
-                banner_timeout=5,
-                auth_timeout=5
-            )
-            data_dir = result.get('data_dir', '/var/lib/postgresql')
-            if server.host == "10.110.23.69":  # Для s00-dbs10
-                cmd = "df -B1 /mnt/hdd"
-            else:
-                cmd = f"df -B1 {data_dir}"
-            stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
-            df_output = stdout.read().decode().strip().splitlines()
-            error_output = stderr.read().decode().strip()
-            logger.info(f"Вывод df для {server.name} с командой '{cmd}': {df_output}")
-            if error_output:
-                logger.warning(f"Ошибка при выполнении df для {server.name}: {error_output}")
-                result["status"] = f"{result['status']} (SSH: df error: {error_output})"
-            elif len(df_output) > 1:
-                columns = df_output[1].split()
-                if len(columns) >= 4:
-                    result["total_space"] = int(columns[1])  # Общая ёмкость в байтах
-                    result["free_space"] = int(columns[3])   # Доступное место в байтах
+        if not is_host_reachable(server.host, server.ssh_port):
+            logger.warning(f"Хост {server.host}:{server.ssh_port} недоступен для SSH")
+            result["status"] = f"{result['status']} (SSH: host unreachable)" if result["status"] != "pending" else "SSH: host unreachable"
+        else:
+            try:
+                logger.info(f"Попытка подключения к SSH на {server.name} ({server.host}:{server.ssh_port})")
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(
+                    server.host,
+                    username=server.ssh_user,
+                    password=server.ssh_password,
+                    port=server.ssh_port,
+                    timeout=5,
+                    banner_timeout=5,
+                    auth_timeout=5
+                )
+                data_dir = result.get('data_dir', '/var/lib/postgresql')
+                if server.host == "10.110.23.69":  # Для s00-dbs10
+                    cmd = "df -B1 /mnt/hdd"
                 else:
-                    logger.warning(f"Некорректный вывод df для {server.name}: {df_output[1]}")
-                    result["status"] = f"{result['status']} (SSH: invalid df output)"
-            else:
-                logger.warning(f"Пустой или недостаточный вывод df для {server.name}: {df_output}")
-                result["status"] = f"{result['status']} (SSH: no df data)"
-            ssh.close()
-            logger.info(f"Успешное подключение к SSH на {server.name}")
-            result["status"] = "ok" if result["status"] == "pending" else f"{result['status']} (SSH ok)"
-        except socket.timeout:
-            logger.error(f"Тайм-аут SSH для {server.name}")
-            result["status"] = f"{result['status']} (SSH: timeout)" if result["status"] != "pending" else "SSH: timeout"
-        except Exception as e:
-            logger.error(f"Ошибка SSH для {server.name}: {e}")
-            result["status"] = f"{result['status']} (SSH: {str(e)})" if result["status"] != "pending" else f"SSH: {str(e)}"
+                    cmd = f"df -B1 {data_dir}"
+                stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
+                df_output = stdout.read().decode().strip().splitlines()
+                error_output = stderr.read().decode().strip()
+                logger.info(f"Вывод df для {server.name} с командой '{cmd}': {df_output}")
+                if error_output:
+                    logger.warning(f"Ошибка при выполнении df для {server.name}: {error_output}")
+                    result["status"] = f"{result['status']} (SSH: df error: {error_output})"
+                elif len(df_output) > 1:
+                    columns = df_output[1].split()
+                    if len(columns) >= 4:
+                        result["total_space"] = int(columns[1])
+                        result["free_space"] = int(columns[3])
+                        ssh_cache[cache_key] = {
+                            "free_space": result["free_space"],
+                            "total_space": result["total_space"],
+                            "timestamp": datetime.now(timezone.utc)
+                        }
+                    else:
+                        logger.warning(f"Некорректный вывод df для {server.name}: {df_output[1]}")
+                        result["status"] = f"{result['status']} (SSH: invalid df output)"
+                else:
+                    logger.warning(f"Пустой или недостаточный вывод df для {server.name}: {df_output}")
+                    result["status"] = f"{result['status']} (SSH: no df data)"
+                ssh.close()
+                logger.info(f"Успешное подключение к SSH на {server.name}")
+                result["status"] = "ok" if result["status"] == "pending" else f"{result['status']} (SSH ok)"
+            except socket.timeout:
+                logger.error(f"Тайм-аут SSH для {server.name}")
+                result["status"] = f"{result['status']} (SSH: timeout)" if result["status"] != "pending" else "SSH: timeout"
+            except Exception as e:
+                logger.error(f"Ошибка SSH для {server.name}: {e}")
+                result["status"] = f"{result['status']} (SSH: {str(e)})" if result["status"] != "pending" else f"SSH: {str(e)}"
 
     return result
 
@@ -253,8 +269,8 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/server/{server_name}/stats")
-async def get_server_stats_details(server_name: str, start_date: Optional[str] = None, end_date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+@lru_cache(maxsize=128)
+def cached_server_stats(server_name: str, start_date: str, end_date: str):
     servers = load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
@@ -279,12 +295,8 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
             connect_timeout=5
         )
         with conn.cursor() as cur:
-            if not start_date or not end_date:
-                end_date_dt = datetime.now(timezone.utc)
-                start_date_dt = end_date_dt - timedelta(days=7)
-            else:
-                start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-                end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00")) if start_date else datetime.now(timezone.utc) - timedelta(days=7)
+            end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00")) if end_date else datetime.now(timezone.utc)
 
             cur.execute("SELECT MAX(ts) FROM pg_statistics;")
             last_update = cur.fetchone()[0]
@@ -306,14 +318,23 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
             """, (start_date_dt, end_date_dt))
             stats_dbs = [row[0] for row in cur.fetchall()]
 
+            # Агрегируем данные по дням для уменьшения объёма
             cur.execute("""
-                SELECT ts, SUM(numbackends) as total_connections, SUM(db_size::float / (1048576 * 1024)) as total_size_gb
+                SELECT date_trunc('hour', ts) as ts, datname, AVG(numbackends) as avg_connections, AVG(db_size::float / (1048576 * 1024)) as avg_size_gb
                 FROM pg_statistics
                 WHERE ts BETWEEN %s AND %s
-                GROUP BY ts
-                ORDER BY ts;
+                GROUP BY date_trunc('hour', ts), datname
+                ORDER BY date_trunc('hour', ts);
             """, (start_date_dt, end_date_dt))
-            timeline = [{"ts": row[0].isoformat(), "total_connections": row[1], "total_size_gb": row[2] or 0} for row in cur.fetchall()]
+            timeline = [
+                {
+                    "ts": row[0].isoformat(),
+                    "datname": row[1],
+                    "connections": round(row[2] or 0),
+                    "size_gb": row[3] or 0
+                }
+                for row in cur.fetchall()
+            ]
             result["connection_timeline"] = timeline
 
         conn.close()
@@ -340,6 +361,10 @@ async def get_server_stats_details(server_name: str, start_date: Optional[str] =
     except Exception as e:
         logger.error(f"Ошибка получения статистики для {server_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/server/{server_name}/stats")
+async def get_server_stats_details(server_name: str, start_date: Optional[str] = None, end_date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    return cached_server_stats(server_name, start_date, end_date)
 
 @app.get("/server/{server_name}/db/{db_name}")
 async def get_database_stats(server_name: str, db_name: str, current_user: dict = Depends(get_current_user)):

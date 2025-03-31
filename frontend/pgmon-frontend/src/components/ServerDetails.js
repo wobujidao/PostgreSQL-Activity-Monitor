@@ -63,7 +63,7 @@ function ServerDetails() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 60000);
 
     return () => {
       isMounted.current = false;
