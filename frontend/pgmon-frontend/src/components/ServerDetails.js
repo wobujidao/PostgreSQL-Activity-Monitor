@@ -352,10 +352,17 @@ function ServerDetails() {
               className="form-control d-inline-block mx-2"
               dateFormat="dd.MM.yyyy"
             />
-            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(7)}>7 дней</Button>
-            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(14)}>2 недели</Button>
-            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(30)}>Месяц</Button>
-            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(90)}>3 месяца</Button>
+            <Dropdown className="d-inline-block mx-2">
+              <Dropdown.Toggle variant="outline-secondary" size="sm">
+                Быстрый диапазон
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setDateRange(7)}>7 дней</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(14)}>2 недели</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(30)}>Месяц</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(90)}>3 месяца</Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
           <p style={{ color: isLastUpdateStale ? 'red' : 'inherit' }}>
             Последнее обновление stat_db: ({lastUpdateFormatted})
