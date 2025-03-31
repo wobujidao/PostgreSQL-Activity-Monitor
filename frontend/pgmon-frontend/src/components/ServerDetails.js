@@ -189,6 +189,15 @@ function ServerDetails() {
     }
   };
 
+  // Быстрые диапазоны дат
+  const setDateRange = (days) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    setStartDate(start);
+    setEndDate(end);
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return <div>Загрузка...</div>;
 
@@ -343,6 +352,10 @@ function ServerDetails() {
               className="form-control d-inline-block mx-2"
               dateFormat="dd.MM.yyyy"
             />
+            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(7)}>7 дней</Button>
+            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(14)}>2 недели</Button>
+            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(30)}>Месяц</Button>
+            <Button variant="outline-secondary" size="sm" className="ml-2" onClick={() => setDateRange(90)}>3 месяца</Button>
           </div>
           <p style={{ color: isLastUpdateStale ? 'red' : 'inherit' }}>
             Последнее обновление stat_db: ({lastUpdateFormatted})
@@ -411,28 +424,6 @@ function ServerDetails() {
               Список баз данных ({allDatabases.length} всего, {filteredDatabases.length} отфильтровано)
             </span>
             <div>
-              <Form inline className="d-flex align-items-center">
-                <Form.Control
-                  type="text"
-                  placeholder="Фильтр по имени"
-                  value={nameFilter}
-                  onChange={(e) => setNameFilter(e.target.value)}
-                  style={{ width: '150px', marginRight: '10px' }}
-                />
-                <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" size="sm">
-                    {filterType === 'startsWith' ? 'Начинается с' : 
-                     filterType === 'contains' ? 'Содержит' : 
-                     filterType === 'endsWith' ? 'Заканчивается на' : 'Точное совпадение'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Item onClick={() => setFilterType('startsWith')}>Начинается с</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterType('contains')}>Содержит</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterType('endsWith')}>Заканчивается на</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterType('exact')}>Точное совпадение</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </Form>
               <Form.Check
                 inline
                 type="checkbox"
@@ -467,6 +458,36 @@ function ServerDetails() {
           </div>
         </Card.Header>
         <Card.Body>
+          <Form inline className="mb-3 d-flex align-items-center">
+            <Form.Control
+              type="text"
+              placeholder="Фильтр по имени"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              style={{ width: '200px', marginRight: '10px' }}
+            />
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-secondary" size="sm">
+                {filterType === 'startsWith' ? 'Начинается с' : 
+                 filterType === 'contains' ? 'Содержит' : 
+                 filterType === 'endsWith' ? 'Заканчивается на' : 'Точное совпадение'}
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setFilterType('startsWith')}>Начинается с</Dropdown.Item>
+                <Dropdown.Item onClick={() => setFilterType('contains')}>Содержит</Dropdown.Item>
+                <Dropdown.Item onClick={() => setFilterType('endsWith')}>Заканчивается на</Dropdown.Item>
+                <Dropdown.Item onClick={() => setFilterType('exact')}>Точное совпадение</Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              className="ml-2"
+              onClick={() => setNameFilter('')}
+            >
+              Очистить
+            </Button>
+          </Form>
           <Table striped bordered hover>
             <thead>
               <tr>
