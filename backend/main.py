@@ -15,6 +15,7 @@ from cryptography.fernet import Fernet
 import logging
 import socket
 from functools import lru_cache
+import os
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +31,7 @@ app.add_middleware(
 )
 
 # Конфигурация
-SECRET_KEY = "mtttDjjZ4VlgntKph8mI3eSVFEgGDVfiVlGyGfXOq9I"
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-for-local-testing")
 ALGORITHM = "HS256"
 TOKEN_EXPIRATION = 60
 CONFIG_DIR = Path("/etc/pg_activity_monitor")
