@@ -513,7 +513,7 @@ function ServerDetails() {
         <Card.Body>
           <div className="mb-3">
             <p>Итоги: Всего баз: {filteredDatabases.length}, Активных: {activeCount}, Неиспользуемых: {unusedCount}</p>
-            <Form inline className="d-flex align-items-center">
+            <Form inline className="d-flex align-items-center mb-2">
               <OverlayTrigger placement="top" overlay={<Tooltip>Введите имя базы для фильтрации</Tooltip>}>
                 <Form.Control
                   type="text"
@@ -546,17 +546,17 @@ function ServerDetails() {
                   Очистить
                 </Button>
               </OverlayTrigger>
-              <Form.Group controlId="itemsPerPage" className="ml-3">
-                <Form.Label className="mr-2">На странице:</Form.Label>
-                <Form.Select value={itemsPerPage} onChange={handlePerPageChange} style={{ width: '100px' }}>
-                  <option value={20}>20</option>
-                  <option value={40}>40</option>
-                  <option value={80}>80</option>
-                  <option value={160}>160</option>
-                  <option value="all">Все</option>
-                </Form.Select>
-              </Form.Group>
             </Form>
+            <Form.Group controlId="itemsPerPage" className="d-flex align-items-center">
+              <Form.Label className="mr-2">На странице:</Form.Label>
+              <Form.Select value={itemsPerPage} onChange={handlePerPageChange} style={{ width: '100px' }}>
+                <option value={20}>20</option>
+                <option value={40}>40</option>
+                <option value={80}>80</option>
+                <option value={160}>160</option>
+                <option value="all">Все</option>
+              </Form.Select>
+            </Form.Group>
           </div>
           <Table striped bordered hover>
             <thead>
