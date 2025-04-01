@@ -28,7 +28,7 @@ function ServerDetails() {
   const [dateRangeLabel, setDateRangeLabel] = useState('7 дней');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20); // Новое состояние для выбора количества записей, по умолчанию 20
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -210,6 +210,12 @@ function ServerDetails() {
     setDateRangeLabel(label);
   };
 
+  const handlePerPageChange = (e) => {
+    const value = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+    setItemsPerPage(value);
+    setCurrentPage(1); // Сбрасываем на первую страницу при изменении количества
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return (
     <div className="text-center mt-5">
@@ -256,8 +262,8 @@ function ServerDetails() {
   const activeCount = filteredDatabases.filter(db => getDatabaseConnections(db.name).length > 0).length;
   const unusedCount = filteredDatabases.filter(db => getDatabaseConnections(db.name).length === 0).length;
 
-  const totalPages = Math.ceil(filteredDatabases.length / itemsPerPage);
-  const paginatedDatabases = filteredDatabases.slice(
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(filteredDatabases.length / itemsPerPage);
+  const paginatedDatabases = itemsPerPage === 'all' ? filteredDatabases : filteredDatabases.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -540,6 +546,16 @@ function ServerDetails() {
                   Очистить
                 </Button>
               </OverlayTrigger>
+              <Form.Group controlId="itemsPerPage" className="ml-3">
+                <Form.Label className="mr-2">На странице:</Form.Label>
+                <Form.Select value={itemsPerPage} onChange={handlePerPageChange} style={{ width: '100px' }}>
+                  <option value={20}>20</option>
+                  <option value={40}>40</option>
+                  <option value={80}>80</option>
+                  <option value={160}>160</option>
+                  <option value="all">Все</option>
+                </Form.Select>
+              </Form.Group>
             </Form>
           </div>
           <Table striped bordered hover>
