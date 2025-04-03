@@ -28,7 +28,7 @@ function ServerDetails() {
   const [dateRangeLabel, setDateRangeLabel] = useState('7 дней');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20); // Новое состояние для выбора количества записей, по умолчанию 20
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -43,19 +43,15 @@ function ServerDetails() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Токен отсутствует');
 
-      const cachedServerData = localStorage.getItem(serverCacheKey);
-      if (cachedServerData) {
-        setServerData(JSON.parse(cachedServerData));
-      } else {
-        const serverResponse = await axios.get('http://10.110.20.55:8000/servers', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const server = serverResponse.data.find(s => s.name === name);
-        if (!server) throw new Error(`Сервер ${name} не найден`);
-        if (isMounted.current) {
-          setServerData(server);
-          localStorage.setItem(serverCacheKey, JSON.stringify(server));
-        }
+      // Всегда запрашиваем свежие данные с сервера
+      const serverResponse = await axios.get('http://10.110.20.55:8000/servers', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const server = serverResponse.data.find(s => s.name === name);
+      if (!server) throw new Error(`Сервер ${name} не найден`);
+      if (isMounted.current) {
+        setServerData(server);
+        localStorage.setItem(serverCacheKey, JSON.stringify(server)); // Сохраняем в localStorage, но не используем как кэш
       }
 
       const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
@@ -213,7 +209,7 @@ function ServerDetails() {
   const handlePerPageChange = (e) => {
     const value = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
     setItemsPerPage(value);
-    setCurrentPage(1); // Сбрасываем на первую страницу при изменении количества
+    setCurrentPage(1);
   };
 
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
