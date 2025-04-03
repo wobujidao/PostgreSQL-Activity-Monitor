@@ -14,7 +14,6 @@ import paramiko
 from cryptography.fernet import Fernet
 import logging
 import socket
-from functools import lru_cache
 import os
 
 # Настройка логирования
@@ -41,6 +40,12 @@ ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
 
 # Кэш для SSH-данных
 ssh_cache = {}
+
+def clear_ssh_cache():
+    current_time = datetime.now(timezone.utc)
+    expired = [key for key, value in ssh_cache.items() if (current_time - value["timestamp"]).total_seconds() > 30]  # 30 секунд
+    for key in expired:
+        del ssh_cache[key]
 
 # Загрузка ключа шифрования
 try:
@@ -185,8 +190,9 @@ def connect_to_server(server: Server):
             result["status"] = f"PostgreSQL: {str(e)}"
 
     # Кэширование SSH-данных
+    clear_ssh_cache()
     cache_key = f"{server.host}:{server.ssh_port}"
-    if cache_key in ssh_cache and (datetime.now(timezone.utc) - ssh_cache[cache_key]["timestamp"]).total_seconds() < 60:
+    if cache_key in ssh_cache and (datetime.now(timezone.utc) - ssh_cache[cache_key]["timestamp"]).total_seconds() < 30:
         result["free_space"] = ssh_cache[cache_key]["free_space"]
         result["total_space"] = ssh_cache[cache_key]["total_space"]
         result["status"] = f"{result['status']} (SSH cached)"
@@ -270,7 +276,6 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@lru_cache(maxsize=128)
 def cached_server_stats(server_name: str, start_date: str, end_date: str):
     servers = load_servers()
     server = next((s for s in servers if s.name == server_name), None)
@@ -319,7 +324,6 @@ def cached_server_stats(server_name: str, start_date: str, end_date: str):
             """, (start_date_dt, end_date_dt))
             stats_dbs = [row[0] for row in cur.fetchall()]
 
-            # Агрегируем данные по дням для уменьшения объёма
             cur.execute("""
                 SELECT date_trunc('hour', ts) as ts, datname, AVG(numbackends) as avg_connections, AVG(db_size::float / (1048576 * 1024)) as avg_size_gb
                 FROM pg_statistics
