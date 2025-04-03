@@ -43,7 +43,7 @@ ssh_cache = {}
 
 def clear_ssh_cache():
     current_time = datetime.now(timezone.utc)
-    expired = [key for key, value in ssh_cache.items() if (current_time - value["timestamp"]).total_seconds() > 30]  # 30 секунд
+    expired = [key for key, value in ssh_cache.items() if (current_time - value["timestamp"]).total_seconds() > 30]
     for key in expired:
         del ssh_cache[key]
 
@@ -152,7 +152,7 @@ def connect_to_server(server: Server):
         "uptime_hours": None,
         "stats_db": server.stats_db,
         "status": "pending",
-        "data_dir": None  # Изначально None, заполняется только из PostgreSQL
+        "data_dir": None
     }
 
     if not is_host_reachable(server.host, server.port):
@@ -201,7 +201,7 @@ def connect_to_server(server: Server):
         if not is_host_reachable(server.host, server.ssh_port):
             logger.warning(f"Хост {server.host}:{server.ssh_port} недоступен для SSH")
             result["status"] = f"{result['status']} (SSH: host unreachable)" if result["status"] != "pending" else "SSH: host unreachable"
-        elif result["data_dir"]:  # Запрашиваем SSH только если data_dir получен
+        elif result["data_dir"]:
             try:
                 logger.info(f"Попытка подключения к SSH на {server.name} ({server.host}:{server.ssh_port})")
                 ssh = paramiko.SSHClient()
@@ -215,7 +215,10 @@ def connect_to_server(server: Server):
                     banner_timeout=5,
                     auth_timeout=5
                 )
-                cmd = f"df -B1 {result['data_dir']}"
+                # Извлекаем точку монтирования из data_dir
+                data_dir = result["data_dir"]
+                mount_point = data_dir.split('/DB')[0] if '/DB' in data_dir else data_dir
+                cmd = f"df -B1 {mount_point}"
                 stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
                 df_output = stdout.read().decode().strip().splitlines()
                 error_output = stderr.read().decode().strip()
