@@ -151,7 +151,8 @@ def connect_to_server(server: Server):
         "connections": None,
         "uptime_hours": None,
         "stats_db": server.stats_db,
-        "status": "pending"
+        "status": "pending",
+        "data_dir": None  # Изначально None, заполняется только из PostgreSQL
     }
 
     if not is_host_reachable(server.host, server.port):
@@ -200,7 +201,7 @@ def connect_to_server(server: Server):
         if not is_host_reachable(server.host, server.ssh_port):
             logger.warning(f"Хост {server.host}:{server.ssh_port} недоступен для SSH")
             result["status"] = f"{result['status']} (SSH: host unreachable)" if result["status"] != "pending" else "SSH: host unreachable"
-        else:
+        elif result["data_dir"]:  # Запрашиваем SSH только если data_dir получен
             try:
                 logger.info(f"Попытка подключения к SSH на {server.name} ({server.host}:{server.ssh_port})")
                 ssh = paramiko.SSHClient()
@@ -214,11 +215,7 @@ def connect_to_server(server: Server):
                     banner_timeout=5,
                     auth_timeout=5
                 )
-                data_dir = result.get('data_dir', '/var/lib/postgresql')
-                if server.host == "10.110.23.69":  # Для s00-dbs10
-                    cmd = "df -B1 /mnt/hdd"
-                else:
-                    cmd = f"df -B1 {data_dir}"
+                cmd = f"df -B1 {result['data_dir']}"
                 stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
                 df_output = stdout.read().decode().strip().splitlines()
                 error_output = stderr.read().decode().strip()
