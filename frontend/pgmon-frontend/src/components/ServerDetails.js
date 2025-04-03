@@ -51,7 +51,7 @@ function ServerDetails() {
       if (!server) throw new Error(`Сервер ${name} не найден`);
       if (isMounted.current) {
         setServerData(server);
-        localStorage.setItem(serverCacheKey, JSON.stringify(server)); // Сохраняем в localStorage, но не используем как кэш
+        localStorage.setItem(serverCacheKey, JSON.stringify(server)); // Сохраняем, но не используем как кэш
       }
 
       const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
