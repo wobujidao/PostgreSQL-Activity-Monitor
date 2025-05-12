@@ -1,6 +1,7 @@
 #!/bin/bash
-# Скрипт для создания базы данных и таблицы для хранения статистики (pg_statistics).
-# В таблицу добавлен столбец db_size для хранения размера каждой базы.
+# Скрипт для создания базы данных и таблиц для хранения статистики (pg_statistics и db_creation).
+# В таблицу pg_statistics добавлен столбец db_size.
+# Таблица db_creation хранит дату создания баз данных.
 
 PGHOST="/var/run/postgresql"
 PGUSER="postgres"
@@ -30,25 +31,33 @@ else
   echo "База данных '$STAT_DB' уже существует."
 fi
 
-echo "Создаём таблицу pg_statistics в базе $STAT_DB..."
+echo "Создаём таблицы в базе $STAT_DB..."
 run_psql -d "$STAT_DB" -c "
   CREATE TABLE IF NOT EXISTS pg_statistics (
-    id serial PRIMARY KEY,               -- уникальный идентификатор записи
-    ts timestamptz NOT NULL,             -- время сбора статистики
-    datname text NOT NULL,               -- имя базы данных
-    numbackends integer,                 -- число активных подключений
-    xact_commit bigint,                  -- число выполненных коммитов
-    db_size bigint,                      -- размер базы данных (в байтах)
-    disk_free_space bigint,              -- свободное место на диске (в байтах)
-    last_size_update timestamptz         -- время последнего обновления db_size
+    id serial PRIMARY KEY,
+    ts timestamptz NOT NULL,
+    datname text NOT NULL,
+    numbackends integer,
+    xact_commit bigint,
+    db_size bigint,
+    disk_free_space bigint,
+    last_size_update timestamptz
   );
 
-  -- Индекс по времени сбора для ускорения выборок
   CREATE INDEX IF NOT EXISTS pg_statistics_ts_idx ON pg_statistics (ts);
+
+  CREATE TABLE IF NOT EXISTS db_creation (
+    datname text PRIMARY KEY,
+    creation_time timestamptz NOT NULL,
+    oid oid
+  );
+
+  CREATE INDEX IF NOT EXISTS db_creation_datname_idx ON db_creation (datname);
+  CREATE INDEX IF NOT EXISTS db_creation_oid_idx ON db_creation (oid);
 "
 if [ $? -eq 0 ]; then
-  echo "База данных '$STAT_DB' и таблица 'pg_statistics' успешно созданы."
+  echo "База данных '$STAT_DB' и таблицы 'pg_statistics', 'db_creation' успешно созданы."
 else
-  echo "Ошибка при создании таблицы 'pg_statistics'." >&2
+  echo "Ошибка при создании таблиц." >&2
   exit 1
 fi
