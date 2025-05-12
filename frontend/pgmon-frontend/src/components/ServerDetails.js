@@ -181,10 +181,10 @@ function ServerDetails() {
 
   const getDatabaseSize = (dbName) => {
     if (!stats || !stats.connection_timeline) return null;
-    const sizes = stats.connection_timeline
-      .filter(entry => entry.datname === dbName)
-      .map(entry => entry.size_gb);
-    return sizes.length > 0 ? Math.max(...sizes) : null;
+    const lastSizeEntry = stats.connection_timeline
+      .filter(entry => entry.datname === dbName && entry.size_gb > 0)
+      .slice(-1)[0]; // Берем последнюю запись с size_gb > 0
+    return lastSizeEntry ? lastSizeEntry.size_gb : null;
   };
 
   const handleSort = (column) => {

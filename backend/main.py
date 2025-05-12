@@ -399,7 +399,9 @@ async def get_database_stats(server_name: str, db_name: str, current_user: dict 
             cur.execute("""
                 SELECT numbackends, db_size::float / 1048576, xact_commit, ts
                 FROM pg_statistics
-                WHERE datname = %s AND ts = (SELECT MAX(ts) FROM pg_statistics WHERE datname = %s);
+                WHERE datname = %s AND db_size IS NOT NULL
+                ORDER BY ts DESC
+                LIMIT 1;
             """, (db_name, db_name))
             stats = cur.fetchone()
             if stats:
