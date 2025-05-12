@@ -76,6 +76,7 @@ if [ "$UPDATE_SIZES" = "true" ]; then
     WHERE ts = '$TIMESTAMP'
       AND datname NOT IN ('template0', 'template1');
   " >> "$LOG_FILE" 2>&1
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - Размеры баз обновлены для записей с ts=$TIMESTAMP" >> "$LOG_FILE"
 fi
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Сбор статистики завершён" >> "$LOG_FILE"
