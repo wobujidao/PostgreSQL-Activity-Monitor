@@ -145,6 +145,19 @@ function ServerDetails() {
 
   const formatSize = (sizeGb) => sizeGb !== null && sizeGb !== undefined ? `${sizeGb.toFixed(2)} ГБ` : 'N/A';
 
+  const formatCreationTime = (creationTime) => {
+    if (!creationTime) return 'N/A';
+    const date = new Date(creationTime);
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Moscow'
+    });
+  };
+
   const isDataStale = (timestamp) => {
     if (!timestamp) return false;
     const lastUpdate = new Date(timestamp).getTime();
@@ -251,6 +264,10 @@ function ServerDetails() {
       return sortDirection === 'asc' ? sizeA - sizeB : sizeB - sizeA;
     } else if (sortColumn === 'status') {
       return sortDirection === 'asc' ? (a.exists === b.exists ? 0 : a.exists ? -1 : 1) : (a.exists === b.exists ? 0 : a.exists ? 1 : -1);
+    } else if (sortColumn === 'creation_time') {
+      const timeA = a.creation_time ? new Date(a.creation_time).getTime() : 0;
+      const timeB = b.creation_time ? new Date(b.creation_time).getTime() : 0;
+      return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
     }
     return 0;
   });
@@ -563,6 +580,9 @@ function ServerDetails() {
                 <th onClick={() => handleSort('size')} style={{ cursor: 'pointer' }}>
                   Размер {sortColumn === 'size' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
                 </th>
+                <th onClick={() => handleSort('creation_time')} style={{ cursor: 'pointer' }}>
+                  Дата создания {sortColumn === 'creation_time' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </th>
                 <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
                   Статус {sortColumn === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
                 </th>
@@ -573,6 +593,7 @@ function ServerDetails() {
                 <tr key={db.name}>
                   <td><Link to={`/server/${name}/db/${db.name}`}>{db.name}</Link></td>
                   <td>{formatSize(getDatabaseSize(db.name))}</td>
+                  <td>{formatCreationTime(db.creation_time)}</td>
                   <td>{db.exists ? '✅' : '❌'}</td>
                 </tr>
               ))}

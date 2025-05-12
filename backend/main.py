@@ -318,11 +318,12 @@ def cached_server_stats(server_name: str, start_date: str, end_date: str):
             result["total_size_gb"] = stats[1] or 0
 
             cur.execute("""
-                SELECT DISTINCT datname
-                FROM pg_statistics
-                WHERE ts BETWEEN %s AND %s;
+                SELECT DISTINCT p.datname, d.creation_time
+                FROM pg_statistics p
+                LEFT JOIN db_creation d ON p.datname = d.datname
+                WHERE p.ts BETWEEN %s AND %s;
             """, (start_date_dt, end_date_dt))
-            stats_dbs = [row[0] for row in cur.fetchall()]
+            stats_dbs = [{"name": row[0], "creation_time": row[1].isoformat() if row[1] else None} for row in cur.fetchall()]
 
             cur.execute("""
                 SELECT date_trunc('hour', ts) as ts, datname, AVG(numbackends) as avg_connections, AVG(db_size::float / (1048576 * 1024)) as avg_size_gb
@@ -358,7 +359,7 @@ def cached_server_stats(server_name: str, start_date: str, end_date: str):
         conn.close()
 
         result["databases"] = [
-            {"name": db, "exists": db in active_dbs}
+            {"name": db["name"], "exists": db["name"] in active_dbs, "creation_time": db["creation_time"]}
             for db in stats_dbs
         ]
 
