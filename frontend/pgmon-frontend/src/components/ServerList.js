@@ -20,7 +20,7 @@ function ServerList() {
     ssh_port: 22
   });
   const [errorMessage, setErrorMessage] = useState('');
-  const [refreshInterval, setRefreshInterval] = useState(10000);
+  const [refreshInterval, setRefreshInterval] = useState(60000); // Увеличено до 60 секунд
   const [timeLeft, setTimeLeft] = useState(refreshInterval / 1000);
 
   useEffect(() => {
@@ -28,19 +28,15 @@ function ServerList() {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
-          const loginResponse = await axios.post(
-            'http://10.110.20.55:8000/token',
-            'username=admin&password=admin',
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-          );
-          localStorage.setItem('token', loginResponse.data.access_token);
+          throw new Error('Токен отсутствует, требуется авторизация');
         }
         const response = await axios.get('http://10.110.20.55:8000/servers', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
         setServers(response.data);
       } catch (error) {
         console.error('Ошибка загрузки серверов:', error);
+        setErrorMessage('Ошибка загрузки серверов: ' + (error.message || 'Неизвестная ошибка'));
       }
     };
 
@@ -74,6 +70,7 @@ function ServerList() {
       console.log(`Сервер ${serverName} успешно удалён`);
     } catch (error) {
       console.error('Ошибка удаления сервера:', error);
+      setErrorMessage('Ошибка удаления сервера');
     }
   };
 
@@ -173,6 +170,7 @@ function ServerList() {
           </div>
         </Card.Header>
         <Card.Body>
+          {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
           <Table striped bordered hover>
             <thead>
               <tr>

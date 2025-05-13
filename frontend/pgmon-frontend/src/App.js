@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Navbar, Button, Modal, Spinner } from 'react-bootstrap';
+import { Container, Navbar, Button, Modal, Spinner, Form } from 'react-bootstrap';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
 import DatabaseDetails from './components/DatabaseDetails';
@@ -12,17 +12,19 @@ function AppContent() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [refreshUsername, setRefreshUsername] = useState(localStorage.getItem('username') || '');
+  const [refreshPassword, setRefreshPassword] = useState('');
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState('unknown');
   const [showSessionModal, setShowSessionModal] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 минут в секундах для отсчёта
-  const [isRefreshing, setIsRefreshing] = useState(false); // Индикатор загрузки
+  const [showRefreshLoginModal, setShowRefreshLoginModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(300); // 5 минут в секундах
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
 
   const TOKEN_EXPIRATION_MS = 60 * 60 * 1000; // 60 минут
   const WARNING_TIME_MS = 5 * 60 * 1000; // 5 минут до истечения
 
-  // Декодирование JWT-токена
   const decodeToken = (token) => {
     try {
       const base64Url = token.split('.')[1];
@@ -35,34 +37,43 @@ function AppContent() {
     }
   };
 
-  // Продление токена
   const refreshToken = async () => {
+    if (!refreshUsername || !refreshPassword) {
+      setShowSessionModal(false);
+      setShowRefreshLoginModal(true);
+      return;
+    }
     setIsRefreshing(true);
     try {
-      const currentToken = localStorage.getItem('token');
-      const response = await axios.post('http://10.110.20.55:8000/token', {}, {
-        headers: { Authorization: `Bearer ${currentToken}` }
-      });
+      const response = await axios.post(
+        'http://10.110.20.55:8000/token',
+        `username=${refreshUsername}&password=${refreshPassword}`,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
       const newToken = response.data.access_token;
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setShowSessionModal(false);
+      setShowRefreshLoginModal(false);
+      setRefreshPassword('');
       setTimeLeft(300);
       setBackendStatus('available');
       console.log('Токен успешно продлён:', newToken);
     } catch (error) {
       console.error('Ошибка продления токена:', error);
-      handleLogout();
+      setError('Ошибка продления сессии: ' + (error.response?.data?.detail || 'Неизвестная ошибка'));
+      setShowRefreshLoginModal(true);
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Выход
   const handleLogout = () => {
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
     setShowSessionModal(false);
+    setShowRefreshLoginModal(false);
     setBackendStatus('unavailable');
     navigate('/');
   };
@@ -97,7 +108,7 @@ function AppContent() {
         if (decoded && decoded.exp) {
           const expTime = decoded.exp * 1000;
           const now = Date.now();
-          const timeRemaining = Math.floor((expTime - now) / 1000); // В секундах
+          const timeRemaining = Math.floor((expTime - now) / 1000);
           if (timeRemaining <= 300 && timeRemaining > 0) {
             setShowSessionModal(true);
             setTimeLeft(timeRemaining);
@@ -116,7 +127,6 @@ function AppContent() {
       }
     }, 1000);
 
-    // Автоматическое продление при активности
     const handleActivity = () => {
       const currentToken = localStorage.getItem('token');
       if (currentToken) {
@@ -124,8 +134,9 @@ function AppContent() {
         if (decoded && decoded.exp) {
           const expTime = decoded.exp * 1000;
           const now = Date.now();
-          if (expTime - now < WARNING_TIME_MS) {
-            refreshToken();
+          if (expTime - now < WARNING_TIME_MS && !showSessionModal && !showRefreshLoginModal) {
+            setShowSessionModal(true);
+            setTimeLeft(Math.floor((expTime - now) / 1000));
           }
         }
       }
@@ -138,7 +149,7 @@ function AppContent() {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
     };
-  }, [timeLeft, showSessionModal]);
+  }, [timeLeft, showSessionModal, showRefreshLoginModal]);
 
   const login = async () => {
     try {
@@ -149,10 +160,15 @@ function AppContent() {
       );
       setToken(response.data.access_token);
       localStorage.setItem('token', response.data.access_token);
+      localStorage.setItem('username', username);
       setError(null);
     } catch (err) {
       setError('Ошибка авторизации: ' + (err.response?.data?.detail || 'Неизвестная ошибка'));
     }
+  };
+
+  const handleRefreshLogin = async () => {
+    await refreshToken();
   };
 
   const formatTimeLeft = (seconds) => {
@@ -225,6 +241,33 @@ function AppContent() {
         <Modal.Footer>
           <Button variant="success" onClick={refreshToken} disabled={isRefreshing}>
             {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Продолжить'}
+          </Button>
+          <Button variant="danger" onClick={handleLogout}>
+            Выйти
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showRefreshLoginModal} onHide={() => {}} backdrop="static" keyboard={false}>
+        <Modal.Header>
+          <Modal.Title>Продление сессии</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div>
+            <p>Введите пароль для пользователя {refreshUsername}:</p>
+            <Form.Control
+              type="password"
+              className="mb-3"
+              placeholder="Пароль"
+              value={refreshPassword}
+              onChange={(e) => setRefreshPassword(e.target.value)}
+            />
+            {error && <p className="text-danger">{error}</p>}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="success" onClick={handleRefreshLogin} disabled={isRefreshing}>
+            {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Войти'}
           </Button>
           <Button variant="danger" onClick={handleLogout}>
             Выйти
