@@ -403,7 +403,7 @@ async def get_database_stats(server_name: str, db_name: str, current_user: dict 
                 WHERE datname = %s AND db_size IS NOT NULL
                 ORDER BY ts DESC
                 LIMIT 1;
-            """, (db_name, db_name))
+            """, (db_name,))
             stats = cur.fetchone()
             if stats:
                 result["connections"] = stats[0] or 0
