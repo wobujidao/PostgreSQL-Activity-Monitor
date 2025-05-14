@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Card, Table, Alert, Button, Dropdown, Spinner } from 'react-bootstrap';
+import { Card, Table, Alert, Dropdown, Spinner } from 'react-bootstrap';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
@@ -232,7 +232,7 @@ function DatabaseDetails() {
         commitsChartRef.current = null;
       }
     };
-  }, [dbHistory, db_name]);
+  }, [dbHistory, dbStats, db_name]);
 
   const setDateRange = (days, label) => {
     const end = new Date();
