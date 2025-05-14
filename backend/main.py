@@ -432,6 +432,88 @@ async def get_database_stats(server_name: str, db_name: str, current_user: dict 
         logger.error(f"Ошибка получения статистики для базы {db_name} на сервере {server_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/server/{server_name}/db/{db_name}/stats")
+async def get_database_stats_details(server_name: str, db_name: str, start_date: Optional[str] = None, end_date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    servers = load_servers()
+    server = next((s for s in servers if s.name == server_name), None)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    stats_db = server.stats_db or "stats_db"
+    result = {
+        "last_stat_update": None,
+        "total_connections": 0,
+        "total_commits": 0,
+        "total_size_mb": 0,
+        "creation_time": None,
+        "max_connections": 0,
+        "min_connections": 0,
+        "timeline": []
+    }
+
+    try:
+        conn = psycopg2.connect(
+            host=server.host,
+            database=stats_db,
+            user=server.user,
+            password=server.password,
+            port=server.port,
+            connect_timeout=5
+        )
+        with conn.cursor() as cur:
+            start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00")) if start_date else datetime.now(timezone.utc) - timedelta(days=7)
+            end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00")) if end_date else datetime.now(timezone.utc)
+
+            # Получаем последнюю дату обновления
+            cur.execute("SELECT MAX(ts) FROM pg_statistics WHERE datname = %s;", (db_name,))
+            last_update = cur.fetchone()[0]
+            result["last_stat_update"] = last_update.isoformat() if last_update else None
+
+            # Получаем агрегированные метрики за период
+            cur.execute("""
+                SELECT SUM(numbackends), SUM(xact_commit), SUM(db_size::float / 1048576),
+                       MAX(numbackends), MIN(numbackends)
+                FROM pg_statistics
+                WHERE datname = %s AND ts BETWEEN %s AND %s;
+            """, (db_name, start_date_dt, end_date_dt))
+            stats = cur.fetchone()
+            result["total_connections"] = stats[0] or 0
+            result["total_commits"] = stats[1] or 0
+            result["total_size_mb"] = stats[2] or 0
+            result["max_connections"] = stats[3] or 0
+            result["min_connections"] = stats[4] or 0
+
+            # Получаем время создания базы
+            cur.execute("SELECT creation_time FROM db_creation WHERE datname = %s;", (db_name,))
+            creation_time = cur.fetchone()
+            result["creation_time"] = creation_time[0].isoformat() if creation_time else None
+
+            # Получаем временную шкалу для графиков
+            cur.execute("""
+                SELECT date_trunc('hour', ts) as ts, AVG(numbackends) as avg_connections,
+                       AVG(db_size::float / 1048576) as avg_size_mb, SUM(xact_commit) as total_commits
+                FROM pg_statistics
+                WHERE datname = %s AND ts BETWEEN %s AND %s
+                GROUP BY date_trunc('hour', ts)
+                ORDER BY date_trunc('hour', ts);
+            """, (db_name, start_date_dt, end_date_dt))
+            timeline = [
+                {
+                    "ts": row[0].isoformat(),
+                    "connections": round(row[1] or 0),
+                    "size_mb": row[2] or 0,
+                    "commits": row[3] or 0
+                }
+                for row in cur.fetchall()
+            ]
+            result["timeline"] = timeline
+
+        conn.close()
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики для базы {db_name} на сервере {server_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/servers/{server_name}")
 async def delete_server(server_name: str, current_user: dict = Depends(get_current_user)):
     servers = load_servers()

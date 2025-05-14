@@ -1,0 +1,16 @@
+.charts-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.chart {
+  width: 32%;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .chart {
+    width: 100%;
+  }
+}

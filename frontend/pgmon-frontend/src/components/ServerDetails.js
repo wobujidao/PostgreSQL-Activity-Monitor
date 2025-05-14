@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Card, Table, Form, Alert, Button, ProgressBar, OverlayTrigger, Tooltip, Dropdown, Spinner, Pagination } from 'react-bootstrap';
-import { Chart } from 'chart.js';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link } from 'react-router-dom';
 import debounce from 'lodash/debounce';
+import './ServerDetails.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
@@ -43,7 +43,6 @@ function ServerDetails() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Токен отсутствует');
 
-      // Всегда запрашиваем свежие данные с сервера
       const serverResponse = await axios.get('http://10.110.20.55:8000/servers', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -51,7 +50,7 @@ function ServerDetails() {
       if (!server) throw new Error(`Сервер ${name} не найден`);
       if (isMounted.current) {
         setServerData(server);
-        localStorage.setItem(serverCacheKey, JSON.stringify(server)); // Сохраняем, но не используем как кэш
+        localStorage.setItem(serverCacheKey, JSON.stringify(server));
       }
 
       const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
@@ -61,12 +60,19 @@ function ServerDetails() {
           end_date: endDate.toISOString()
         }
       });
-      if (isMounted.current) setStats(statsResponse.data);
+      if (isMounted.current) {
+        setStats(statsResponse.data);
+        setError(null);
+      }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
-      if (isMounted.current) setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
+      if (isMounted.current) {
+        setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
+      }
     } finally {
-      if (isMounted.current) setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   }, [name, startDate, endDate, serverCacheKey]);
 
@@ -94,13 +100,13 @@ function ServerDetails() {
       sizeChartRef.current = null;
     }
 
-    connectionsChartRef.current = new Chart(connectionsCanvasRef.current.getContext('2d'), {
+    connectionsChartRef.current = new ChartJS(connectionsCanvasRef.current.getContext('2d'), {
       type: 'line',
       data: connectionsChartData,
       options: connectionsChartOptions
     });
 
-    sizeChartRef.current = new Chart(sizeCanvasRef.current.getContext('2d'), {
+    sizeChartRef.current = new ChartJS(sizeCanvasRef.current.getContext('2d'), {
       type: 'line',
       data: sizeChartData,
       options: sizeChartOptions
@@ -196,7 +202,7 @@ function ServerDetails() {
     if (!stats || !stats.connection_timeline) return null;
     const lastSizeEntry = stats.connection_timeline
       .filter(entry => entry.datname === dbName && entry.size_gb > 0)
-      .slice(-1)[0]; // Берем последнюю запись с size_gb > 0
+      .slice(-1)[0];
     return lastSizeEntry ? lastSizeEntry.size_gb : null;
   };
 
@@ -482,7 +488,6 @@ function ServerDetails() {
             <div>
               <OverlayTrigger placement="top" overlay={<Tooltip>Скрыть удалённые базы</Tooltip>}>
                 <Form.Check
-                  inline
                   type="checkbox"
                   label="Не показывать удалённые базы"
                   checked={hideDeleted}
@@ -526,7 +531,7 @@ function ServerDetails() {
         <Card.Body>
           <div className="mb-3">
             <p>Итоги: Всего баз: {filteredDatabases.length}, Активных: {activeCount}, Неиспользуемых: {unusedCount}</p>
-            <Form inline className="d-flex align-items-center mb-2">
+            <Form className="d-flex align-items-center mb-2">
               <OverlayTrigger placement="top" overlay={<Tooltip>Введите имя базы для фильтрации</Tooltip>}>
                 <Form.Control
                   type="text"
