@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Card, Table, Alert, Button, Dropdown, Spinner } from 'react-bootstrap';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import './DatabaseDetails.css';
@@ -10,6 +10,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineCont
 
 function DatabaseDetails() {
   const { name, db_name } = useParams();
+  const navigate = useNavigate();
   const [dbStats, setDbStats] = useState(null);
   const [dbHistory, setDbHistory] = useState(null);
   const [error, setError] = useState(null);
@@ -30,7 +31,12 @@ function DatabaseDetails() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        if (!token) throw new Error('Токен отсутствует');
+        if (!token) {
+          console.error('No token found in localStorage');
+          setError('Токен отсутствует, пожалуйста, войдите заново');
+          navigate('/');
+          return;
+        }
 
         console.log('Fetching stats for:', name, db_name);
         const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}`, {
@@ -55,7 +61,12 @@ function DatabaseDetails() {
       } catch (err) {
         console.error('Fetch error:', err);
         if (isMounted.current) {
-          setError('Ошибка загрузки статистики базы: ' + (err.response?.data?.detail || err.message));
+          const errorMessage = err.response?.status === 401 ? 'Недействительный токен, пожалуйста, войдите заново' : (err.response?.data?.detail || err.message);
+          setError('Ошибка загрузки статистики базы: ' + errorMessage);
+          if (err.response?.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/');
+          }
           setDbStats(dbStats || {});
           setDbHistory(dbHistory || { timeline: [], creation_time: null });
         }
@@ -72,7 +83,7 @@ function DatabaseDetails() {
       isMounted.current = false;
       clearInterval(interval);
     };
-  }, [name, db_name, startDate, endDate]);
+  }, [name, db_name, startDate, endDate, navigate]);
 
   useEffect(() => {
     if (!dbHistory || !dbHistory.timeline || !connectionsCanvasRef.current || !sizeCanvasRef.current || !commitsCanvasRef.current) {
@@ -257,40 +268,17 @@ function DatabaseDetails() {
         <Card.Header>
           <div className="d-flex justify-content-between align-items-center">
             <span>Статистика базы данных {loading && <Spinner animation="border" size="sm" className="ml-2" />}</span>
-            <div>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="mx-2"
-                onClick={() => setDateRange(7, '7 дней')}
-              >
-                7 дней
-              </Button>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="mx-2"
-                onClick={() => setDateRange(14, '2 недели')}
-              >
-                2 недели
-              </Button>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="mx-2"
-                onClick={() => setDateRange(30, 'Месяц')}
-              >
-                Месяц
-              </Button>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="mx-2"
-                onClick={() => setDateRange(90, '3 месяца')}
-              >
-                3 месяца
-              </Button>
-            </div>
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-secondary" size="sm">
+                {dateRangeLabel}
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setDateRange(7, '7 дней')}>7 дней</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(14, '2 недели')}>2 недели</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(30, 'Месяц')}>Месяц</Dropdown.Item>
+                <Dropdown.Item onClick={() => setDateRange(90, '3 месяца')}>3 месяца</Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
         </Card.Header>
         <Card.Body>
