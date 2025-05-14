@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Card, Table, Alert, Dropdown, Spinner } from 'react-bootstrap';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -24,67 +24,57 @@ function DatabaseDetails() {
   const connectionsCanvasRef = useRef(null);
   const sizeCanvasRef = useRef(null);
   const commitsCanvasRef = useRef(null);
-  const isMounted = useRef(true);
+
+  const fetchDbStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No token found in localStorage');
+        setError('Токен отсутствует, пожалуйста, войдите заново');
+        navigate('/');
+        return;
+      }
+
+      console.log('Fetching stats for:', name, db_name);
+      const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log('Stats response:', statsResponse.data);
+
+      const historyResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString()
+        }
+      });
+      console.log('History response:', historyResponse.data);
+
+      setDbStats(statsResponse.data);
+      setDbHistory(historyResponse.data);
+      setError(null);
+      console.log('States updated:', { dbStats: statsResponse.data, dbHistory: historyResponse.data });
+    } catch (err) {
+      console.error('Fetch error:', err);
+      const errorMessage = err.response?.status === 401 ? 'Недействительный токен, пожалуйста, войдите заново' : (err.response?.data?.detail || err.message);
+      setError('Ошибка загрузки статистики базы: ' + errorMessage);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+      }
+      setDbStats(null);
+      setDbHistory(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [name, db_name, startDate, endDate, navigate]);
 
   useEffect(() => {
-    const fetchDbStats = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.error('No token found in localStorage');
-          setError('Токен отсутствует, пожалуйста, войдите заново');
-          navigate('/');
-          return;
-        }
-
-        console.log('Fetching stats for:', name, db_name);
-        const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        console.log('Stats response:', statsResponse.data);
-
-        const historyResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString()
-          }
-        });
-        console.log('History response:', historyResponse.data);
-
-        if (isMounted.current) {
-          setDbStats(statsResponse.data);
-          setDbHistory(historyResponse.data);
-          setError(null);
-          console.log('States updated:', { dbStats: statsResponse.data, dbHistory: historyResponse.data });
-        }
-      } catch (err) {
-        console.error('Fetch error:', err);
-        if (isMounted.current) {
-          const errorMessage = err.response?.status === 401 ? 'Недействительный токен, пожалуйста, войдите заново' : (err.response?.data?.detail || err.message);
-          setError('Ошибка загрузки статистики базы: ' + errorMessage);
-          if (err.response?.status === 401) {
-            localStorage.removeItem('token');
-            navigate('/');
-          }
-          setDbStats(null);
-          setDbHistory(null);
-        }
-      } finally {
-        if (isMounted.current) {
-          setLoading(false);
-        }
-      }
-    };
-
     fetchDbStats();
     const interval = setInterval(fetchDbStats, 60000);
-    return () => {
-      isMounted.current = false;
-      clearInterval(interval);
-    };
-  }, [name, db_name, startDate, endDate, navigate]);
+    return () => clearInterval(interval);
+  }, [fetchDbStats]);
 
   useEffect(() => {
     if (!dbHistory || !dbHistory.timeline || !connectionsCanvasRef.current || !sizeCanvasRef.current || !commitsCanvasRef.current) {
@@ -260,7 +250,6 @@ function DatabaseDetails() {
     });
   };
 
-  // Debug: Log current states
   console.log('Rendering with states:', { dbStats, dbHistory, error, loading });
 
   return (
@@ -268,7 +257,6 @@ function DatabaseDetails() {
       <h2>База данных: {db_name} (Сервер: {name})</h2>
       <Link to={`/server/${name}`} className="btn btn-secondary mb-4">Назад к серверу</Link>
 
-      {/* Debug: Display raw state data */}
       <div style={{ marginBottom: '20px', background: '#f0f0f0', padding: '10px' }}>
         <strong>Debug States:</strong><br />
         dbStats: {JSON.stringify(dbStats)}<br />
@@ -279,55 +267,61 @@ function DatabaseDetails() {
 
       {error && <Alert variant="danger">{error}</Alert>}
 
-      <Card className="mb-4">
-        <Card.Header>
-          <div className="d-flex justify-content-between align-items-center">
-            <span>Статистика базы данных {loading && <Spinner animation="border" size="sm" className="ml-2" />}</span>
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-secondary" size="sm">
-                {dateRangeLabel}
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                <Dropdown.Item onClick={() => setDateRange(7, '7 дней')}>7 дней</Dropdown.Item>
-                <Dropdown.Item onClick={() => setDateRange(14, '2 недели')}>2 недели</Dropdown.Item>
-                <Dropdown.Item onClick={() => setDateRange(30, 'Месяц')}>Месяц</Dropdown.Item>
-                <Dropdown.Item onClick={() => setDateRange(90, '3 месяца')}>3 месяца</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          </div>
-        </Card.Header>
-        <Card.Body>
-          <Table striped bordered hover>
-            <tbody>
-              <tr><td>Размер (МБ)</td><td>{dbStats?.size_mb ? dbStats.size_mb.toFixed(2) : 'N/A'}</td></tr>
-              <tr><td>Активные подключения</td><td>{dbStats?.connections ?? 'N/A'}</td></tr>
-              <tr><td>Выполненные коммиты</td><td>{dbStats?.commits ?? 'N/A'}</td></tr>
-              <tr><td>Последнее обновление</td><td>{formatTimestamp(dbStats?.last_update)}</td></tr>
-              <tr><td>Время создания</td><td>{formatTimestamp(dbHistory?.creation_time)}</td></tr>
-              <tr><td>Общее количество подключений (период)</td><td>{dbHistory?.total_connections ?? 'N/A'}</td></tr>
-              <tr><td>Максимальное количество подключений</td><td>{dbHistory?.max_connections ?? 'N/A'}</td></tr>
-              <tr><td>Минимальное количество подключений</td><td>{dbHistory?.min_connections ?? 'N/A'}</td></tr>
-              <tr><td>Общее количество коммитов (период)</td><td>{dbHistory?.total_commits ?? 'N/A'}</td></tr>
-            </tbody>
-          </Table>
-
-          {dbHistory?.timeline?.length > 0 ? (
-            <div className="charts-container">
-              <div className="chart">
-                <canvas ref={connectionsCanvasRef} id="connectionsChart" />
-              </div>
-              <div className="chart">
-                <canvas ref={sizeCanvasRef} id="sizeChart" />
-              </div>
-              <div className="chart">
-                <canvas ref={commitsCanvasRef} id="commitsChart" />
-              </div>
+      {loading ? (
+        <Alert variant="info">Загрузка данных...</Alert>
+      ) : dbStats && dbHistory ? (
+        <Card className="mb-4">
+          <Card.Header>
+            <div className="d-flex justify-content-between align-items-center">
+              <span>Статистика базы данных</span>
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" size="sm">
+                  {dateRangeLabel}
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item onClick={() => setDateRange(7, '7 дней')}>7 дней</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setDateRange(14, '2 недели')}>2 недели</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setDateRange(30, 'Месяц')}>Месяц</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setDateRange(90, '3 месяца')}>3 месяца</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
             </div>
-          ) : (
-            <Alert variant="warning">Нет данных для отображения графиков за выбранный период</Alert>
-          )}
-        </Card.Body>
-      </Card>
+          </Card.Header>
+          <Card.Body>
+            <Table striped bordered hover>
+              <tbody>
+                <tr><td>Размер (МБ)</td><td>{dbStats.size_mb ? dbStats.size_mb.toFixed(2) : 'N/A'}</td></tr>
+                <tr><td>Активные подключения</td><td>{dbStats.connections ?? 'N/A'}</td></tr>
+                <tr><td>Выполненные коммиты</td><td>{dbStats.commits ?? 'N/A'}</td></tr>
+                <tr><td>Последнее обновление</td><td>{formatTimestamp(dbStats.last_update)}</td></tr>
+                <tr><td>Время создания</td><td>{formatTimestamp(dbHistory.creation_time)}</td></tr>
+                <tr><td>Общее количество подключений (период)</td><td>{dbHistory.total_connections ?? 'N/A'}</td></tr>
+                <tr><td>Максимальное количество подключений</td><td>{dbHistory.max_connections ?? 'N/A'}</td></tr>
+                <tr><td>Минимальное количество подключений</td><td>{dbHistory.min_connections ?? 'N/A'}</td></tr>
+                <tr><td>Общее количество коммитов (период)</td><td>{dbHistory.total_commits ?? 'N/A'}</td></tr>
+              </tbody>
+            </Table>
+
+            {dbHistory.timeline?.length > 0 ? (
+              <div className="charts-container">
+                <div className="chart">
+                  <canvas ref={connectionsCanvasRef} id="connectionsChart" />
+                </div>
+                <div className="chart">
+                  <canvas ref={sizeCanvasRef} id="sizeChart" />
+                </div>
+                <div className="chart">
+                  <canvas ref={commitsCanvasRef} id="commitsChart" />
+                </div>
+              </div>
+            ) : (
+              <Alert variant="warning">Нет данных для отображения графиков за выбранный период</Alert>
+            )}
+          </Card.Body>
+        </Card>
+      ) : (
+        <Alert variant="warning">Ожидание данных...</Alert>
+      )}
     </div>
   );
 }
