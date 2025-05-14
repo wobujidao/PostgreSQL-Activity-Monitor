@@ -57,6 +57,7 @@ function DatabaseDetails() {
           setDbStats(statsResponse.data);
           setDbHistory(historyResponse.data);
           setError(null);
+          console.log('States updated:', { dbStats: statsResponse.data, dbHistory: historyResponse.data });
         }
       } catch (err) {
         console.error('Fetch error:', err);
@@ -67,8 +68,8 @@ function DatabaseDetails() {
             localStorage.removeItem('token');
             navigate('/');
           }
-          setDbStats(dbStats || {});
-          setDbHistory(dbHistory || { timeline: [], creation_time: null });
+          setDbStats(null);
+          setDbHistory(null);
         }
       } finally {
         if (isMounted.current) {
@@ -87,9 +88,11 @@ function DatabaseDetails() {
 
   useEffect(() => {
     if (!dbHistory || !dbHistory.timeline || !connectionsCanvasRef.current || !sizeCanvasRef.current || !commitsCanvasRef.current) {
-      console.log('Skipping chart render: incomplete data or canvas refs');
+      console.log('Skipping chart render: incomplete data or canvas refs', { dbHistory, connectionsCanvasRef: !!connectionsCanvasRef.current });
       return;
     }
+
+    console.log('Rendering charts with timeline:', dbHistory.timeline);
 
     if (connectionsChartRef.current) {
       connectionsChartRef.current.destroy();
@@ -232,7 +235,7 @@ function DatabaseDetails() {
         commitsChartRef.current = null;
       }
     };
-  }, [dbHistory, dbStats, db_name]);
+  }, [dbHistory, db_name]);
 
   const setDateRange = (days, label) => {
     const end = new Date();
@@ -257,10 +260,22 @@ function DatabaseDetails() {
     });
   };
 
+  // Debug: Log current states
+  console.log('Rendering with states:', { dbStats, dbHistory, error, loading });
+
   return (
     <div className="container mt-5">
       <h2>База данных: {db_name} (Сервер: {name})</h2>
       <Link to={`/server/${name}`} className="btn btn-secondary mb-4">Назад к серверу</Link>
+
+      {/* Debug: Display raw state data */}
+      <div style={{ marginBottom: '20px', background: '#f0f0f0', padding: '10px' }}>
+        <strong>Debug States:</strong><br />
+        dbStats: {JSON.stringify(dbStats)}<br />
+        dbHistory: {JSON.stringify(dbHistory)}<br />
+        error: {error || 'null'}<br />
+        loading: {loading.toString()}
+      </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
 
