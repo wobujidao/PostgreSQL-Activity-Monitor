@@ -257,14 +257,6 @@ function DatabaseDetails() {
       <h2>База данных: {db_name} (Сервер: {name})</h2>
       <Link to={`/server/${name}`} className="btn btn-secondary mb-4">Назад к серверу</Link>
 
-      <div style={{ marginBottom: '20px', background: '#f0f0f0', padding: '10px' }}>
-        <strong>Debug States:</strong><br />
-        dbStats: {JSON.stringify(dbStats)}<br />
-        dbHistory: {JSON.stringify(dbHistory)}<br />
-        error: {error || 'null'}<br />
-        loading: {loading.toString()}
-      </div>
-
       {error && <Alert variant="danger">{error}</Alert>}
 
       {loading ? (
