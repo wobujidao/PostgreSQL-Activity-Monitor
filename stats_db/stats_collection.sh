@@ -9,7 +9,7 @@ SOURCE_DB="postgres"
 STAT_DB="stats_db"
 LOG_FILE="/var/log/pg_stats.log"
 MAX_LOG_SIZE=5242880  # 5 МБ
-LOCK_FILE="/var/run/pg_stats_collection.lock"
+LOCK_FILE="/tmp/pg_stats_collection.lock"
 
 # Проверка на повторный запуск
 if [ -f "$LOCK_FILE" ]; then
