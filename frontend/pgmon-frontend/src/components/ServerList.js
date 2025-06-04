@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Table, Button, Modal, Form, Card, Alert } from 'react-bootstrap';
+import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import MetricsOverview from './MetricsOverview';
 import './ServerList.css';
 
 function ServerList() {
@@ -20,8 +21,12 @@ function ServerList() {
     ssh_port: 22
   });
   const [errorMessage, setErrorMessage] = useState('');
-  const [refreshInterval, setRefreshInterval] = useState(60000); // Увеличено до 60 секунд
+  const [refreshInterval, setRefreshInterval] = useState(60000);
   const [timeLeft, setTimeLeft] = useState(refreshInterval / 1000);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -131,9 +136,24 @@ function ServerList() {
     setTimeLeft(value / 1000);
   };
 
-  const formatBytes = (bytes) => bytes ? `${(bytes / 1073741824).toFixed(2)} ГБ` : 'N/A';
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return 'N/A';
+    const sizes = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+  };
 
   const formatUptime = (hours) => {
+    if (!hours) return 'N/A';
     const totalSeconds = hours * 3600;
     const days = Math.floor(totalSeconds / 86400);
     const hoursLeft = Math.floor((totalSeconds % 86400) / 3600);
@@ -141,78 +161,292 @@ function ServerList() {
     return `${days} д. ${hoursLeft} ч. ${minutes} мин.`;
   };
 
+  const getServerStatus = (server) => {
+    if (!server.status || server.status === 'failed' || server.status.includes('error')) {
+      return { 
+        class: 'error', 
+        text: 'Connection Failed',
+        tooltip: 'Не удается подключиться к серверу. Проверьте сетевое соединение и настройки подключения.'
+      };
+    }
+    if (server.status === 'ok' || server.status.includes('ok')) {
+      const totalConnections = (server.connections?.active || 0) + (server.connections?.idle || 0);
+      if (totalConnections > 50) {
+        return { 
+          class: 'warning', 
+          text: 'High Load',
+          tooltip: `Высокая нагрузка: ${totalConnections} активных соединений. Рекомендуется мониторинг производительности.`
+        };
+      }
+      return { 
+        class: 'online', 
+        text: 'Online',
+        tooltip: `Сервер работает нормально. Соединений: ${totalConnections}`
+      };
+    }
+    return { 
+      class: 'offline', 
+      text: 'Unknown',
+      tooltip: 'Статус сервера неизвестен. Возможны проблемы с мониторингом.'
+    };
+  };
+
+  const getDiskUsageClass = (freeSpace, totalSpace) => {
+    if (!freeSpace || !totalSpace) return 'danger';
+    const usedPercent = ((totalSpace - freeSpace) / totalSpace) * 100;
+    if (usedPercent < 70) return 'success';
+    if (usedPercent < 85) return 'warning';
+    return 'danger';
+  };
+
+  const getDiskUsagePercent = (freeSpace, totalSpace) => {
+    if (!freeSpace || !totalSpace) return 0;
+    return ((totalSpace - freeSpace) / totalSpace) * 100;
+  };
+
+  const getSortValue = (server, field) => {
+    switch (field) {
+      case 'name':
+        return server.name || '';
+      case 'host':
+        return server.host || '';
+      case 'version':
+        return server.version || '';
+      case 'connections':
+        return (server.connections?.active || 0) + (server.connections?.idle || 0);
+      case 'free_space':
+        return server.free_space || 0;
+      case 'uptime':
+        return server.uptime_hours || 0;
+      case 'status':
+        return getServerStatus(server).text;
+      default:
+        return '';
+    }
+  };
+
+  const filteredServers = servers.filter(server => {
+    const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         server.host.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (statusFilter === 'all') return matchesSearch;
+    if (statusFilter === 'online') return matchesSearch && getServerStatus(server).class === 'online';
+    if (statusFilter === 'error') return matchesSearch && getServerStatus(server).class === 'error';
+    
+    return matchesSearch;
+  }).sort((a, b) => {
+    const aValue = getSortValue(a, sortField);
+    const bValue = getSortValue(b, sortField);
+    
+    if (typeof aValue === 'string') {
+      return sortDirection === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    } else {
+      return sortDirection === 'asc' 
+        ? aValue - bValue
+        : bValue - aValue;
+    }
+  });
+
   const progress = (timeLeft / (refreshInterval / 1000)) * 100;
 
+  const getSortClass = (field) => {
+    if (sortField !== field) return 'sortable';
+    return `sortable sorted-${sortDirection}`;
+  };
+
   return (
-    <div className="container mt-5">
+    <div className="container mt-4">
+      {/* Метрики */}
+      <MetricsOverview servers={servers} />
+
+      {/* Панель фильтров */}
       <Card className="mb-4">
-        <Card.Header>
-          <div className="d-flex justify-content-between align-items-center">
-            <span>Сервера</span>
-            <Form.Group controlId="refreshInterval" className="d-flex align-items-center">
-              <Form.Label className="refresh-label mr-2">Обновление каждые:</Form.Label>
-              <Form.Select
-                value={refreshInterval}
-                onChange={handleIntervalChange}
-                style={{ width: 'auto' }}
-                className="mr-3"
-              >
-                <option value={5000}>5 сек</option>
-                <option value={10000}>10 сек</option>
-                <option value={15000}>15 сек</option>
-                <option value={30000}>30 сек</option>
-                <option value={60000}>1 мин</option>
-              </Form.Select>
-              <div className="progress-circle" style={{ '--progress': `${progress}%` }}>
-                <span>{timeLeft} с</span>
+        <Card.Body className="py-3">
+          <Row className="align-items-center">
+            <Col md={4}>
+              <div className="d-flex align-items-center gap-2">
+                <label className="mb-0 font-weight-medium">Статус:</label>
+                <Form.Select
+                  size="sm"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  style={{ width: 'auto' }}
+                >
+                  <option value="all">Все серверы</option>
+                  <option value="online">Только активные</option>
+                  <option value="error">С ошибками</option>
+                </Form.Select>
               </div>
-            </Form.Group>
-          </div>
-        </Card.Header>
-        <Card.Body>
-          {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
-          <Table striped bordered hover>
-            <thead>
-              <tr>
-                <th>Сервер</th>
-                <th>IP</th>
-                <th>Версия PostgreSQL</th>
-                <th>Свободное место</th>
-                <th>Соединения</th>
-                <th>Uptime</th>
-                <th>Статус</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {servers.map(server => (
-                <tr key={server.name}>
-                  <td><Link to={`/server/${server.name}`}>{server.name}</Link></td>
-                  <td>{server.host}</td>
-                  <td>{server.version || 'N/A'}</td>
-                  <td>{formatBytes(server.free_space)}</td>
-                  <td>{server.connections ? `${server.connections.active} активных, ${server.connections.idle} простаивающих` : 'N/A'}</td>
-                  <td>{server.uptime_hours ? formatUptime(server.uptime_hours) : 'N/A'}</td>
-                  <td>{server.status}</td>
-                  <td>
-                    <Button variant="primary" className="mr-2" onClick={() => handleEdit(server)}>
-                      Редактировать
-                    </Button>
-                    <Button variant="danger" onClick={() => handleDelete(server.name)}>
-                      Удалить
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+            </Col>
+            <Col md={4}>
+              <div className="d-flex align-items-center gap-2">
+                <label className="mb-0 font-weight-medium">Поиск:</label>
+                <Form.Control
+                  size="sm"
+                  type="text"
+                  placeholder="Имя сервера..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </Col>
+            <Col md={4}>
+              <div className="d-flex align-items-center justify-content-end gap-3">
+                <div className="d-flex align-items-center gap-2">
+                  <label className="mb-0 font-weight-medium">Обновление:</label>
+                  <Form.Select
+                    size="sm"
+                    value={refreshInterval}
+                    onChange={handleIntervalChange}
+                    style={{ width: 'auto' }}
+                  >
+                    <option value={5000}>5 сек</option>
+                    <option value={10000}>10 сек</option>
+                    <option value={15000}>15 сек</option>
+                    <option value={30000}>30 сек</option>
+                    <option value={60000}>1 мин</option>
+                  </Form.Select>
+                </div>
+                <div className="progress-circle" style={{ '--progress': `${progress}%` }}>
+                  <span>{timeLeft}с</span>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => window.location.reload()}
+                >
+                  🔄 Обновить
+                </Button>
+              </div>
+            </Col>
+          </Row>
         </Card.Body>
       </Card>
 
-      <Button variant="success" onClick={handleAdd}>
-        Добавить сервер
-      </Button>
+      {/* Таблица серверов */}
+      <Card>
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <h5 className="mb-0">Серверы PostgreSQL</h5>
+          <Button variant="success" size="sm" onClick={handleAdd}>
+            + Добавить сервер
+          </Button>
+        </Card.Header>
+        <Card.Body className="p-0">
+          {errorMessage && (
+            <Alert variant="danger" className="m-3 mb-0">
+              {errorMessage}
+            </Alert>
+          )}
+          <div className="table-responsive">
+            <Table className="mb-0" hover>
+              <thead>
+                <tr>
+                  <th className={getSortClass('name')} onClick={() => handleSort('name')}>
+                    Сервер
+                  </th>
+                  <th className={getSortClass('host')} onClick={() => handleSort('host')}>
+                    IP адрес
+                  </th>
+                  <th className={getSortClass('version')} onClick={() => handleSort('version')}>
+                    Версия PG
+                  </th>
+                  <th className={getSortClass('connections')} onClick={() => handleSort('connections')}>
+                    Соединения
+                  </th>
+                  <th className={getSortClass('free_space')} onClick={() => handleSort('free_space')}>
+                    Свободное место
+                  </th>
+                  <th className={getSortClass('uptime')} onClick={() => handleSort('uptime')}>
+                    Uptime
+                  </th>
+                  <th className={getSortClass('status')} onClick={() => handleSort('status')}>
+                    Статус
+                  </th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredServers.map(server => {
+                  const status = getServerStatus(server);
+                  const diskClass = getDiskUsageClass(server.free_space, server.total_space);
+                  const diskPercent = getDiskUsagePercent(server.free_space, server.total_space);
+                  
+                  return (
+                    <tr key={server.name}>
+                      <td>
+                        <Link to={`/server/${server.name}`} className="font-weight-medium">
+                          {server.name}
+                        </Link>
+                      </td>
+                      <td>
+                        <code className="server-ip">{server.host}</code>
+                      </td>
+                      <td className="text-sm">{server.version || 'N/A'}</td>
+                      <td className="text-sm">
+                        {server.connections ? (
+                          <>
+                            <span className="connections-active">{server.connections.active || 0} активных</span>
+                            {' / '}
+                            <span className="connections-idle">{server.connections.idle || 0} idle</span>
+                          </>
+                        ) : 'N/A'}
+                      </td>
+                      <td>
+                        <div className="disk-usage">
+                          <div className="disk-usage-text">{formatBytes(server.free_space)}</div>
+                          {server.total_space && (
+                            <OverlayTrigger
+                              placement="top"
+                              overlay={
+                                <Tooltip>
+                                  Использовано: {diskPercent.toFixed(1)}% 
+                                  ({formatBytes(server.total_space - server.free_space)} из {formatBytes(server.total_space)})
+                                </Tooltip>
+                              }
+                            >
+                              <div className="disk-progress">
+                                <div 
+                                  className={`disk-progress-bar ${diskClass}`}
+                                  style={{ width: `${diskPercent}%` }}
+                                ></div>
+                              </div>
+                            </OverlayTrigger>
+                          )}
+                        </div>
+                      </td>
+                      <td className="uptime-info">{formatUptime(server.uptime_hours)}</td>
+                      <td>
+                        <OverlayTrigger
+                          placement="top"
+                          overlay={<Tooltip>{status.tooltip}</Tooltip>}
+                        >
+                          <span className={`server-status ${status.class}`}>
+                            {status.text}
+                          </span>
+                        </OverlayTrigger>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-btn edit"
+                            onClick={() => handleEdit(server)}
+                          >
+                            Управление
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </div>
+        </Card.Body>
+      </Card>
 
+      {/* Модальное окно редактирования */}
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Редактировать сервер</Modal.Title>
@@ -220,8 +454,8 @@ function ServerList() {
         <Modal.Body>
           {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
           {editServer && (
-            <Form>
-              <Form.Group>
+            <Form className="modal-form">
+              <Form.Group className="mb-3">
                 <Form.Label>Название</Form.Label>
                 <Form.Control
                   type="text"
@@ -229,7 +463,7 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, name: e.target.value })}
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Хост</Form.Label>
                 <Form.Control
                   type="text"
@@ -237,7 +471,7 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, host: e.target.value })}
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Пользователь PostgreSQL</Form.Label>
                 <Form.Control
                   type="text"
@@ -245,7 +479,7 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, user: e.target.value })}
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Пароль PostgreSQL</Form.Label>
                 <Form.Control
                   type="password"
@@ -254,7 +488,7 @@ function ServerList() {
                   placeholder="Оставьте пустым, если не меняете"
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Порт PostgreSQL</Form.Label>
                 <Form.Control
                   type="number"
@@ -262,7 +496,7 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, port: parseInt(e.target.value) })}
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Пользователь SSH</Form.Label>
                 <Form.Control
                   type="text"
@@ -270,7 +504,7 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, ssh_user: e.target.value })}
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Пароль SSH</Form.Label>
                 <Form.Control
                   type="password"
@@ -279,7 +513,7 @@ function ServerList() {
                   placeholder="Оставьте пустым, если не меняете"
                 />
               </Form.Group>
-              <Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Порт SSH</Form.Label>
                 <Form.Control
                   type="number"
@@ -300,14 +534,15 @@ function ServerList() {
         </Modal.Footer>
       </Modal>
 
+      {/* Модальное окно добавления */}
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Добавить сервер</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
-          <Form>
-            <Form.Group>
+          <Form className="modal-form">
+            <Form.Group className="mb-3">
               <Form.Label>Название</Form.Label>
               <Form.Control
                 type="text"
@@ -315,7 +550,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Хост</Form.Label>
               <Form.Control
                 type="text"
@@ -323,7 +558,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, host: e.target.value })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Пользователь PostgreSQL</Form.Label>
               <Form.Control
                 type="text"
@@ -331,7 +566,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, user: e.target.value })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Пароль PostgreSQL</Form.Label>
               <Form.Control
                 type="password"
@@ -339,7 +574,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, password: e.target.value })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Порт PostgreSQL</Form.Label>
               <Form.Control
                 type="number"
@@ -347,7 +582,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Пользователь SSH</Form.Label>
               <Form.Control
                 type="text"
@@ -355,7 +590,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, ssh_user: e.target.value })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Пароль SSH</Form.Label>
               <Form.Control
                 type="password"
@@ -363,7 +598,7 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, ssh_password: e.target.value })}
               />
             </Form.Group>
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label>Порт SSH</Form.Label>
               <Form.Control
                 type="number"

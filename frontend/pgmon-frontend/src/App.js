@@ -12,7 +12,7 @@ function AppContent() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [refreshUsername, setRefreshUsername] = useState(localStorage.getItem('username') || '');
+  const [currentUser, setCurrentUser] = useState(localStorage.getItem('username') || '');
   const [refreshPassword, setRefreshPassword] = useState('');
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState('unknown');
@@ -22,7 +22,6 @@ function AppContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
 
-  const TOKEN_EXPIRATION_MS = 60 * 60 * 1000; // 60 минут
   const WARNING_TIME_MS = 5 * 60 * 1000; // 5 минут до истечения
 
   const decodeToken = (token) => {
@@ -38,7 +37,8 @@ function AppContent() {
   };
 
   const refreshToken = async () => {
-    if (!refreshUsername || !refreshPassword) {
+    const storedUsername = localStorage.getItem('username');
+    if (!storedUsername || !refreshPassword) {
       setShowSessionModal(false);
       setShowRefreshLoginModal(true);
       return;
@@ -47,7 +47,7 @@ function AppContent() {
     try {
       const response = await axios.post(
         'http://10.110.20.55:8000/token',
-        `username=${refreshUsername}&password=${refreshPassword}`,
+        `username=${storedUsername}&password=${refreshPassword}`,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       const newToken = response.data.access_token;
@@ -70,6 +70,7 @@ function AppContent() {
 
   const handleLogout = () => {
     setToken(null);
+    setCurrentUser('');
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     setShowSessionModal(false);
@@ -149,7 +150,7 @@ function AppContent() {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
     };
-  }, [timeLeft, showSessionModal, showRefreshLoginModal]);
+  }, [timeLeft, showSessionModal, showRefreshLoginModal, WARNING_TIME_MS]);
 
   const login = async () => {
     try {
@@ -159,6 +160,7 @@ function AppContent() {
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       setToken(response.data.access_token);
+      setCurrentUser(username);
       localStorage.setItem('token', response.data.access_token);
       localStorage.setItem('username', username);
       setError(null);
@@ -181,23 +183,23 @@ function AppContent() {
     return (
       <div className="App">
         <Container>
-          <h1 className="text-center my-4">Вход</h1>
           <div className="login-form">
+            <h1>Вход в систему</h1>
             <input
               type="text"
-              className="form-control mb-3"
+              className="form-control"
               placeholder="Логин"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
             <input
               type="password"
-              className="form-control mb-3"
+              className="form-control"
               placeholder="Пароль"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <Button variant="primary" onClick={login}>
+            <Button variant="primary" onClick={login} className="w-100 mt-3">
               Войти
             </Button>
             {error && <p className="text-danger mt-3">{error}</p>}
@@ -207,22 +209,35 @@ function AppContent() {
     );
   }
 
+  const storedUsername = localStorage.getItem('username') || '';
+
   return (
     <div className="App">
-      <Navbar bg="dark" variant="dark">
+      <Navbar bg="dark" variant="dark" className="px-0">
         <Container>
           <Navbar.Brand>
-            PostgreSQL Monitor
-            <span className={`backend-status ml-2 ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
-              {backendStatus === 'available' ? 'Бэкэнд доступен' : 'Бэкэнд недоступен'}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="me-2">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+            </svg>
+            PostgreSQL Activity Monitor
+            <span className={`backend-status ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
+              {backendStatus === 'available' ? 'Backend Active' : 'Backend Unavailable'}
             </span>
           </Navbar.Brand>
-          <Button variant="secondary" onClick={handleLogout}>
-            Выход
-          </Button>
+          <div className="d-flex align-items-center">
+            {currentUser && (
+              <span className="user-info">
+                {currentUser}@pgmon
+              </span>
+            )}
+            <Button variant="secondary" onClick={handleLogout}>
+              Выход
+            </Button>
+          </div>
         </Container>
       </Navbar>
-      <Container className="mt-5">
+      
+      <Container className="mt-4">
         <Routes>
           <Route exact path="/" element={<ServerList />} />
           <Route path="/server/:name" element={<ServerDetails />} />
@@ -254,7 +269,7 @@ function AppContent() {
         </Modal.Header>
         <Modal.Body>
           <div>
-            <p>Введите пароль для пользователя {refreshUsername}:</p>
+            <p>Введите пароль для пользователя {storedUsername}:</p>
             <Form.Control
               type="password"
               className="mb-3"
