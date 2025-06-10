@@ -472,3 +472,317 @@
     text-align: center;
   }
 }
+
+
+
+/* ===== ДОПОЛНИТЕЛЬНЫЕ СТИЛИ ДЛЯ АНАЛИЗА БАЗ ДАННЫХ ===== */
+
+/* Вкладки */
+.nav-tabs {
+  border-bottom: 2px solid #dee2e6;
+  margin-bottom: 24px;
+}
+
+.nav-tabs .nav-link {
+  color: #6c757d;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 12px 4px;
+  margin-right: 32px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.nav-tabs .nav-link:hover {
+  color: #495057;
+  border-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+  color: #3498db;
+  background: none;
+  border-bottom-color: #3498db;
+}
+
+.nav-tabs .badge {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  background: #dc3545;
+}
+
+/* Метрики анализа */
+.analysis-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+  transition: transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.metric-card.danger::before {
+  background: #e74c3c;
+}
+
+.metric-card.warning::before {
+  background: #f39c12;
+}
+
+.metric-card.info::before {
+  background: #3498db;
+}
+
+.metric-card.success::before {
+  background: #27ae60;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.metric-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 12px 0;
+  line-height: 1;
+}
+
+.metric-label {
+  color: #7f8c8d;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-sublabel {
+  font-size: 0.8125rem;
+  color: #95a5a6;
+  margin-top: 4px;
+}
+
+/* Визуализация баз данных */
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.db-tile {
+  padding: 16px;
+  border-radius: 8px;
+  border: 2px solid;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.db-tile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.db-tile.dead {
+  background: #fee;
+  border-color: #fcc;
+  color: #e74c3c;
+}
+
+.db-tile.warning {
+  background: #fff8e1;
+  border-color: #ffe082;
+  color: #f57c00;
+}
+
+.db-tile.static {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  color: #616161;
+}
+
+.db-tile.healthy {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #2e7d32;
+}
+
+.db-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-info {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin: 2px 0;
+}
+
+/* Таблица анализа */
+.analysis-table {
+  font-size: 0.875rem;
+}
+
+.analysis-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+.analysis-table .status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.analysis-table .status-badge.dead {
+  background: #dc3545;
+  color: white;
+}
+
+.analysis-table .status-badge.static {
+  background: #6c757d;
+  color: white;
+}
+
+.analysis-table .status-badge.warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.analysis-table .reason {
+  color: #6c757d;
+  font-size: 0.8125rem;
+}
+
+/* Фильтры */
+.filter-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: white;
+  min-width: 180px;
+}
+
+/* Кнопка экспорта */
+.export-btn {
+  padding: 8px 16px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.export-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Пустое состояние */
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  color: #7f8c8d;
+}
+
+.empty-state h5 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+  color: #34495e;
+}
+
+/* Настройки критериев */
+.criteria-form {
+  max-width: 600px;
+}
+
+.criteria-form .form-group {
+  margin-bottom: 24px;
+}
+
+.criteria-form .form-label {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #2c3e50;
+}
+
+.criteria-form .form-text {
+  font-size: 0.8125rem;
+  color: #7f8c8d;
+  margin-top: 4px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .analysis-metrics {
+    grid-template-columns: 1fr;
+  }
+  
+  .db-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+  }
+  
+  .nav-tabs .nav-link {
+    margin-right: 16px;
+    font-size: 0.875rem;
+  }
+  
+  .filter-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filter-select {
+    width: 100%;
+  }
+}
