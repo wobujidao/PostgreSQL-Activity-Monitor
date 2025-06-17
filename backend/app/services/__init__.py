@@ -11,3 +11,8 @@ __all__ = [
     "save_servers", 
     "connect_to_server"
 ]
+from .user_manager import UserManager
+
+user_manager = UserManager()
+
+__all__.extend(["UserManager", "user_manager"])

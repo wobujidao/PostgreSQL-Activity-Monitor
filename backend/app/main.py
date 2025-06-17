@@ -6,6 +6,7 @@ import logging
 from app.config import ALLOWED_ORIGINS, LOG_LEVEL
 from app.api import auth_router, servers_router, health_router, stats_router
 from app.database import db_pool
+from app.api import users_router
 
 # Настройка логирования
 logging.basicConfig(
@@ -51,6 +52,7 @@ app.include_router(auth_router)
 app.include_router(servers_router)
 app.include_router(health_router)
 app.include_router(stats_router)
+app.include_router(users_router, tags=["users"])
 
 # Корневой маршрут
 @app.get("/")
