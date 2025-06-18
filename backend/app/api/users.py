@@ -37,6 +37,20 @@ async def create_user(
             detail=str(e)
         )
 
+@router.get("/users/me", response_model=UserResponse)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user)
+):
+    """Получить информацию о текущем пользователе"""
+    return UserResponse(
+        login=current_user.login,
+        role=current_user.role,
+        email=current_user.email,
+        created_at=current_user.created_at,
+        last_login=current_user.last_login,
+        is_active=current_user.is_active
+    )
+
 @router.get("/users/{username}", response_model=UserResponse)
 async def get_user(
     username: str,
@@ -94,17 +108,3 @@ async def delete_user(
         )
     
     return {"message": f"Пользователь {username} удален"}
-
-@router.get("/users/me", response_model=UserResponse)
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user)
-):
-    """Получить информацию о текущем пользователе"""
-    return UserResponse(
-        login=current_user.login,
-        role=current_user.role,
-        email=current_user.email,
-        created_at=current_user.created_at,
-        last_login=current_user.last_login,
-        is_active=current_user.is_active
-    )
