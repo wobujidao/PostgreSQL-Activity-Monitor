@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Navbar, Button, Modal, Spinner, Form, Dropdown } from 'react-bootstrap';
+import { Container, Navbar, Button, Modal, Spinner, Form } from 'react-bootstrap';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
 import DatabaseDetails from './components/DatabaseDetails';
-import UserManagement from './components/UserManagement';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -14,7 +13,6 @@ function AppContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [currentUser, setCurrentUser] = useState(localStorage.getItem('username') || '');
-  const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || '');
   const [refreshPassword, setRefreshPassword] = useState('');
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState('unknown');
@@ -73,10 +71,8 @@ function AppContent() {
   const handleLogout = () => {
     setToken(null);
     setCurrentUser('');
-    setUserRole('');
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    localStorage.removeItem('userRole');
     setShowSessionModal(false);
     setShowRefreshLoginModal(false);
     setBackendStatus('unavailable');
@@ -103,25 +99,6 @@ function AppContent() {
       const interval = setInterval(checkBackendStatus, 5000);
       return () => clearInterval(interval);
     }
-  }, [token]);
-
-  // Получение информации о текущем пользователе
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      if (token) {
-        try {
-          const response = await axios.get('http://10.110.20.55:8000/users/me', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setUserRole(response.data.role);
-          localStorage.setItem('userRole', response.data.role);
-        } catch (error) {
-          console.error('Ошибка получения информации о пользователе:', error);
-        }
-      }
-    };
-
-    fetchUserInfo();
   }, [token]);
 
   useEffect(() => {
@@ -249,50 +226,22 @@ function AppContent() {
           </Navbar.Brand>
           <div className="d-flex align-items-center">
             {currentUser && (
-              <>
-                <span className="user-info">
-                  {currentUser}@pgmon
-                </span>
-                <Dropdown align="end" className="ms-2">
-                  <Dropdown.Toggle variant="secondary" size="sm" id="user-dropdown">
-                    👤
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Header>
-                      {currentUser}
-                      <div className="text-muted small">
-                        {userRole === 'admin' ? '👑 Администратор' : 
-                         userRole === 'operator' ? '⚙️ Оператор' : 
-                         '👁️ Просмотр'}
-                      </div>
-                    </Dropdown.Header>
-                    <Dropdown.Divider />
-                    {/* Показываем только админам */}
-                    {userRole === 'admin' && (
-                      <>
-                        <Dropdown.Item onClick={() => navigate('/users')}>
-                          ⚙️ Управление пользователями
-                        </Dropdown.Item>
-                        <Dropdown.Divider />
-                      </>
-                    )}
-                    <Dropdown.Item onClick={handleLogout}>
-                      🚪 Выход
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </>
+              <span className="user-info">
+                {currentUser}@pgmon
+              </span>
             )}
+            <Button variant="secondary" onClick={handleLogout}>
+              Выход
+            </Button>
           </div>
         </Container>
       </Navbar>
-
+      
       <Container className="mt-4">
         <Routes>
           <Route exact path="/" element={<ServerList />} />
           <Route path="/server/:name" element={<ServerDetails />} />
           <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
-          <Route path="/users" element={userRole === 'admin' ? <UserManagement /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Container>
