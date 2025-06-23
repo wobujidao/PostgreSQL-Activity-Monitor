@@ -519,3 +519,98 @@ a:hover {
     min-width: 100%;
   }
 }
+/* ===== НОВЫЕ СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ===== */
+
+/* Модальные окна сессии */
+.session-modal .modal-content,
+.refresh-modal .modal-content {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.session-modal .modal-header,
+.refresh-modal .modal-header {
+  background: linear-gradient(135deg, #f8f9fa, #ffffff);
+  padding: 1.5rem;
+  border-radius: 12px 12px 0 0;
+}
+
+.session-modal .modal-title,
+.refresh-modal .modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.session-modal .modal-body,
+.refresh-modal .modal-body {
+  padding: 2rem;
+}
+
+.session-modal .modal-footer,
+.refresh-modal .modal-footer {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Таймер сессии */
+.session-timer h2 {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--danger-color);
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+/* Стилизованные поля ввода в модальных окнах */
+.form-control-styled {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.form-control-styled:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+}
+
+/* Анимация появления модальных окон */
+.modal.show .modal-dialog {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Кнопки в модальных окнах */
+.session-modal .btn,
+.refresh-modal .btn {
+  padding: 0.5rem 1.5rem;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.session-modal .btn:hover,
+.refresh-modal .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Backdrop с blur эффектом */
+.modal-backdrop.show {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.5);
+}

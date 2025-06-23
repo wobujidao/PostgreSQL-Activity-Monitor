@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Navbar, Button, Modal, Spinner, Form, Dropdown } from 'react-bootstrap';
+import Login from './components/Login';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
 import DatabaseDetails from './components/DatabaseDetails';
@@ -11,8 +12,6 @@ import './App.css';
 
 function AppContent() {
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [currentUser, setCurrentUser] = useState(localStorage.getItem('username') || '');
   const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || '');
   const [refreshPassword, setRefreshPassword] = useState('');
@@ -175,7 +174,7 @@ function AppContent() {
     };
   }, [timeLeft, showSessionModal, showRefreshLoginModal, WARNING_TIME_MS]);
 
-  const login = async () => {
+  const login = async (username, password) => {
     try {
       const response = await axios.post(
         'http://10.110.20.55:8000/token',
@@ -203,33 +202,7 @@ function AppContent() {
   };
 
   if (!token) {
-    return (
-      <div className="App">
-        <Container>
-          <div className="login-form">
-            <h1>Вход в систему</h1>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Логин"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <input
-              type="password"
-              className="form-control"
-              placeholder="Пароль"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <Button variant="primary" onClick={login} className="w-100 mt-3">
-              Войти
-            </Button>
-            {error && <p className="text-danger mt-3">{error}</p>}
-          </div>
-        </Container>
-      </div>
-    );
+    return <Login onLogin={login} error={error} />;
   }
 
   const storedUsername = localStorage.getItem('username') || '';
@@ -297,45 +270,74 @@ function AppContent() {
         </Routes>
       </Container>
 
-      <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false}>
-        <Modal.Header>
-          <Modal.Title>Сессия истекает</Modal.Title>
+      {/* Модальное окно продления сессии с новым дизайном */}
+      <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false} centered className="session-modal">
+        <Modal.Header className="border-0">
+          <Modal.Title className="d-flex align-items-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="me-2 text-warning">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            Сессия истекает
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Время вашей сессии истекает через {formatTimeLeft(timeLeft)}. Хотите продлить сессию или выйти?
+          <div className="text-center">
+            <div className="session-timer mb-3">
+              <h2 className="mb-1">{formatTimeLeft(timeLeft)}</h2>
+              <p className="text-muted">Время вашей сессии истекает</p>
+            </div>
+            <p>Хотите продлить сессию или выйти?</p>
+          </div>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="success" onClick={refreshToken} disabled={isRefreshing}>
+        <Modal.Footer className="border-0 justify-content-center">
+          <Button 
+            variant="success" 
+            onClick={refreshToken} 
+            disabled={isRefreshing}
+            className="px-4"
+          >
             {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Продолжить'}
           </Button>
-          <Button variant="danger" onClick={handleLogout}>
+          <Button variant="danger" onClick={handleLogout} className="px-4">
             Выйти
           </Button>
         </Modal.Footer>
       </Modal>
 
-      <Modal show={showRefreshLoginModal} onHide={() => {}} backdrop="static" keyboard={false}>
-        <Modal.Header>
-          <Modal.Title>Продление сессии</Modal.Title>
+      {/* Модальное окно ввода пароля для продления сессии */}
+      <Modal show={showRefreshLoginModal} onHide={() => {}} backdrop="static" keyboard={false} centered className="refresh-modal">
+        <Modal.Header className="border-0">
+          <Modal.Title className="d-flex align-items-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="me-2 text-primary">
+              <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+            Продление сессии
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div>
-            <p>Введите пароль для пользователя {storedUsername}:</p>
+            <p className="mb-3">Введите пароль для пользователя <strong>{storedUsername}</strong>:</p>
             <Form.Control
               type="password"
-              className="mb-3"
+              className="mb-3 form-control-styled"
               placeholder="Пароль"
               value={refreshPassword}
               onChange={(e) => setRefreshPassword(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleRefreshLogin()}
             />
-            {error && <p className="text-danger">{error}</p>}
+            {error && <div className="alert alert-danger py-2">{error}</div>}
           </div>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="success" onClick={handleRefreshLogin} disabled={isRefreshing}>
+        <Modal.Footer className="border-0 justify-content-center">
+          <Button 
+            variant="success" 
+            onClick={handleRefreshLogin} 
+            disabled={isRefreshing || !refreshPassword}
+            className="px-4"
+          >
             {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Войти'}
           </Button>
-          <Button variant="danger" onClick={handleLogout}>
+          <Button variant="danger" onClick={handleLogout} className="px-4">
             Выйти
           </Button>
         </Modal.Footer>
