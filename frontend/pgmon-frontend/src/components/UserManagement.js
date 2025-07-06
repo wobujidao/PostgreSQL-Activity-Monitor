@@ -6,14 +6,11 @@ import {
   Button, 
   Modal, 
   Form, 
-  Alert, 
-  Spinner,
-  Badge,
-  OverlayTrigger,
-  Tooltip
+  Alert
 } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import LoadingSpinner from './LoadingSpinner';
 import './UserManagement.css';
 
 const API_BASE_URL = 'http://10.110.20.55:8000';
@@ -168,22 +165,12 @@ function UserManagement() {
     setTimeout(() => setSuccessMessage(''), 3000);
   };
 
-  // Получение цвета для роли
-  const getRoleBadgeVariant = (role) => {
-    switch (role) {
-      case 'admin': return 'danger';
-      case 'operator': return 'warning';
-      case 'viewer': return 'info';
-      default: return 'secondary';
-    }
-  };
-
   // Получение названия роли на русском
   const getRoleName = (role) => {
     switch (role) {
-      case 'admin': return 'Администратор';
-      case 'operator': return 'Оператор';
-      case 'viewer': return 'Просмотр';
+      case 'admin': return '👑 Администратор';
+      case 'operator': return '⚙️ Оператор';
+      case 'viewer': return '👁️ Просмотр';
       default: return role;
     }
   };
@@ -226,44 +213,70 @@ function UserManagement() {
   };
 
   if (loading) {
-    return (
-      <Container className="text-center mt-5">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Загрузка...</span>
-        </Spinner>
-      </Container>
-    );
+    return <LoadingSpinner text="Загрузка пользователей..." subtext="Получение списка" />;
   }
 
   return (
     <Container className="mt-4">
-      <div className="user-management-header">
-        <div>
-          <h2>Управление пользователями</h2>
-          <p className="text-muted">
-            Всего пользователей: {users.length} | 
-            Администраторов: {users.filter(u => u.role === 'admin').length} | 
-            Операторов: {users.filter(u => u.role === 'operator').length} | 
-            Просмотр: {users.filter(u => u.role === 'viewer').length}
-          </p>
-        </div>
-        <div className="header-actions">
-          <Link to="/" className="btn btn-outline-secondary me-2">
-            ← Назад
-          </Link>
-          <Button variant="success" onClick={() => setShowAddModal(true)}>
-            + Добавить пользователя
-          </Button>
+      {/* Заголовок страницы */}
+      <div className="page-header">
+        <h1 className="page-title">Управление пользователями</h1>
+        <div className="breadcrumb">
+          <Link to="/">Главная</Link>
+          <span>/</span>
+          <Link to="/">Серверы</Link>
+          <span>/</span>
+          <span>Пользователи</span>
         </div>
       </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError(null)}>{error}</Alert>}
-      {successMessage && <Alert variant="success">{successMessage}</Alert>}
+      {/* Статистика пользователей */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        <Card style={{ textAlign: 'center', padding: '1.5rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👥</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>ВСЕГО ПОЛЬЗОВАТЕЛЕЙ</div>
+          <div style={{ fontSize: '2rem', fontWeight: '700' }}>{users.length}</div>
+        </Card>
+        <Card style={{ textAlign: 'center', padding: '1.5rem', borderLeft: '4px solid var(--danger)' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👑</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>АДМИНИСТРАТОРЫ</div>
+          <div style={{ fontSize: '2rem', fontWeight: '700' }}>{users.filter(u => u.role === 'admin').length}</div>
+        </Card>
+        <Card style={{ textAlign: 'center', padding: '1.5rem', borderLeft: '4px solid var(--warning)' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚙️</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>ОПЕРАТОРЫ</div>
+          <div style={{ fontSize: '2rem', fontWeight: '700' }}>{users.filter(u => u.role === 'operator').length}</div>
+        </Card>
+        <Card style={{ textAlign: 'center', padding: '1.5rem', borderLeft: '4px solid var(--accent)' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👁️</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>ПРОСМОТР</div>
+          <div style={{ fontSize: '2rem', fontWeight: '700' }}>{users.filter(u => u.role === 'viewer').length}</div>
+        </Card>
+      </div>
 
+      {error && <Alert variant="danger" dismissible onClose={() => setError(null)}>{error}</Alert>}
+      {successMessage && (
+        <div style={{ background: '#d4edda', color: '#155724', padding: '1rem 1.25rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          ✅ {successMessage}
+        </div>
+      )}
+
+      {/* Таблица пользователей */}
       <Card>
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <span className="card-title">Список пользователей</span>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <Button variant="outline-secondary" size="sm" onClick={() => window.history.back()}>
+              ← Назад к серверам
+            </Button>
+            <Button variant="success" onClick={() => setShowAddModal(true)}>
+              + Добавить пользователя
+            </Button>
+          </div>
+        </Card.Header>
         <Card.Body className="p-0">
           <Table hover responsive className="mb-0">
-            <thead className="table-light">
+            <thead>
               <tr>
                 <th>Логин</th>
                 <th>Роль</th>
@@ -271,7 +284,7 @@ function UserManagement() {
                 <th>Создан</th>
                 <th>Последний вход</th>
                 <th>Статус</th>
-                <th className="text-end">Действия</th>
+                <th style={{ textAlign: 'right' }}>Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -280,49 +293,47 @@ function UserManagement() {
                   <td>
                     <strong>{user.login}</strong>
                     {user.login === currentUser && (
-                      <Badge bg="primary" className="ms-2">Вы</Badge>
+                      <span style={{ background: 'var(--accent)', color: 'white', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', marginLeft: '8px' }}>Вы</span>
                     )}
                   </td>
                   <td>
-                    <Badge bg={getRoleBadgeVariant(user.role)}>
+                    <span style={{
+                      background: user.role === 'admin' ? '#ef444419' : user.role === 'operator' ? '#f59e0b19' : '#0ea5e919',
+                      color: user.role === 'admin' ? 'var(--danger)' : user.role === 'operator' ? 'var(--warning)' : 'var(--accent)',
+                      padding: '4px 12px',
+                      borderRadius: '9999px',
+                      fontSize: '12px',
+                      fontWeight: '500'
+                    }}>
                       {getRoleName(user.role)}
-                    </Badge>
+                    </span>
                   </td>
                   <td>{user.email || '-'}</td>
                   <td>{formatDate(user.created_at)}</td>
                   <td>{formatDate(user.last_login)}</td>
                   <td>
-                    <Badge bg={user.is_active ? 'success' : 'secondary'}>
+                    <span className={`status-badge status-${user.is_active ? 'ok' : 'error'}`}>
                       {user.is_active ? 'Активен' : 'Заблокирован'}
-                    </Badge>
+                    </span>
                   </td>
-                  <td className="text-end">
-                    <OverlayTrigger
-                      placement="top"
-                      overlay={<Tooltip>Редактировать</Tooltip>}
+                  <td style={{ textAlign: 'right' }}>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      style={{ marginRight: '0.5rem' }}
+                      onClick={() => openEditModal(user)}
                     >
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        className="me-2"
-                        onClick={() => openEditModal(user)}
-                      >
-                        ✏️
-                      </Button>
-                    </OverlayTrigger>
-                    <OverlayTrigger
-                      placement="top"
-                      overlay={<Tooltip>Удалить</Tooltip>}
+                      ✏️
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => handleDeleteUser(user.login)}
+                      disabled={user.login === currentUser || user.login === 'admin'}
+                      style={{ opacity: user.login === currentUser || user.login === 'admin' ? 0.5 : 1 }}
                     >
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.login)}
-                        disabled={user.login === currentUser || user.login === 'admin'}
-                      >
-                        🗑️
-                      </Button>
-                    </OverlayTrigger>
+                      🗑️
+                    </Button>
                   </td>
                 </tr>
               ))}

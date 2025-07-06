@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { Card, Table, Alert, Dropdown, Spinner } from 'react-bootstrap';
+import { Card, Table, Alert, Dropdown, Button } from 'react-bootstrap';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import LoadingSpinner from './LoadingSpinner';
 import './DatabaseDetails.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
@@ -254,63 +255,148 @@ function DatabaseDetails() {
 
   return (
     <div className="container mt-5">
-      <h2>База данных: {db_name} (Сервер: {name})</h2>
-      <Link to={`/server/${name}`} className="btn btn-secondary mb-4">Назад к серверу</Link>
+      {/* Заголовок страницы как в артефакте */}
+      <div className="page-header">
+        <h1 className="page-title">База данных: {db_name}</h1>
+        <div className="breadcrumb">
+          <Link to="/">Главная</Link>
+          <span>/</span>
+          <Link to="/">Серверы</Link>
+          <span>/</span>
+          <Link to={`/server/${name}`}>{name}</Link>
+          <span>/</span>
+          <span>{db_name}</span>
+        </div>
+      </div>
+
+      {/* Информация о базе данных */}
+      <div className="server-info-card">
+        <div className="server-info-grid">
+          <div className="info-block">
+            <span className="info-label">Размер базы</span>
+            <span className="info-value">
+              {dbStats && dbStats.size_mb ? `${(dbStats.size_mb / 1024).toFixed(1)} ГБ` : 'N/A'}
+            </span>
+          </div>
+          <div className="info-block">
+            <span className="info-label">Активные подключения</span>
+            <span className="info-value">{dbStats?.connections ?? 'N/A'}</span>
+          </div>
+          <div className="info-block">
+            <span className="info-label">Транзакций выполнено</span>
+            <span className="info-value">
+              {dbHistory?.total_commits ? dbHistory.total_commits.toLocaleString() : 'N/A'}
+            </span>
+          </div>
+          <div className="info-block">
+            <span className="info-label">Создана</span>
+            <span className="info-value">
+              {dbHistory?.creation_time ? formatTimestamp(dbHistory.creation_time) : 'N/A'}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
 
-      {loading ? (
-        <Alert variant="info">Загрузка данных...</Alert>
-      ) : dbStats && dbHistory ? (
-        <Card className="mb-4">
-          <Card.Header>
-            <div className="d-flex justify-content-between align-items-center">
-              <span>Статистика базы данных</span>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" size="sm">
-                  {dateRangeLabel}
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  <Dropdown.Item onClick={() => setDateRange(7, '7 дней')}>7 дней</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setDateRange(14, '2 недели')}>2 недели</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setDateRange(30, 'Месяц')}>Месяц</Dropdown.Item>
-                  <Dropdown.Item onClick={() => setDateRange(90, '3 месяца')}>3 месяца</Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          </Card.Header>
-          <Card.Body>
-            <Table striped bordered hover>
-              <tbody>
-                <tr><td>Размер (МБ)</td><td>{dbStats.size_mb ? dbStats.size_mb.toFixed(2) : 'N/A'}</td></tr>
-                <tr><td>Активные подключения</td><td>{dbStats.connections ?? 'N/A'}</td></tr>
-                <tr><td>Выполненные коммиты</td><td>{dbStats.commits ?? 'N/A'}</td></tr>
-                <tr><td>Последнее обновление</td><td>{formatTimestamp(dbStats.last_update)}</td></tr>
-                <tr><td>Время создания</td><td>{formatTimestamp(dbHistory.creation_time)}</td></tr>
-                <tr><td>Общее количество подключений (период)</td><td>{dbHistory.total_connections ?? 'N/A'}</td></tr>
-                <tr><td>Максимальное количество подключений</td><td>{dbHistory.max_connections ?? 'N/A'}</td></tr>
-                <tr><td>Минимальное количество подключений</td><td>{dbHistory.min_connections ?? 'N/A'}</td></tr>
-                <tr><td>Общее количество коммитов (период)</td><td>{dbHistory.total_commits ?? 'N/A'}</td></tr>
-              </tbody>
-            </Table>
+      {/* Выбор периода */}
+      <div className="filter-bar">
+        <div className="filter-group">
+          <label className="filter-label">Период анализа:</label>
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              {dateRangeLabel}
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              <Dropdown.Item onClick={() => setDateRange(7, '7 дней')}>7 дней</Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateRange(14, '2 недели')}>2 недели</Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateRange(30, 'Месяц')}>Месяц</Dropdown.Item>
+              <Dropdown.Item onClick={() => setDateRange(90, '3 месяца')}>3 месяца</Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+        <Button variant="primary" size="sm" onClick={fetchDbStats} style={{ marginLeft: 'auto' }}>
+          Обновить данные
+        </Button>
+      </div>
 
-            {dbHistory.timeline?.length > 0 ? (
-              <div className="charts-container">
-                <div className="chart">
-                  <canvas ref={connectionsCanvasRef} id="connectionsChart" />
+      {loading ? (
+        <LoadingSpinner text="Загрузка статистики базы..." subtext="Анализ данных" />
+      ) : dbStats && dbHistory ? (
+        <>
+          {/* Статистика базы данных */}
+          <Card className="mb-4">
+            <Card.Header>
+              <span className="card-title">Статистика базы данных</span>
+            </Card.Header>
+            <Card.Body>
+              <Table striped bordered hover>
+                <tbody>
+                  <tr>
+                    <td>Размер (МБ)</td>
+                    <td>{dbStats.size_mb ? dbStats.size_mb.toFixed(2) : 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Активные подключения</td>
+                    <td>{dbStats.connections ?? 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Выполненные коммиты</td>
+                    <td>{dbStats.commits ? dbStats.commits.toLocaleString() : 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Последнее обновление</td>
+                    <td>{formatTimestamp(dbStats.last_update)}</td>
+                  </tr>
+                  <tr>
+                    <td>Время создания</td>
+                    <td>{formatTimestamp(dbHistory.creation_time)}</td>
+                  </tr>
+                  <tr>
+                    <td>Общее количество подключений (период)</td>
+                    <td>{dbHistory.total_connections ? dbHistory.total_connections.toLocaleString() : 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Максимальное количество подключений</td>
+                    <td>{dbHistory.max_connections ?? 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Минимальное количество подключений</td>
+                    <td>{dbHistory.min_connections ?? 'N/A'}</td>
+                  </tr>
+                </tbody>
+              </Table>
+
+              {/* Графики */}
+              {dbHistory.timeline?.length > 0 ? (
+                <div className="charts-container" style={{ marginTop: '2rem' }}>
+                  <div className="chart-card">
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                      Подключения к базе {db_name}
+                    </h3>
+                    <canvas ref={connectionsCanvasRef} id="connectionsChart" />
+                  </div>
+                  <div className="chart-card">
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                      Размер базы {db_name}
+                    </h3>
+                    <canvas ref={sizeCanvasRef} id="sizeChart" />
+                  </div>
+                  <div className="chart-card">
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                      Коммиты в базе {db_name}
+                    </h3>
+                    <canvas ref={commitsCanvasRef} id="commitsChart" />
+                  </div>
                 </div>
-                <div className="chart">
-                  <canvas ref={sizeCanvasRef} id="sizeChart" />
-                </div>
-                <div className="chart">
-                  <canvas ref={commitsCanvasRef} id="commitsChart" />
-                </div>
-              </div>
-            ) : (
-              <Alert variant="warning">Нет данных для отображения графиков за выбранный период</Alert>
-            )}
-          </Card.Body>
-        </Card>
+              ) : (
+                <Alert variant="warning" className="mt-3">
+                  Нет данных для отображения графиков за выбранный период
+                </Alert>
+              )}
+            </Card.Body>
+          </Card>
+        </>
       ) : (
         <Alert variant="warning">Ожидание данных...</Alert>
       )}

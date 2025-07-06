@@ -1,4 +1,5 @@
 import React from 'react';
+import './LoadingSpinner.css';
 
 function LoadingSpinner({ text = "Загрузка...", subtext = "Пожалуйста, подождите" }) {
   return (
