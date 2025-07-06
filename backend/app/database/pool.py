@@ -45,7 +45,8 @@ class DatabasePool:
                         user=server.user,
                         password=server.password,
                         port=server.port,
-                        connect_timeout=5
+                        connect_timeout=5,
+                        options='-c statement_timeout=5000 -c tcp_user_timeout=5000'
                     )
                 except Exception as e:
                     logger.error(f"Ошибка создания пула для {server.name}: {e}")

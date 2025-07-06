@@ -10,15 +10,32 @@ from app.config import SSH_CACHE_TTL
 logger = logging.getLogger(__name__)
 
 def is_host_reachable(host: str, port: int, timeout: int = 2) -> bool:
-    """Проверка доступности хоста"""
+    """Проверка доступности хоста с улучшенной обработкой"""
     try:
+        # Проверяем валидность хоста
+        if not host or host.lower() in ['test', 'localhost', '127.0.0.1']:
+            logger.debug(f"Невалидный хост: {host}")
+            return False
+            
+        # Пытаемся резолвить DNS
+        try:
+            ip = socket.gethostbyname(host)
+            logger.debug(f"DNS резолвинг {host} -> {ip}")
+        except socket.gaierror:
+            logger.warning(f"DNS не может разрешить хост {host}")
+            return False
+        
+        # Проверяем доступность порта
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
+        try:
+            result = sock.connect_ex((host, port))
+            return result == 0
+        finally:
+            sock.close()
+            
     except Exception as e:
-        logger.debug(f"Ошибка проверки доступности {host}:{port}: {e}")
+        logger.error(f"Ошибка проверки доступности {host}:{port}: {e}")
         return False
 
 def get_ssh_disk_usage(server: Server, data_dir: str) -> Tuple[Optional[int], Optional[int], str]:

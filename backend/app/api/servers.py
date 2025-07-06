@@ -5,6 +5,7 @@ import logging
 from app.models import Server
 from app.auth import get_current_user
 from app.services import load_servers, save_servers, connect_to_server, cache_manager
+from app.services.ssh import is_host_reachable
 from app.database import db_pool
 
 logger = logging.getLogger(__name__)
@@ -21,16 +22,51 @@ async def get_servers(current_user: dict = Depends(get_current_user)):
 async def add_server(server: Server, current_user: dict = Depends(get_current_user)):
     """Добавить новый сервер"""
     try:
+        # Валидация имени и хоста
+        if not server.name or server.name.lower() == 'test':
+            raise HTTPException(status_code=400, detail="Недопустимое имя сервера")
+            
+        if not server.host or server.host.lower() in ['test', 'localhost']:
+            raise HTTPException(status_code=400, detail="Недопустимый адрес хоста")
+        
         servers = load_servers()
         if any(s.name == server.name for s in servers):
             logger.warning(f"Попытка добавить существующий сервер: {server.name}")
             raise HTTPException(status_code=400, detail="Server with this name already exists")
         
+        # Быстрая проверка доступности
+        logger.info(f"Проверка доступности сервера {server.name} ({server.host}:{server.port})")
+        if not is_host_reachable(server.host, server.port):
+            logger.warning(f"Сервер {server.name} недоступен по адресу {server.host}:{server.port}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Сервер {server.host}:{server.port} недоступен. Проверьте адрес и порт."
+            )
+        
+        # Сохраняем сервер
         servers.append(server)
         save_servers(servers)
         logger.info(f"Добавлен новый сервер: {server.name}")
         
-        return connect_to_server(server)
+        # Возвращаем базовую информацию без полного подключения
+        return {
+            "name": server.name,
+            "host": server.host,
+            "port": server.port,
+            "user": server.user,
+            "ssh_user": server.ssh_user,
+            "ssh_port": server.ssh_port,
+            "has_password": bool(server.password),
+            "has_ssh_password": bool(server.ssh_password),
+            "status": "added",
+            "version": None,
+            "free_space": None,
+            "total_space": None,
+            "connections": None,
+            "uptime_hours": None,
+            "stats_db": server.stats_db,
+            "data_dir": None
+        }
         
     except HTTPException:
         raise
