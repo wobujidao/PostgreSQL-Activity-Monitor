@@ -48,25 +48,30 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
         save_servers(servers)
         logger.info(f"Добавлен новый сервер: {server.name}")
         
-        # Возвращаем базовую информацию без полного подключения
-        return {
-            "name": server.name,
-            "host": server.host,
-            "port": server.port,
-            "user": server.user,
-            "ssh_user": server.ssh_user,
-            "ssh_port": server.ssh_port,
-            "has_password": bool(server.password),
-            "has_ssh_password": bool(server.ssh_password),
-            "status": "added",
-            "version": None,
-            "free_space": None,
-            "total_space": None,
-            "connections": None,
-            "uptime_hours": None,
-            "stats_db": server.stats_db,
-            "data_dir": None
-        }
+        # Возвращаем полную информацию о сервере
+        try:
+            return connect_to_server(server)
+        except Exception as e:
+            # Если не удалось подключиться, возвращаем базовую информацию
+            logger.warning(f"Не удалось получить полную информацию о сервере {server.name}: {e}")
+            return {
+                "name": server.name,
+                "host": server.host,
+                "port": server.port,
+                "user": server.user,
+                "ssh_user": server.ssh_user,
+                "ssh_port": server.ssh_port,
+                "has_password": bool(server.password),
+                "has_ssh_password": bool(server.ssh_password),
+                "status": "added (connection pending)",
+                "version": None,
+                "free_space": None,
+                "total_space": None,
+                "connections": None,
+                "uptime_hours": None,
+                "stats_db": server.stats_db,
+                "data_dir": None
+            }
         
     except HTTPException:
         raise
