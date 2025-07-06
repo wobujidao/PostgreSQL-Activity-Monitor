@@ -86,6 +86,11 @@ function ServerList() {
   };
 
   const handleDeleteServer = async () => {
+    if (!editServer) {
+      console.error('editServer is null');
+      return;
+    }
+    
     if (!window.confirm(`Вы уверены, что хотите удалить сервер ${editServer.name}?`)) {
       return;
     }
@@ -97,10 +102,11 @@ function ServerList() {
       );
       setServers(servers.filter(s => s.name !== editServer.name));
       setShowEditModal(false);
+      setErrorMessage('');
       console.log('Сервер успешно удалён');
     } catch (error) {
       console.error('Ошибка удаления сервера:', error);
-      setErrorMessage('Ошибка при удалении сервера');
+      setErrorMessage('Ошибка при удалении сервера: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -135,7 +141,8 @@ function ServerList() {
       }
     } catch (error) {
       console.error('Ошибка добавления сервера:', error);
-      setErrorMessage('Ошибка при добавлении сервера');
+      const errorMsg = error.response?.data?.detail || error.message || 'Неизвестная ошибка';
+      setErrorMessage('Ошибка при добавлении сервера: ' + errorMsg);
     }
   };
 
