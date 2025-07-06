@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import MetricsOverview from './MetricsOverview';
+import LoadingSpinner from './LoadingSpinner';
 import './ServerList.css';
 
 function ServerList() {
@@ -27,6 +28,7 @@ function ServerList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -39,9 +41,11 @@ function ServerList() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setServers(response.data);
+        setLoading(false);
       } catch (error) {
         console.error('Ошибка загрузки серверов:', error);
         setErrorMessage('Ошибка загрузки серверов: ' + (error.message || 'Неизвестная ошибка'));
+        setLoading(false);
       }
     };
 
@@ -64,19 +68,6 @@ function ServerList() {
   const handleEdit = (server) => {
     setEditServer({ ...server, password: '', ssh_password: '' });
     setShowEditModal(true);
-  };
-
-  const handleDelete = async (serverName) => {
-    try {
-      await axios.delete(`http://10.110.20.55:8000/servers/${serverName}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setServers(servers.filter(server => server.name !== serverName));
-      console.log(`Сервер ${serverName} успешно удалён`);
-    } catch (error) {
-      console.error('Ошибка удаления сервера:', error);
-      setErrorMessage('Ошибка удаления сервера');
-    }
   };
 
   const handleSaveEdit = async () => {
@@ -163,8 +154,8 @@ function ServerList() {
 
   const getServerStatus = (server) => {
     if (!server.status || server.status === 'failed' || server.status.includes('error')) {
-      return { 
-        class: 'error', 
+      return {
+        class: 'error',
         text: 'Connection Failed',
         tooltip: 'Не удается подключиться к серверу. Проверьте сетевое соединение и настройки подключения.'
       };
@@ -172,20 +163,20 @@ function ServerList() {
     if (server.status === 'ok' || server.status.includes('ok')) {
       const totalConnections = (server.connections?.active || 0) + (server.connections?.idle || 0);
       if (totalConnections > 50) {
-        return { 
-          class: 'warning', 
+        return {
+          class: 'warning',
           text: 'High Load',
           tooltip: `Высокая нагрузка: ${totalConnections} активных соединений. Рекомендуется мониторинг производительности.`
         };
       }
-      return { 
-        class: 'online', 
+      return {
+        class: 'online',
         text: 'Online',
         tooltip: `Сервер работает нормально. Соединений: ${totalConnections}`
       };
     }
-    return { 
-      class: 'offline', 
+    return {
+      class: 'offline',
       text: 'Unknown',
       tooltip: 'Статус сервера неизвестен. Возможны проблемы с мониторингом.'
     };
@@ -228,22 +219,22 @@ function ServerList() {
   const filteredServers = servers.filter(server => {
     const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          server.host.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     if (statusFilter === 'all') return matchesSearch;
     if (statusFilter === 'online') return matchesSearch && getServerStatus(server).class === 'online';
     if (statusFilter === 'error') return matchesSearch && getServerStatus(server).class === 'error';
-    
+
     return matchesSearch;
   }).sort((a, b) => {
     const aValue = getSortValue(a, sortField);
     const bValue = getSortValue(b, sortField);
-    
+
     if (typeof aValue === 'string') {
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue);
     } else {
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? aValue - bValue
         : bValue - aValue;
     }
@@ -255,6 +246,11 @@ function ServerList() {
     if (sortField !== field) return 'sortable';
     return `sortable sorted-${sortDirection}`;
   };
+
+  // Показываем LoadingSpinner при первой загрузке
+  if (loading) {
+    return <LoadingSpinner text="Загрузка серверов..." subtext="Подключение к базам данных" />;
+  }
 
   return (
     <div className="container mt-4">
@@ -372,11 +368,11 @@ function ServerList() {
                   const status = getServerStatus(server);
                   const diskClass = getDiskUsageClass(server.free_space, server.total_space);
                   const diskPercent = getDiskUsagePercent(server.free_space, server.total_space);
-                  
+
                   return (
                     <tr key={server.name}>
                       <td>
-                        <Link to={`/server/${server.name}`} className="font-weight-medium">
+                        <Link to={`/server/${server.name}`} className="server-link">
                           {server.name}
                         </Link>
                       </td>
@@ -394,26 +390,33 @@ function ServerList() {
                         ) : 'N/A'}
                       </td>
                       <td>
-                        <div className="disk-usage">
-                          <div className="disk-usage-text">{formatBytes(server.free_space)}</div>
-                          {server.total_space && (
-                            <OverlayTrigger
-                              placement="top"
-                              overlay={
-                                <Tooltip>
-                                  Использовано: {diskPercent.toFixed(1)}% 
-                                  ({formatBytes(server.total_space - server.free_space)} из {formatBytes(server.total_space)})
-                                </Tooltip>
-                              }
-                            >
-                              <div className="disk-progress">
-                                <div 
-                                  className={`disk-progress-bar ${diskClass}`}
-                                  style={{ width: `${diskPercent}%` }}
-                                ></div>
-                              </div>
-                            </OverlayTrigger>
-                          )}
+                        <div className="disk-space-cell">
+                          <div className="disk-space-info">
+                            <div className="disk-space-text">
+                              <strong style={{ color: diskClass === 'danger' ? 'var(--danger)' : diskClass === 'warning' ? 'var(--warning)' : 'var(--success)' }}>
+                                {formatBytes(server.free_space)}
+                              </strong>
+                              {server.total_space && ` из ${formatBytes(server.total_space)} (${(100 - diskPercent).toFixed(1)}%)`}
+                            </div>
+                            {server.total_space && (
+                              <OverlayTrigger
+                                placement="top"
+                                overlay={
+                                  <Tooltip>
+                                    Использовано: {diskPercent.toFixed(1)}%
+                                    ({formatBytes(server.total_space - server.free_space)} из {formatBytes(server.total_space)})
+                                  </Tooltip>
+                                }
+                              >
+                                <div className="disk-progress">
+                                  <div
+                                    className={`disk-progress-bar ${diskClass}`}
+                                    style={{ width: `${diskPercent}%` }}
+                                  ></div>
+                                </div>
+                              </OverlayTrigger>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="uptime-info">{formatUptime(server.uptime_hours)}</td>
@@ -422,20 +425,21 @@ function ServerList() {
                           placement="top"
                           overlay={<Tooltip>{status.tooltip}</Tooltip>}
                         >
-                          <span className={`server-status ${status.class}`}>
-                            {status.text}
+                          <span className={`status-badge status-${status.class === 'online' ? 'ok' : status.class}`}>
+                            {status.text === 'Online' ? 'Активен' : 
+                             status.text === 'High Load' ? 'Нагрузка' :
+                             status.text === 'Connection Failed' ? 'Недоступен' :
+                             'Неизвестно'}
                           </span>
                         </OverlayTrigger>
                       </td>
                       <td>
-                        <div className="action-buttons">
-                          <button 
-                            className="action-btn edit"
-                            onClick={() => handleEdit(server)}
-                          >
-                            Управление
-                          </button>
-                        </div>
+                        <button
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => handleEdit(server)}
+                        >
+                          Управление
+                        </button>
                       </td>
                     </tr>
                   );
