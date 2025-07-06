@@ -39,28 +39,28 @@ body {
   min-height: 100vh;
 }
 
-/* Header/Navbar */
+/* Header/Navbar - уменьшенная высота */
 .navbar {
   background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
   box-shadow: var(--shadow-md);
-  padding: 1rem 0 !important;
+  padding: 0.5rem 0 !important; /* Уменьшено с 1rem до 0.5rem */
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
 .navbar-brand {
-  font-size: 20px !important;
+  font-size: 18px !important; /* Уменьшено с 20px */
   font-weight: 600 !important;
   color: white !important;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px; /* Уменьшено с 12px */
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px; /* Уменьшено с 32px */
+  height: 28px; /* Уменьшено с 32px */
   background: var(--accent);
   border-radius: 6px;
   display: flex;
@@ -68,22 +68,27 @@ body {
   justify-content: center;
 }
 
+.logo-icon svg {
+  width: 18px; /* Уменьшено с 20px */
+  height: 18px; /* Уменьшено с 20px */
+}
+
 .user-info {
   color: white;
-  font-size: 15px;
+  font-size: 14px; /* Уменьшено с 15px */
   opacity: 0.9;
-  margin-right: 16px;
+  margin-right: 12px; /* Уменьшено с 16px */
 }
 
 .backend-status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px !important;
-  padding: 6px 10px;
+  gap: 5px; /* Уменьшено с 6px */
+  font-size: 12px !important; /* Уменьшено с 13px */
+  padding: 4px 8px; /* Уменьшено с 6px 10px */
   border-radius: 4px;
   font-weight: 500;
-  margin-left: 12px;
+  margin-left: 10px; /* Уменьшено с 12px */
 }
 
 .backend-status.available {
@@ -100,7 +105,7 @@ body {
 
 .backend-status::before {
   content: '●';
-  font-size: 10px;
+  font-size: 8px; /* Уменьшено с 10px */
   animation: pulse 2s infinite;
 }
 
@@ -109,52 +114,11 @@ body {
   50% { opacity: 0.7; }
 }
 
-/* Navigation Tabs - только для внутренних страниц */
-.nav-container {
-  background: white;
-  border-bottom: 1px solid var(--border);
-  padding: 16px 0;
-  position: sticky;
-  top: 72px; /* высота header */
-  z-index: 90;
-  box-shadow: var(--shadow-sm);
-}
-
-.nav-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
-  display: flex;
-  gap: 8px;
-}
-
-.nav-tab {
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  border-radius: var(--radius);
-  transition: all 0.2s;
-}
-
-.nav-tab:hover {
-  background: var(--bg-main);
-  color: var(--text-primary);
-}
-
-.nav-tab.active {
-  background: var(--accent);
-  color: white;
-}
-
 /* Container */
 .container {
   max-width: 1400px !important;
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px; /* Уменьшено с 24px */
 }
 
 /* Cards */
@@ -164,7 +128,7 @@ body {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
   overflow: hidden;
-  margin-bottom: 24px;
+  margin-bottom: 20px; /* Уменьшено с 24px */
 }
 
 .card-header {
@@ -269,8 +233,8 @@ body {
 }
 
 .btn-sm {
-  padding: 0.5rem 1rem;
-  font-size: 14px;
+  padding: 0.375rem 0.75rem; /* Уменьшено с 0.5rem 1rem */
+  font-size: 13px; /* Уменьшено с 14px */
 }
 
 /* Tables */
@@ -557,9 +521,9 @@ body {
   background: rgba(255,255,255,0.1) !important;
   border: 1px solid rgba(255,255,255,0.2) !important;
   color: white !important;
-  padding: 0.5rem 1rem;
+  padding: 0.375rem 0.75rem; /* Уменьшено с 0.5rem 1rem */
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px; /* Уменьшено с 14px */
 }
 
 .dropdown-toggle:hover {
@@ -604,11 +568,11 @@ body {
 
 /* Page Headers */
 .page-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem; /* Уменьшено с 2rem */
 }
 
 .page-title {
-  font-size: 28px;
+  font-size: 26px; /* Уменьшено с 28px */
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
@@ -617,7 +581,7 @@ body {
 .breadcrumb {
   display: flex;
   gap: 0.5rem;
-  font-size: 15px;
+  font-size: 14px; /* Уменьшено с 15px */
   color: var(--text-secondary);
 }
 
@@ -720,15 +684,15 @@ body {
 /* Responsive */
 @media (max-width: 768px) {
   .container {
-    padding: 18px;
+    padding: 16px; /* Уменьшено с 18px */
   }
   
   .card-body {
-    padding: 18px;
+    padding: 16px; /* Уменьшено с 18px */
   }
   
   .navbar-brand {
-    font-size: 18px !important;
+    font-size: 16px !important; /* Уменьшено с 18px */
   }
   
   .backend-status {

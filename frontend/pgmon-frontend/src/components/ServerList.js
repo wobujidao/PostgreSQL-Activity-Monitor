@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import MetricsOverview from './MetricsOverview';
 import LoadingSpinner from './LoadingSpinner';
 import './ServerList.css';
 
@@ -254,9 +253,6 @@ function ServerList() {
 
   return (
     <div className="container mt-4">
-      {/* Метрики */}
-      <MetricsOverview servers={servers} />
-
       {/* Панель фильтров */}
       <Card className="mb-4">
         <Card.Body className="py-3">
