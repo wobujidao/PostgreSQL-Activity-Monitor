@@ -121,6 +121,16 @@ body {
   padding: 20px; /* Уменьшено с 24px */
 }
 
+/* Минимальный отступ сверху для контейнера после navbar */
+.container.mt-4 {
+  margin-top: 0.25rem !important; /* Минимальный отступ */
+}
+
+/* Дополнительно для главной страницы серверов */
+.container > .card:first-child {
+  margin-top: 0.5rem !important; /* Очень маленький отступ для первой карточки */
+}
+
 /* Cards */
 .card {
   background: var(--bg-card);
@@ -391,6 +401,18 @@ body {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+/* Улучшаем видимость полей в модальных окнах */
+.modal-body .form-control {
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+}
+
+.modal-body .form-control:focus {
+  background: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
 }
 
 .form-select {

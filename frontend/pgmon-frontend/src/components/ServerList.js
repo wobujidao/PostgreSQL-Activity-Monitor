@@ -85,6 +85,25 @@ function ServerList() {
     }
   };
 
+  const handleDeleteServer = async () => {
+    if (!window.confirm(`Вы уверены, что хотите удалить сервер ${editServer.name}?`)) {
+      return;
+    }
+    
+    try {
+      await axios.delete(
+        `http://10.110.20.55:8000/servers/${editServer.name}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setServers(servers.filter(s => s.name !== editServer.name));
+      setShowEditModal(false);
+      console.log('Сервер успешно удалён');
+    } catch (error) {
+      console.error('Ошибка удаления сервера:', error);
+      setErrorMessage('Ошибка при удалении сервера');
+    }
+  };
+
   const handleAdd = () => {
     setErrorMessage('');
     setShowAddModal(true);
@@ -184,7 +203,7 @@ function ServerList() {
   const getDiskUsageClass = (freeSpace, totalSpace) => {
     if (!freeSpace || !totalSpace) return 'danger';
     const usedPercent = ((totalSpace - freeSpace) / totalSpace) * 100;
-    if (usedPercent < 70) return 'success';
+    if (usedPercent < 70) return 'good';
     if (usedPercent < 85) return 'warning';
     return 'danger';
   };
@@ -309,7 +328,7 @@ function ServerList() {
                   size="sm"
                   onClick={() => window.location.reload()}
                 >
-                  🔄 Обновить
+                  Обновить
                 </Button>
               </div>
             </Col>
@@ -447,9 +466,9 @@ function ServerList() {
       </Card>
 
       {/* Модальное окно редактирования */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>Редактировать сервер</Modal.Title>
+          <Modal.Title>Управление сервером: {editServer?.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
@@ -521,15 +540,28 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, ssh_port: parseInt(e.target.value) })}
                 />
               </Form.Group>
+              
+              {/* Опасная зона */}
+              <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem', color: 'var(--danger)' }}>Опасная зона</h4>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius)', padding: '1rem' }}>
+                  <p style={{ marginBottom: '1rem', fontSize: '14px' }}>
+                    Удаление сервера приведет к потере всей истории мониторинга. Это действие необратимо.
+                  </p>
+                  <Button variant="danger" onClick={handleDeleteServer}>
+                    🗑️ Удалить сервер
+                  </Button>
+                </div>
+              </div>
             </Form>
           )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-            Закрыть
+            Отмена
           </Button>
           <Button variant="primary" onClick={handleSaveEdit}>
-            Сохранить
+            Сохранить изменения
           </Button>
         </Modal.Footer>
       </Modal>

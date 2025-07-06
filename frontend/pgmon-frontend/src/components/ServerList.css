@@ -225,7 +225,7 @@
   transition: width 0.3s ease;
 }
 
-.disk-progress-bar.success {
+.disk-progress-bar.good {
   background: var(--success-color);
 }
 
