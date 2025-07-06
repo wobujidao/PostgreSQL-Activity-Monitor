@@ -33,9 +33,8 @@ function ServerDetails() {
   const [sortColumn, setSortColumn] = useState('size');
   const [sortDirection, setSortDirection] = useState('desc');
   const [nameFilter, setNameFilter] = useState('');
-  const [filterType] = useState('contains');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(20);
   const [activeTab, setActiveTab] = useState('overview');
   const [analysisFilter, setAnalysisFilter] = useState('all');
   const connectionsChartRef = useRef(null);
@@ -378,7 +377,7 @@ function ServerDetails() {
     setCurrentPage(1);
   };
 
-  const setDateRange = (days, label) => {
+  const setDateRange = (days) => {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - days);
@@ -477,10 +476,10 @@ function ServerDetails() {
       <div className="filter-bar">
         <div className="filter-group">
           <label className="filter-label">Период:</label>
-          <button className="btn btn-sm btn-primary" onClick={() => setDateRange(1, '24ч')}>24ч</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(7, '7д')}>7д</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(30, '30д')}>30д</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(90, '90д')}>90д</button>
+          <button className="btn btn-sm btn-primary" onClick={() => setDateRange(1)}>24ч</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(7)}>7д</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(30)}>30д</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(90)}>90д</button>
         </div>
         <div className="filter-group" style={{ marginLeft: 'auto' }}>
           <DatePicker

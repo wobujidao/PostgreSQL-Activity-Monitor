@@ -212,9 +212,11 @@ function AppContent() {
       <Navbar bg="dark" variant="dark" className="px-0">
         <Container>
           <Navbar.Brand>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="me-2">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-            </svg>
+            <div className="logo-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+              </svg>
+            </div>
             PostgreSQL Activity Monitor
             <span className={`backend-status ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
               {backendStatus === 'available' ? 'Backend Active' : 'Backend Unavailable'}
@@ -229,6 +231,9 @@ function AppContent() {
                 <Dropdown align="end" className="ms-2">
                   <Dropdown.Toggle variant="secondary" size="sm" id="user-dropdown">
                     👤
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7 10l5 5 5-5z"/>
+                    </svg>
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Header>
