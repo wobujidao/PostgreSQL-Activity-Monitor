@@ -456,8 +456,80 @@
   color: var(--text-secondary);
 }
 
+/* Выравнивание высоты input с select */
+.aligned-input {
+  height: 31px !important;
+  padding: 4px 12px !important;
+}
+
+/* Информация о суммарном размере */
+.filtered-summary {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  margin-top: -10px;
+}
+
+.summary-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.summary-label {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.summary-value {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.summary-size {
+  color: #0ea5e9;
+  font-size: 16px;
+}
+
+.summary-separator {
+  color: #dee2e6;
+}
+
+.summary-hint {
+  color: #f59e0b;
+  font-style: italic;
+  margin-left: auto;
+}
+
+/* Подсветка строк таблицы */
+.table-info {
+  background-color: #e3f2fd !important;
+}
+
+.table-info:hover {
+  background-color: #bbdefb !important;
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
+  .filtered-summary {
+    padding: 10px 16px;
+  }
+  
+  .summary-content {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+  }
+  
+  .summary-hint {
+    margin-left: 0;
+    width: 100%;
+    margin-top: 4px;
+  }
   .server-header {
     flex-direction: column;
     align-items: stretch;

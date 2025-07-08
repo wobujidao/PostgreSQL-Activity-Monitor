@@ -40,6 +40,7 @@ function ServerDetails() {
   const [hideDeleted] = useState(true); // Убираем setHideDeleted, так как она не используется
   const [showNoConnections, setShowNoConnections] = useState(false);
   const [showStaticConnections, setShowStaticConnections] = useState(false);
+  const [showUnchangedConnections, setShowUnchangedConnections] = useState(false); // Новый фильтр
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
   const [selectedDateRange, setSelectedDateRange] = useState(7); // По умолчанию 7 дней
@@ -86,6 +87,7 @@ function ServerDetails() {
 
       // Проверяем статичность подключений
       let isStatic = false;
+      let hasUnchangedConnections = false;
       let avgConnections = 0;
       
       if (dbTimeline.length > 10) {
@@ -93,8 +95,12 @@ function ServerDetails() {
         const connections = last10.map(e => e.connections || 0);
         const uniqueValues = new Set(connections);
         isStatic = uniqueValues.size === 1 && connections[0] > 0;
+        hasUnchangedConnections = uniqueValues.size === 1 && connections[0] > 0;
         avgConnections = connections.reduce((a, b) => a + b, 0) / connections.length;
       } else if (dbTimeline.length > 0) {
+        const connections = dbTimeline.map(e => e.connections || 0);
+        const uniqueValues = new Set(connections);
+        hasUnchangedConnections = uniqueValues.size === 1 && connections[0] > 0;
         avgConnections = dbTimeline.reduce((sum, e) => sum + (e.connections || 0), 0) / dbTimeline.length;
       }
 
@@ -124,6 +130,7 @@ function ServerDetails() {
         avgConnections,
         sizeGB,
         isStatic,
+        hasUnchangedConnections,
         lastActivity
       };
     });
@@ -133,7 +140,8 @@ function ServerDetails() {
       dead: analyzed.filter(db => db.status === 'dead'),
       static: analyzed.filter(db => db.status === 'static'),
       warning: analyzed.filter(db => db.status === 'warning'),
-      healthy: analyzed.filter(db => db.status === 'healthy')
+      healthy: analyzed.filter(db => db.status === 'healthy'),
+      unchanged: analyzed.filter(db => db.hasUnchangedConnections)
     };
   }, [stats, criteria]); // Добавляем criteria в зависимости
 
@@ -494,6 +502,14 @@ function ServerDetails() {
     alert('Критерии сброшены на значения по умолчанию');
   };
 
+  // Функция для проверки, имеет ли база неизменные подключения
+  const hasUnchangedConnections = (dbName) => {
+    const connections = getDatabaseConnections(dbName);
+    if (connections.length < 2) return false;
+    const uniqueValues = new Set(connections);
+    return uniqueValues.size === 1 && connections[0] > 0;
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return (
     <LoadingSpinner text="Загрузка данных сервера..." subtext="Получение статистики" />
@@ -508,7 +524,8 @@ function ServerDetails() {
       nameMatch &&
       (!hideDeleted || db.exists) &&
       (!showNoConnections || (connections.length === 0 || connections.every(conn => conn === 0))) &&
-      (!showStaticConnections || (connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0)))
+      (!showStaticConnections || (connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0))) &&
+      (!showUnchangedConnections || hasUnchangedConnections(db.name))
     );
   }).sort((a, b) => {
     if (sortColumn === 'name') {
@@ -526,6 +543,12 @@ function ServerDetails() {
     }
     return 0;
   });
+
+  // Вычисляем суммарный размер отфильтрованных баз
+  const totalFilteredSize = filteredDatabases.reduce((sum, db) => {
+    const size = getDatabaseSize(db.name) || 0;
+    return sum + size;
+  }, 0);
 
   const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(filteredDatabases.length / itemsPerPage);
   const paginatedDatabases = itemsPerPage === 'all' ? filteredDatabases : filteredDatabases.slice(
@@ -687,7 +710,7 @@ function ServerDetails() {
             </div>
             <input 
               type="text" 
-              className="form-control form-control-sm" 
+              className="form-control form-control-sm aligned-input" 
               placeholder="Имя базы..." 
               value={nameFilter} 
               onChange={(e) => { 
@@ -708,6 +731,7 @@ function ServerDetails() {
                 const val = e.target.value;
                 setShowNoConnections(val === 'no-conn');
                 setShowStaticConnections(val === 'static');
+                setShowUnchangedConnections(false);
                 setCurrentPage(1);
               }} 
               style={{ width: 'auto' }}
@@ -727,6 +751,7 @@ function ServerDetails() {
             setShowNoConnections(!showNoConnections);
             if (!showNoConnections) {
               setShowStaticConnections(false);
+              setShowUnchangedConnections(false);
             }
             setCurrentPage(1);
           }}
@@ -735,6 +760,22 @@ function ServerDetails() {
             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
           </svg>
           Без подключений
+        </button>
+        <button 
+          className={`btn btn-sm ${showUnchangedConnections ? 'btn-primary' : 'btn-outline-primary'}`}
+          onClick={() => {
+            setShowUnchangedConnections(!showUnchangedConnections);
+            if (!showUnchangedConnections) {
+              setShowNoConnections(false);
+              setShowStaticConnections(false);
+            }
+            setCurrentPage(1);
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          Статичные подключения
         </button>
         <div style={{ marginLeft: 'auto' }}>
           <button 
@@ -745,6 +786,27 @@ function ServerDetails() {
           </button>
         </div>
       </div>
+
+      {/* Информация о суммарном размере отфильтрованных баз */}
+      {filteredDatabases.length > 0 && (showNoConnections || showStaticConnections || showUnchangedConnections || nameFilter) && (
+        <div className="filtered-summary">
+          <div className="summary-content">
+            <span className="summary-label">Отфильтровано баз:</span>
+            <span className="summary-value">{filteredDatabases.length}</span>
+            <span className="summary-separator">|</span>
+            <span className="summary-label">Суммарный размер:</span>
+            <span className="summary-value summary-size">{totalFilteredSize.toFixed(2)} ГБ</span>
+            {(showNoConnections || showUnchangedConnections) && (
+              <>
+                <span className="summary-separator">|</span>
+                <span className="summary-hint">
+                  Удаление этих баз освободит ~{totalFilteredSize.toFixed(1)} ГБ
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <Tabs activeKey={activeTab} onSelect={setActiveTab} className="mb-4">
         <Tab eventKey="overview" title="Обзор">
@@ -770,12 +832,13 @@ function ServerDetails() {
                   {paginatedDatabases.map(db => {
                     const connections = getDatabaseConnections(db.name);
                     const isInactive = connections.length === 0 || connections.every(conn => conn === 0);
+                    const isUnchanged = hasUnchangedConnections(db.name);
                     const lastActivity = stats.connection_timeline
                       ?.filter(entry => entry.datname === db.name)
                       ?.slice(-1)[0]?.ts;
                     
                     return (
-                      <tr key={db.name} className={isInactive ? 'table-warning' : ''}>
+                      <tr key={db.name} className={isInactive ? 'table-warning' : isUnchanged ? 'table-info' : ''}>
                         <td>
                           <Link to={`/server/${name}/db/${db.name}`} className="server-link">
                             {db.name}
@@ -783,8 +846,9 @@ function ServerDetails() {
                         </td>
                         <td><strong>{formatSize(getDatabaseSize(db.name))}</strong></td>
                         <td>
-                          <span style={{ color: isInactive ? 'var(--danger)' : 'var(--success)' }}>
+                          <span style={{ color: isInactive ? 'var(--danger)' : isUnchanged ? 'var(--warning)' : 'var(--success)' }}>
                             {connections.length > 0 ? connections[connections.length - 1] : 0}
+                            {isUnchanged && ' (стат.)'}
                           </span>
                         </td>
                         <td style={{ color: isInactive ? 'var(--danger)' : 'inherit' }}>
