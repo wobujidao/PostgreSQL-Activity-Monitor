@@ -25,25 +25,6 @@ function Login({ onLogin, error: parentError }) {
 
   return (
     <div className="login-container">
-      {/* Feature Cards */}
-      <div className="features">
-        <div className="feature-card">
-          <div className="feature-icon">📊</div>
-          <div className="feature-title">Мониторинг в реальном времени</div>
-          <div className="feature-desc">Отслеживайте активность PostgreSQL серверов</div>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">🔍</div>
-          <div className="feature-title">Анализ активности</div>
-          <div className="feature-desc">Находите неактивные базы данных</div>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">⚡</div>
-          <div className="feature-title">Быстрый доступ</div>
-          <div className="feature-desc">Управляйте пользователями и серверами</div>
-        </div>
-      </div>
-
       {/* Login Box */}
       <div className="login-box">
         {/* Logo Section */}
