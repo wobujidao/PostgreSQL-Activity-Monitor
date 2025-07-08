@@ -69,6 +69,51 @@
   min-width: 120px;
 }
 
+/* Индикатор загрузки */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--accent);
+  margin-left: auto;
+}
+
+.loading-indicator .spinner-border {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+/* Фильтр поиска с типом */
+.search-with-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Обертка для выпадающих списков со стрелкой */
+.select-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.select-wrapper .form-select {
+  padding-right: 28px !important;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #6c757d;
+}
+
 .update-status {
   font-size: 12px;
   padding: 4px 8px;
@@ -167,6 +212,7 @@
   display: flex;
   gap: 20px;
   margin: 20px 0;
+  transition: opacity 0.3s ease;
 }
 
 .chart {
