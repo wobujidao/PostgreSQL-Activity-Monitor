@@ -42,6 +42,32 @@
   margin-bottom: 20px;
 }
 
+.filter-bar {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .date-controls {
   display: flex;
   align-items: center;
@@ -103,6 +129,9 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  height: 31px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
 }
 
 .select-arrow {
@@ -317,12 +346,6 @@
   margin-bottom: 12px;
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .filter-input {
   padding: 6px 12px;
   border: 1px solid var(--border-color);
@@ -460,6 +483,31 @@
 .aligned-input {
   height: 31px !important;
   padding: 4px 12px !important;
+}
+
+/* Стили для всех кнопок в фильтрах */
+.filter-bar .btn {
+  height: 31px !important;
+  padding: 0 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  border-radius: 4px;
+}
+
+.filter-bar .btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Убедимся что все select одинаковой высоты */
+.filter-bar .form-select {
+  height: 31px !important;
+  padding: 4px 28px 4px 12px !important;
+  font-size: 14px !important;
 }
 
 /* Информация о суммарном размере */

@@ -387,7 +387,18 @@ function ServerDetails() {
     });
   };
 
-  const formatSize = (sizeGb) => sizeGb !== null && sizeGb !== undefined ? `${sizeGb.toFixed(2)} ГБ` : 'N/A';
+  const formatSize = (sizeGb) => {
+    if (sizeGb === null || sizeGb === undefined) return 'N/A';
+    
+    // Если размер меньше 1 ГБ, показываем в МБ
+    if (sizeGb < 1) {
+      const sizeMb = sizeGb * 1024;
+      return `${sizeMb.toFixed(0)} МБ`;
+    }
+    
+    // Иначе показываем в ГБ
+    return `${sizeGb.toFixed(2)} ГБ`;
+  };
 
   const formatCreationTime = (creationTime) => {
     if (!creationTime) return 'N/A';
@@ -757,7 +768,7 @@ function ServerDetails() {
           }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+            <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
           </svg>
           Без подключений
         </button>
@@ -796,14 +807,6 @@ function ServerDetails() {
             <span className="summary-separator">|</span>
             <span className="summary-label">Суммарный размер:</span>
             <span className="summary-value summary-size">{totalFilteredSize.toFixed(2)} ГБ</span>
-            {(showNoConnections || showUnchangedConnections) && (
-              <>
-                <span className="summary-separator">|</span>
-                <span className="summary-hint">
-                  Удаление этих баз освободит ~{totalFilteredSize.toFixed(1)} ГБ
-                </span>
-              </>
-            )}
           </div>
         </div>
       )}
