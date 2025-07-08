@@ -27,8 +27,20 @@ def load_servers() -> List[Server]:
         
         servers = []
         for item in data:
+            # Расшифровываем пароли
             item["password"] = decrypt_password(item["password"])
             item["ssh_password"] = decrypt_password(item["ssh_password"])
+            
+            # Расшифровываем SSH-ключ и passphrase если есть
+            if item.get("ssh_private_key"):
+                item["ssh_private_key"] = decrypt_password(item["ssh_private_key"])
+            if item.get("ssh_key_passphrase"):
+                item["ssh_key_passphrase"] = decrypt_password(item["ssh_key_passphrase"])
+            
+            # Устанавливаем значение по умолчанию для ssh_auth_type
+            if "ssh_auth_type" not in item:
+                item["ssh_auth_type"] = "password"
+            
             servers.append(Server(**item))
         
         logger.debug(f"Загружено {len(servers)} серверов")
@@ -50,7 +62,11 @@ def save_servers(servers: List[Server]):
                 "port": s.port,
                 "ssh_user": s.ssh_user,
                 "ssh_password": encrypt_password(s.ssh_password),
-                "ssh_port": s.ssh_port
+                "ssh_port": s.ssh_port,
+                "ssh_auth_type": getattr(s, "ssh_auth_type", "password"),
+                "ssh_private_key": encrypt_password(s.ssh_private_key) if getattr(s, "ssh_private_key", None) else None,
+                "ssh_key_passphrase": encrypt_password(s.ssh_key_passphrase) if getattr(s, "ssh_key_passphrase", None) else None,
+                "ssh_key_fingerprint": getattr(s, "ssh_key_fingerprint", None)
             } for s in servers], f, indent=2)
         logger.info(f"Сохранено {len(servers)} серверов")
     except Exception as e:
@@ -96,6 +112,8 @@ def connect_to_server(server: Server) -> Dict[str, Any]:
         "ssh_port": server.ssh_port,
         "has_password": bool(server.password),
         "has_ssh_password": bool(server.ssh_password),
+        "ssh_auth_type": getattr(server, "ssh_auth_type", "password"),
+        "ssh_key_fingerprint": getattr(server, "ssh_key_fingerprint", None),
         "version": None,
         "free_space": None,
         "total_space": None,

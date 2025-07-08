@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 # app/api/servers.py
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from typing import List, Dict, Any
 import logging
 from app.models import Server
 from app.auth import get_current_user
-from app.services import load_servers, save_servers, connect_to_server, cache_manager
+from app.services import load_servers, save_servers, connect_to_server, cache_manager, SSHKeyManager
 from app.services.ssh import is_host_reachable
 from app.database import db_pool
 
@@ -14,46 +15,56 @@ router = APIRouter(prefix="/servers", tags=["servers"])
 
 @router.get("", response_model=List[dict])
 async def get_servers(current_user: dict = Depends(get_current_user)):
-    """Получить список всех серверов с их статусом"""
+    """Get list of all servers with their status"""
     servers = load_servers()
     return [connect_to_server(server) for server in servers]
 
 @router.post("", response_model=dict)
 async def add_server(server: Server, current_user: dict = Depends(get_current_user)):
-    """Добавить новый сервер"""
+    """Add new server"""
     try:
-        # Валидация имени и хоста
+        # Validate name and host
         if not server.name or server.name.lower() == 'test':
-            raise HTTPException(status_code=400, detail="Недопустимое имя сервера")
+            raise HTTPException(status_code=400, detail="Invalid server name")
             
         if not server.host or server.host.lower() in ['test', 'localhost']:
-            raise HTTPException(status_code=400, detail="Недопустимый адрес хоста")
+            raise HTTPException(status_code=400, detail="Invalid host address")
         
         servers = load_servers()
         if any(s.name == server.name for s in servers):
-            logger.warning(f"Попытка добавить существующий сервер: {server.name}")
+            logger.warning("Attempt to add existing server: {}".format(server.name))
             raise HTTPException(status_code=400, detail="Server with this name already exists")
         
-        # Быстрая проверка доступности
-        logger.info(f"Проверка доступности сервера {server.name} ({server.host}:{server.port})")
+        # Quick availability check
+        logger.info("Checking server availability {} ({}:{})".format(server.name, server.host, server.port))
         if not is_host_reachable(server.host, server.port):
-            logger.warning(f"Сервер {server.name} недоступен по адресу {server.host}:{server.port}")
+            logger.warning("Server {} unreachable at {}:{}".format(server.name, server.host, server.port))
             raise HTTPException(
                 status_code=400, 
-                detail=f"Сервер {server.host}:{server.port} недоступен. Проверьте адрес и порт."
+                detail="Server {}:{} is unreachable. Check address and port.".format(server.host, server.port)
             )
         
-        # Сохраняем сервер
+        # Validate SSH key if provided
+        if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_private_key', None):
+            is_valid, error_msg, fingerprint = SSHKeyManager.validate_private_key(
+                server.ssh_private_key,
+                getattr(server, 'ssh_key_passphrase', None)
+            )
+            if not is_valid:
+                raise HTTPException(status_code=400, detail="Invalid SSH key: {}".format(error_msg))
+            server.ssh_key_fingerprint = fingerprint
+        
+        # Save server
         servers.append(server)
         save_servers(servers)
-        logger.info(f"Добавлен новый сервер: {server.name}")
+        logger.info("Added new server: {}".format(server.name))
         
-        # Возвращаем полную информацию о сервере
+        # Return full server information
         try:
             return connect_to_server(server)
         except Exception as e:
-            # Если не удалось подключиться, возвращаем базовую информацию
-            logger.warning(f"Не удалось получить полную информацию о сервере {server.name}: {e}")
+            # If connection failed, return basic info
+            logger.warning("Could not get full server info for {}: {}".format(server.name, e))
             return {
                 "name": server.name,
                 "host": server.host,
@@ -61,6 +72,8 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
                 "user": server.user,
                 "ssh_user": server.ssh_user,
                 "ssh_port": server.ssh_port,
+                "ssh_auth_type": getattr(server, "ssh_auth_type", "password"),
+                "ssh_key_fingerprint": getattr(server, "ssh_key_fingerprint", None),
                 "has_password": bool(server.password),
                 "has_ssh_password": bool(server.ssh_password),
                 "status": "added (connection pending)",
@@ -76,8 +89,8 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка при добавлении сервера {server.name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка при добавлении сервера: {str(e)}")
+        logger.error("Error adding server {}: {}".format(server.name, e))
+        raise HTTPException(status_code=500, detail="Error adding server: {}".format(str(e)))
 
 @router.put("/{server_name}", response_model=dict)
 async def update_server(
@@ -85,7 +98,7 @@ async def update_server(
     updated_server: Server, 
     current_user: dict = Depends(get_current_user)
 ):
-    """Обновить конфигурацию сервера"""
+    """Update server configuration"""
     try:
         servers = load_servers()
         server_index = next((i for i, s in enumerate(servers) if s.name == server_name), None)
@@ -94,11 +107,21 @@ async def update_server(
         
         old_server = servers[server_index]
         
-        # Очищаем кэши при изменении сервера
-        cache_key = f"{old_server.host}:{old_server.port}"
+        # Validate SSH key if provided
+        if getattr(updated_server, 'ssh_auth_type', 'password') == 'key' and getattr(updated_server, 'ssh_private_key', None):
+            is_valid, error_msg, fingerprint = SSHKeyManager.validate_private_key(
+                updated_server.ssh_private_key,
+                getattr(updated_server, 'ssh_key_passphrase', None)
+            )
+            if not is_valid:
+                raise HTTPException(status_code=400, detail="Invalid SSH key: {}".format(error_msg))
+            updated_server.ssh_key_fingerprint = fingerprint
+        
+        # Clear caches when server changes
+        cache_key = "{}:{}".format(old_server.host, old_server.port)
         cache_manager.invalidate_server_cache(cache_key)
         
-        # Закрываем старые пулы если изменились параметры подключения
+        # Close old pools if connection params changed
         if (old_server.host != updated_server.host or 
             old_server.port != updated_server.port or 
             old_server.user != updated_server.user):
@@ -108,36 +131,148 @@ async def update_server(
         
         servers[server_index] = updated_server
         save_servers(servers)
-        logger.info(f"Обновлён сервер: {server_name}")
+        logger.info("Updated server: {}".format(server_name))
         
         return connect_to_server(updated_server)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка при обновлении сервера {server_name}: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка при обновлении сервера: {str(e)}")
+        logger.error("Error updating server {}: {}".format(server_name, e))
+        raise HTTPException(status_code=500, detail="Error updating server: {}".format(str(e)))
 
 @router.delete("/{server_name}")
 async def delete_server(server_name: str, current_user: dict = Depends(get_current_user)):
-    """Удалить сервер из конфигурации"""
+    """Delete server from configuration"""
     servers = load_servers()
     server_to_delete = next((s for s in servers if s.name == server_name), None)
     
     if not server_to_delete:
         raise HTTPException(status_code=404, detail="Server not found")
     
-    # Очищаем кэши
-    cache_key = f"{server_to_delete.host}:{server_to_delete.port}"
+    # Clear caches
+    cache_key = "{}:{}".format(server_to_delete.host, server_to_delete.port)
     cache_manager.invalidate_server_cache(cache_key)
     
-    # Закрываем пулы для удаляемого сервера
+    # Close pools for deleted server
     db_pool.close_pool(server_to_delete)
     if server_to_delete.stats_db:
         db_pool.close_pool(server_to_delete, server_to_delete.stats_db)
     
     updated_servers = [s for s in servers if s.name != server_name]
     save_servers(updated_servers)
-    logger.info(f"Удалён сервер: {server_name}")
+    logger.info("Deleted server: {}".format(server_name))
     
-    return {"message": f"Server {server_name} deleted"}
+    return {"message": "Server {} deleted".format(server_name)}
+
+@router.post("/{server_name}/test-ssh")
+async def test_ssh_connection(
+    server_name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Test SSH connection to server"""
+    servers = load_servers()
+    server = next((s for s in servers if s.name == server_name), None)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    
+    try:
+        if getattr(server, 'ssh_auth_type', 'password') == 'key':
+            success, message = SSHKeyManager.test_ssh_connection(
+                host=server.host,
+                port=server.ssh_port,
+                username=server.ssh_user,
+                private_key_content=getattr(server, 'ssh_private_key', None),
+                passphrase=getattr(server, 'ssh_key_passphrase', None)
+            )
+        else:
+            success, message = SSHKeyManager.test_ssh_connection(
+                host=server.host,
+                port=server.ssh_port,
+                username=server.ssh_user,
+                password=server.ssh_password
+            )
+        
+        return {
+            "success": success,
+            "message": message,
+            "auth_type": getattr(server, 'ssh_auth_type', 'password')
+        }
+        
+    except Exception as e:
+        logger.error("Error testing SSH for {}: {}".format(server_name, e))
+        return {
+            "success": False,
+            "message": "Test failed: {}".format(str(e)),
+            "auth_type": getattr(server, 'ssh_auth_type', 'password')
+        }
+
+@router.post("/generate-ssh-key")
+async def generate_ssh_key(
+    request_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate new SSH key pair"""
+    try:
+        key_type = request_data.get("key_type", "rsa")
+        key_size = request_data.get("key_size", 2048)
+        passphrase = request_data.get("passphrase", None)
+        
+        if key_type not in ["rsa", "ed25519"]:
+            raise HTTPException(status_code=400, detail="Key type must be 'rsa' or 'ed25519'")
+        
+        if key_type == "rsa" and key_size not in [2048, 3072, 4096]:
+            raise HTTPException(status_code=400, detail="RSA key size must be 2048, 3072, or 4096")
+        
+        private_key, public_key, fingerprint = SSHKeyManager.generate_ssh_key_pair(
+            key_type=key_type,
+            key_size=key_size,
+            passphrase=passphrase
+        )
+        
+        return {
+            "private_key": private_key,
+            "public_key": public_key,
+            "fingerprint": fingerprint,
+            "key_type": key_type,
+            "key_size": key_size if key_type == "rsa" else None
+        }
+        
+    except Exception as e:
+        logger.error("Error generating SSH key: {}".format(e))
+        raise HTTPException(status_code=500, detail="Error generating key: {}".format(str(e)))
+
+@router.post("/validate-ssh-key")
+async def validate_ssh_key(
+    request_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Validate SSH private key"""
+    try:
+        private_key = request_data.get("private_key", "")
+        passphrase = request_data.get("passphrase", None)
+        
+        is_valid, error_msg, fingerprint = SSHKeyManager.validate_private_key(
+            private_key,
+            passphrase
+        )
+        
+        if is_valid:
+            public_key = SSHKeyManager.get_public_key_from_private(private_key, passphrase)
+            return {
+                "valid": True,
+                "fingerprint": fingerprint,
+                "public_key": public_key
+            }
+        else:
+            return {
+                "valid": False,
+                "error": error_msg
+            }
+            
+    except Exception as e:
+        logger.error("Error validating SSH key: {}".format(e))
+        return {
+            "valid": False,
+            "error": "Validation error: {}".format(str(e))
+        }

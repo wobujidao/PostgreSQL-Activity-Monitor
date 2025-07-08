@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner';
+import SSHKeyManager from './SSHKeyManager';
 import './ServerList.css';
 
 function ServerList() {
   const [servers, setServers] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSSHKeyModal, setShowSSHKeyModal] = useState(false);
   const [editServer, setEditServer] = useState(null);
   const [newServer, setNewServer] = useState({
     name: '',
@@ -18,7 +20,11 @@ function ServerList() {
     port: 5432,
     ssh_user: '',
     ssh_password: '',
-    ssh_port: 22
+    ssh_port: 22,
+    ssh_auth_type: 'password',
+    ssh_private_key: '',
+    ssh_key_passphrase: '',
+    ssh_key_fingerprint: ''
   });
   const [errorMessage, setErrorMessage] = useState('');
   const [refreshInterval, setRefreshInterval] = useState(60000);
@@ -28,6 +34,10 @@ function ServerList() {
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [loading, setLoading] = useState(true);
+  const [testingSSH, setTestingSSH] = useState(false);
+  const [sshTestResult, setSSHTestResult] = useState(null);
+  const [currentServerForSSH, setCurrentServerForSSH] = useState(null);
+  const [isAddMode, setIsAddMode] = useState(false);
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -65,8 +75,17 @@ function ServerList() {
   }, [refreshInterval]);
 
   const handleEdit = (server) => {
-    setEditServer({ ...server, password: '', ssh_password: '' });
+    setEditServer({ 
+      ...server, 
+      password: '', 
+      ssh_password: '',
+      ssh_auth_type: server.ssh_auth_type || 'password',
+      ssh_private_key: '',
+      ssh_key_passphrase: '',
+      ssh_key_fingerprint: server.ssh_key_fingerprint || ''
+    });
     setShowEditModal(true);
+    setIsAddMode(false);
   };
 
   const handleSaveEdit = async () => {
@@ -78,10 +97,11 @@ function ServerList() {
       );
       setServers(servers.map(server => server.name === editServer.name ? response.data : server));
       setShowEditModal(false);
+      setSSHTestResult(null);
       console.log('Сервер успешно обновлён:', response.data);
     } catch (error) {
       console.error('Ошибка обновления сервера:', error);
-      setErrorMessage('Ошибка при сохранении изменений');
+      setErrorMessage('Ошибка при сохранении изменений: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -113,6 +133,8 @@ function ServerList() {
   const handleAdd = () => {
     setErrorMessage('');
     setShowAddModal(true);
+    setIsAddMode(true);
+    setSSHTestResult(null);
   };
 
   const handleSaveAdd = async () => {
@@ -134,9 +156,14 @@ function ServerList() {
           port: 5432,
           ssh_user: '',
           ssh_password: '',
-          ssh_port: 22
+          ssh_port: 22,
+          ssh_auth_type: 'password',
+          ssh_private_key: '',
+          ssh_key_passphrase: '',
+          ssh_key_fingerprint: ''
         });
         setShowAddModal(false);
+        setSSHTestResult(null);
         console.log('Сервер успешно добавлен:', response.data);
       }
     } catch (error) {
@@ -144,6 +171,52 @@ function ServerList() {
       const errorMsg = error.response?.data?.detail || error.message || 'Неизвестная ошибка';
       setErrorMessage('Ошибка при добавлении сервера: ' + errorMsg);
     }
+  };
+
+  const handleTestSSH = async (server) => {
+    setTestingSSH(true);
+    setSSHTestResult(null);
+    try {
+      const response = await axios.post(
+        `http://10.110.20.55:8000/servers/${server.name}/test-ssh`,
+        {},
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setSSHTestResult(response.data);
+    } catch (error) {
+      setSSHTestResult({
+        success: false,
+        message: error.response?.data?.detail || error.message
+      });
+    } finally {
+      setTestingSSH(false);
+    }
+  };
+
+  const handleOpenSSHKeyManager = (server) => {
+    setCurrentServerForSSH(server);
+    setShowSSHKeyModal(true);
+  };
+
+  const handleSSHKeyGenerated = (keyData) => {
+    if (isAddMode) {
+      setNewServer({
+        ...newServer,
+        ssh_auth_type: 'key',
+        ssh_private_key: keyData.privateKey,
+        ssh_key_passphrase: keyData.passphrase,
+        ssh_key_fingerprint: keyData.fingerprint
+      });
+    } else if (editServer) {
+      setEditServer({
+        ...editServer,
+        ssh_auth_type: 'key',
+        ssh_private_key: keyData.privateKey,
+        ssh_key_passphrase: keyData.passphrase,
+        ssh_key_fingerprint: keyData.fingerprint
+      });
+    }
+    setShowSSHKeyModal(false);
   };
 
   const handleIntervalChange = (e) => {
@@ -277,6 +350,95 @@ function ServerList() {
     return <LoadingSpinner text="Загрузка серверов..." subtext="Подключение к базам данных" />;
   }
 
+  // Компонент для SSH настроек в модальном окне
+  const SSHAuthSettings = ({ server, onChange, isEdit = false }) => (
+    <>
+      <Form.Group className="mb-3">
+        <Form.Label>SSH Аутентификация</Form.Label>
+        <div>
+          <Form.Check
+            inline
+            type="radio"
+            label="По паролю"
+            name={`sshAuth-${isEdit ? 'edit' : 'add'}`}
+            value="password"
+            checked={server.ssh_auth_type === 'password'}
+            onChange={(e) => onChange({ ...server, ssh_auth_type: e.target.value })}
+          />
+          <Form.Check
+            inline
+            type="radio"
+            label="По SSH-ключу"
+            name={`sshAuth-${isEdit ? 'edit' : 'add'}`}
+            value="key"
+            checked={server.ssh_auth_type === 'key'}
+            onChange={(e) => onChange({ ...server, ssh_auth_type: e.target.value })}
+          />
+        </div>
+      </Form.Group>
+
+      {server.ssh_auth_type === 'password' ? (
+        <Form.Group className="mb-3">
+          <Form.Label>Пароль SSH</Form.Label>
+          <Form.Control
+            type="password"
+            value={server.ssh_password || ''}
+            onChange={(e) => onChange({ ...server, ssh_password: e.target.value })}
+            placeholder={isEdit ? "Оставьте пустым, если не меняете" : "Введите пароль SSH"}
+          />
+        </Form.Group>
+      ) : (
+        <>
+          <Form.Group className="mb-3">
+            <Form.Label>SSH-ключ</Form.Label>
+            {server.ssh_key_fingerprint && (
+              <div className="mb-2">
+                <small className="text-muted">
+                  Fingerprint: <code>{server.ssh_key_fingerprint}</code>
+                </small>
+              </div>
+            )}
+            <div className="d-flex gap-2">
+              <Form.Control
+                type="password"
+                value={server.ssh_private_key ? '••••••••' : ''}
+                placeholder="SSH-ключ не загружен"
+                readOnly
+              />
+              <Button 
+                variant="outline-primary"
+                onClick={() => handleOpenSSHKeyManager(server)}
+              >
+                🔑 Управление ключом
+              </Button>
+            </div>
+          </Form.Group>
+        </>
+      )}
+
+      {server.name && server.ssh_auth_type && (
+        <Form.Group className="mb-3">
+          <Button
+            variant="outline-success"
+            size="sm"
+            onClick={() => handleTestSSH(server)}
+            disabled={testingSSH}
+          >
+            {testingSSH ? <Spinner size="sm" /> : '🔧 Тест SSH подключения'}
+          </Button>
+          {sshTestResult && (
+            <Alert 
+              variant={sshTestResult.success ? 'success' : 'danger'} 
+              className="mt-2 mb-0"
+            >
+              {sshTestResult.success ? '✅' : '❌'} {sshTestResult.message}
+            </Alert>
+          )}
+        </Form.Group>
+      )}
+    </>
+  );
+
   return (
     <div className="container mt-4">
       {/* Панель фильтров */}
@@ -407,6 +569,7 @@ function ServerList() {
                   <th className={getSortClass('status')} onClick={() => handleSort('status')}>
                     Статус
                   </th>
+                  <th>SSH</th>
                   <th>Действия</th>
                 </tr>
               </thead>
@@ -481,6 +644,11 @@ function ServerList() {
                         </OverlayTrigger>
                       </td>
                       <td>
+                        <span className="text-sm">
+                          {server.ssh_auth_type === 'key' ? '🔑' : '🔒'} {server.ssh_auth_type || 'password'}
+                        </span>
+                      </td>
+                      <td>
                         <button
                           className="btn btn-outline-primary btn-sm"
                           onClick={() => handleEdit(server)}
@@ -498,7 +666,7 @@ function ServerList() {
       </Card>
 
       {/* Модальное окно редактирования */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg">
+      <Modal show={showEditModal} onHide={() => { setShowEditModal(false); setSSHTestResult(null); }} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Управление сервером: {editServer?.name}</Modal.Title>
         </Modal.Header>
@@ -547,6 +715,9 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, port: parseInt(e.target.value) })}
                 />
               </Form.Group>
+              
+              <hr />
+              
               <Form.Group className="mb-3">
                 <Form.Label>Пользователь SSH</Form.Label>
                 <Form.Control
@@ -555,15 +726,13 @@ function ServerList() {
                   onChange={(e) => setEditServer({ ...editServer, ssh_user: e.target.value })}
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Пароль SSH</Form.Label>
-                <Form.Control
-                  type="password"
-                  value={editServer.ssh_password || ''}
-                  onChange={(e) => setEditServer({ ...editServer, ssh_password: e.target.value })}
-                  placeholder="Оставьте пустым, если не меняете"
-                />
-              </Form.Group>
+
+              <SSHAuthSettings 
+                server={editServer} 
+                onChange={setEditServer}
+                isEdit={true}
+              />
+
               <Form.Group className="mb-3">
                 <Form.Label>Порт SSH</Form.Label>
                 <Form.Control
@@ -589,7 +758,7 @@ function ServerList() {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+          <Button variant="secondary" onClick={() => { setShowEditModal(false); setSSHTestResult(null); }}>
             Отмена
           </Button>
           <Button variant="primary" onClick={handleSaveEdit}>
@@ -599,7 +768,7 @@ function ServerList() {
       </Modal>
 
       {/* Модальное окно добавления */}
-      <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
+      <Modal show={showAddModal} onHide={() => { setShowAddModal(false); setSSHTestResult(null); }} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Добавить сервер</Modal.Title>
         </Modal.Header>
@@ -646,6 +815,9 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })}
               />
             </Form.Group>
+            
+            <hr />
+            
             <Form.Group className="mb-3">
               <Form.Label>Пользователь SSH</Form.Label>
               <Form.Control
@@ -654,14 +826,13 @@ function ServerList() {
                 onChange={(e) => setNewServer({ ...newServer, ssh_user: e.target.value })}
               />
             </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Пароль SSH</Form.Label>
-              <Form.Control
-                type="password"
-                value={newServer.ssh_password}
-                onChange={(e) => setNewServer({ ...newServer, ssh_password: e.target.value })}
-              />
-            </Form.Group>
+
+            <SSHAuthSettings 
+              server={newServer} 
+              onChange={setNewServer}
+              isEdit={false}
+            />
+
             <Form.Group className="mb-3">
               <Form.Label>Порт SSH</Form.Label>
               <Form.Control
@@ -673,7 +844,7 @@ function ServerList() {
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+          <Button variant="secondary" onClick={() => { setShowAddModal(false); setSSHTestResult(null); }}>
             Закрыть
           </Button>
           <Button variant="primary" onClick={handleSaveAdd}>
@@ -681,6 +852,17 @@ function ServerList() {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Модальное окно управления SSH-ключами */}
+      <SSHKeyManager 
+        show={showSSHKeyModal}
+        onHide={() => setShowSSHKeyModal(false)}
+        onKeyGenerated={handleSSHKeyGenerated}
+        onKeyValidated={handleSSHKeyGenerated}
+        serverName={currentServerForSSH?.name}
+        serverHost={currentServerForSSH?.host}
+        sshUser={currentServerForSSH?.ssh_user}
+      />
     </div>
   );
 }

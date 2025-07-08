@@ -2,10 +2,13 @@
 import paramiko
 import socket
 import logging
+import tempfile
+import os
 from typing import Tuple, Optional
 from app.models import Server
 from app.services.cache import cache_manager
 from app.config import SSH_CACHE_TTL
+from app.utils import decrypt_password
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,65 @@ def is_host_reachable(host: str, port: int, timeout: int = 2) -> bool:
         logger.error(f"Ошибка проверки доступности {host}:{port}: {e}")
         return False
 
+def get_ssh_client(server: Server) -> paramiko.SSHClient:
+    """Создает и настраивает SSH-клиент для сервера"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    connect_kwargs = {
+        'hostname': server.host,
+        'port': server.ssh_port,
+        'username': server.ssh_user,
+        'timeout': 5,
+        'banner_timeout': 5,
+        'auth_timeout': 5
+    }
+    
+    # Определяем метод аутентификации
+    if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_private_key', None):
+        # Подключение по SSH-ключу
+        logger.debug(f"Подключение к {server.name} по SSH-ключу")
+        
+        # Расшифровываем приватный ключ
+        private_key_content = decrypt_password(server.ssh_private_key)
+        
+        # Расшифровываем passphrase если есть
+        passphrase = None
+        if getattr(server, 'ssh_key_passphrase', None):
+            passphrase = decrypt_password(server.ssh_key_passphrase)
+        
+        # Создаем временный файл для ключа
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+            tmp_file.write(private_key_content)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Пробуем загрузить ключ разных типов
+            pkey = None
+            for key_class in [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey]:
+                try:
+                    pkey = key_class.from_private_key_file(tmp_file_path, password=passphrase)
+                    logger.debug(f"Загружен {key_class.__name__} ключ для {server.name}")
+                    break
+                except Exception as e:
+                    continue
+            
+            if not pkey:
+                raise Exception("Не удалось загрузить приватный ключ")
+            
+            connect_kwargs['pkey'] = pkey
+            
+        finally:
+            # Удаляем временный файл
+            os.unlink(tmp_file_path)
+    else:
+        # Подключение по паролю
+        logger.debug(f"Подключение к {server.name} по паролю")
+        connect_kwargs['password'] = server.ssh_password
+    
+    ssh.connect(**connect_kwargs)
+    return ssh
+
 def get_ssh_disk_usage(server: Server, data_dir: str) -> Tuple[Optional[int], Optional[int], str]:
     """Получение информации о диске через SSH"""
     cache_key = f"{server.host}:{server.ssh_port}"
@@ -57,17 +119,7 @@ def get_ssh_disk_usage(server: Server, data_dir: str) -> Tuple[Optional[int], Op
     
     try:
         logger.debug(f"SSH подключение к {server.name}")
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(
-            server.host,
-            username=server.ssh_user,
-            password=server.ssh_password,
-            port=server.ssh_port,
-            timeout=5,
-            banner_timeout=5,
-            auth_timeout=5
-        )
+        ssh = get_ssh_client(server)
         
         # Извлекаем точку монтирования
         mount_point = data_dir.split('/DB')[0] if '/DB' in data_dir else data_dir
@@ -103,6 +155,9 @@ def get_ssh_disk_usage(server: Server, data_dir: str) -> Tuple[Optional[int], Op
     except socket.timeout:
         logger.error(f"SSH таймаут для {server.name}")
         return None, None, "timeout"
+    except paramiko.AuthenticationException:
+        logger.error(f"SSH ошибка аутентификации для {server.name}")
+        return None, None, "authentication failed"
     except Exception as e:
         logger.error(f"SSH ошибка для {server.name}: {e}")
         return None, None, str(e)
