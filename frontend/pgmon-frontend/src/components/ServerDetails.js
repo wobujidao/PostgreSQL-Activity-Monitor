@@ -12,11 +12,23 @@ import './ServerDetails.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
-// Константы критериев анализа
-const DB_ANALYSIS_CRITERIA = {
-  deadDays: 30,              // 30 дней без подключений (изменено с 90)
-  staticConnectionsDays: 30,  // 1 месяц без изменений
-  lowActivityThreshold: 2     // порог низкой активности (изменено с 5)
+// Функция для загрузки критериев из localStorage
+const loadCriteria = () => {
+  const saved = localStorage.getItem('dbAnalysisCriteria');
+  if (saved) {
+    return JSON.parse(saved);
+  }
+  // Значения по умолчанию
+  return {
+    deadDays: 30,
+    staticConnectionsDays: 30,
+    lowActivityThreshold: 2
+  };
+};
+
+// Функция для сохранения критериев
+const saveCriteria = (criteria) => {
+  localStorage.setItem('dbAnalysisCriteria', JSON.stringify(criteria));
 };
 
 function ServerDetails() {
@@ -40,6 +52,8 @@ function ServerDetails() {
   const [activeTab, setActiveTab] = useState('overview');
   const [analysisFilter, setAnalysisFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(false); // Для индикации загрузки
+  const [criteria, setCriteria] = useState(loadCriteria()); // Загружаем критерии
+  const [criteriaChanged, setCriteriaChanged] = useState(false);
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -47,6 +61,10 @@ function ServerDetails() {
   const isMounted = useRef(true);
 
   const serverCacheKey = `serverData_${name}`;
+  
+  // Получаем роль пользователя
+  const userRole = localStorage.getItem('userRole') || 'viewer';
+  const canEditCriteria = userRole === 'admin' || userRole === 'operator';
 
   // Функция анализа баз данных
   const analyzeDatabases = useCallback(() => {
@@ -80,17 +98,17 @@ function ServerDetails() {
         avgConnections = dbTimeline.reduce((sum, e) => sum + (e.connections || 0), 0) / dbTimeline.length;
       }
 
-      // Определяем статус
+      // Определяем статус с использованием текущих критериев
       let status = 'healthy';
       let reason = '';
       
-      if (daysSinceActivity >= DB_ANALYSIS_CRITERIA.deadDays) {
+      if (daysSinceActivity >= criteria.deadDays) {
         status = 'dead';
         reason = `Нет активности ${daysSinceActivity} дней`;
-      } else if (isStatic && daysSinceActivity >= DB_ANALYSIS_CRITERIA.staticConnectionsDays) {
+      } else if (isStatic && daysSinceActivity >= criteria.staticConnectionsDays) {
         status = 'static';
-        reason = `Статичные подключения (${avgConnections.toFixed(0)}) более ${DB_ANALYSIS_CRITERIA.staticConnectionsDays} дней`;
-      } else if (avgConnections > 0 && avgConnections < DB_ANALYSIS_CRITERIA.lowActivityThreshold) {
+        reason = `Статичные подключения (${avgConnections.toFixed(0)}) более ${criteria.staticConnectionsDays} дней`;
+      } else if (avgConnections > 0 && avgConnections < criteria.lowActivityThreshold) {
         status = 'warning';
         reason = `Низкая активность (среднее: ${avgConnections.toFixed(1)} подключений)`;
       }
@@ -117,7 +135,7 @@ function ServerDetails() {
       warning: analyzed.filter(db => db.status === 'warning'),
       healthy: analyzed.filter(db => db.status === 'healthy')
     };
-  }, [stats]);
+  }, [stats, criteria]); // Добавляем criteria в зависимости
 
   const dbAnalysis = analyzeDatabases();
 
@@ -448,6 +466,34 @@ function ServerDetails() {
     }
   };
 
+  // Обработчики для критериев
+  const handleCriteriaChange = (field, value) => {
+    const newValue = parseInt(value) || 0;
+    setCriteria(prev => ({
+      ...prev,
+      [field]: newValue
+    }));
+    setCriteriaChanged(true);
+  };
+
+  const handleSaveCriteria = () => {
+    saveCriteria(criteria);
+    setCriteriaChanged(false);
+    alert('Критерии сохранены');
+  };
+
+  const handleResetCriteria = () => {
+    const defaultCriteria = {
+      deadDays: 30,
+      staticConnectionsDays: 30,
+      lowActivityThreshold: 2
+    };
+    setCriteria(defaultCriteria);
+    saveCriteria(defaultCriteria);
+    setCriteriaChanged(false);
+    alert('Критерии сброшены на значения по умолчанию');
+  };
+
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
   if (!serverData || !stats) return (
     <LoadingSpinner text="Загрузка данных сервера..." subtext="Получение статистики" />
@@ -668,7 +714,7 @@ function ServerDetails() {
             >
               <option value="">Все базы</option>
               <option value="no-conn">Только активные</option>
-              <option value="static">Неактивные > {DB_ANALYSIS_CRITERIA.deadDays} дней</option>
+              <option value="static">Неактивные > {criteria.deadDays} дней</option>
             </select>
             <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 10l5 5 5-5z"/>
@@ -817,7 +863,7 @@ function ServerDetails() {
               {/* Метрики */}
               <div className="analysis-metrics">
                 <div className="metric-card danger">
-                  <div className="metric-label">Неактивные &gt; {DB_ANALYSIS_CRITERIA.deadDays} дней</div>
+                  <div className="metric-label">Неактивные &gt; {criteria.deadDays} дней</div>
                   <div className="metric-value">{dbAnalysis.dead.length}</div>
                   <div className="metric-sublabel">
                     {dbAnalysis.dead.reduce((sum, db) => sum + db.sizeGB, 0).toFixed(1)} ГБ
@@ -826,12 +872,12 @@ function ServerDetails() {
                 <div className="metric-card warning">
                   <div className="metric-label">Низкая активность</div>
                   <div className="metric-value">{dbAnalysis.warning.length}</div>
-                  <div className="metric-sublabel">&lt; {DB_ANALYSIS_CRITERIA.lowActivityThreshold} подключений</div>
+                  <div className="metric-sublabel">&lt; {criteria.lowActivityThreshold} подключений</div>
                 </div>
                 <div className="metric-card info">
                   <div className="metric-label">Статичные подключения</div>
                   <div className="metric-value">{dbAnalysis.static.length}</div>
-                  <div className="metric-sublabel">Без изменений &gt; 30 дней</div>
+                  <div className="metric-sublabel">Без изменений &gt; {criteria.staticConnectionsDays} дней</div>
                 </div>
                 <div className="metric-card success">
                   <div className="metric-label">Активные базы</div>
@@ -846,17 +892,22 @@ function ServerDetails() {
                   <div className="d-flex justify-content-between align-items-center">
                     <span>Карта активности баз данных</span>
                     <div className="filter-toolbar">
-                      <Form.Select 
-                        className="filter-select"
-                        value={analysisFilter} 
-                        onChange={(e) => setAnalysisFilter(e.target.value)}
-                      >
-                        <option value="all">Все базы ({dbAnalysis.all.length})</option>
-                        <option value="dead">Неактивные ({dbAnalysis.dead.length})</option>
-                        <option value="warning">Низкая активность ({dbAnalysis.warning.length})</option>
-                        <option value="static">Статичные ({dbAnalysis.static.length})</option>
-                        <option value="healthy">Активные ({dbAnalysis.healthy.length})</option>
-                      </Form.Select>
+                      <div className="select-wrapper">
+                        <Form.Select 
+                          className="filter-select"
+                          value={analysisFilter} 
+                          onChange={(e) => setAnalysisFilter(e.target.value)}
+                        >
+                          <option value="all">Все базы ({dbAnalysis.all.length})</option>
+                          <option value="dead">Неактивные ({dbAnalysis.dead.length})</option>
+                          <option value="warning">Низкая активность ({dbAnalysis.warning.length})</option>
+                          <option value="static">Статичные ({dbAnalysis.static.length})</option>
+                          <option value="healthy">Активные ({dbAnalysis.healthy.length})</option>
+                        </Form.Select>
+                        <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M7 10l5 5 5-5z"/>
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 </Card.Header>
@@ -885,75 +936,6 @@ function ServerDetails() {
                   </div>
                 </Card.Body>
               </Card>
-
-              {/* Таблица анализа */}
-              <Card>
-                <Card.Header>
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span>Детальный анализ неактивных баз</span>
-                    <button 
-                      className="export-btn"
-                      onClick={exportDeadDatabases}
-                      disabled={dbAnalysis.dead.length === 0}
-                    >
-                      Экспорт CSV ({dbAnalysis.dead.length} баз)
-                    </button>
-                  </div>
-                </Card.Header>
-                <Card.Body>
-                  {dbAnalysis.dead.length > 0 || dbAnalysis.static.length > 0 ? (
-                    <Table striped hover className="analysis-table">
-                      <thead>
-                        <tr>
-                          <th>База данных</th>
-                          <th>Размер</th>
-                          <th>Последняя активность</th>
-                          <th>Статус</th>
-                          <th>Причина</th>
-                          <th>Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...dbAnalysis.dead, ...dbAnalysis.static]
-                          .sort((a, b) => b.sizeGB - a.sizeGB)
-                          .map(db => (
-                            <tr key={db.name}>
-                              <td>
-                                <Link to={`/server/${name}/db/${db.name}`}>{db.name}</Link>
-                              </td>
-                              <td>{db.sizeGB.toFixed(2)} ГБ</td>
-                              <td>
-                                {db.daysSinceActivity === Infinity 
-                                  ? 'Никогда' 
-                                  : `${db.daysSinceActivity} дней назад`}
-                              </td>
-                              <td>
-                                <span className={`status-badge ${db.status}`}>
-                                  {db.status === 'dead' ? 'Неактивна' : 'Статична'}
-                                </span>
-                              </td>
-                              <td className="reason">{db.reason}</td>
-                              <td>
-                                <Button 
-                                  variant="outline-primary" 
-                                  size="sm"
-                                  onClick={() => navigate(`/server/${name}/db/${db.name}`)}
-                                >
-                                  Анализ
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </Table>
-                  ) : (
-                    <div className="empty-state">
-                      <h5>🎉 Отлично!</h5>
-                      <p>Нет баз данных требующих внимания</p>
-                    </div>
-                  )}
-                </Card.Body>
-              </Card>
             </>
           )}
         </Tab>
@@ -967,13 +949,14 @@ function ServerDetails() {
                   <Form.Label>Считать базу неактивной если нет подключений (дней):</Form.Label>
                   <Form.Control 
                     type="number" 
-                    value={DB_ANALYSIS_CRITERIA.deadDays}
-                    min="30"
+                    value={criteria.deadDays}
+                    onChange={(e) => handleCriteriaChange('deadDays', e.target.value)}
+                    min="1"
                     max="365"
-                    disabled
+                    disabled={!canEditCriteria}
                   />
                   <Form.Text className="text-muted">
-                    Текущее значение: {DB_ANALYSIS_CRITERIA.deadDays} дней
+                    Базы без подключений более указанного количества дней считаются неактивными
                   </Form.Text>
                 </Form.Group>
 
@@ -981,10 +964,11 @@ function ServerDetails() {
                   <Form.Label>Считать подключения статичными если нет изменений (дней):</Form.Label>
                   <Form.Control 
                     type="number" 
-                    value={DB_ANALYSIS_CRITERIA.staticConnectionsDays}
-                    min="7"
+                    value={criteria.staticConnectionsDays}
+                    onChange={(e) => handleCriteriaChange('staticConnectionsDays', e.target.value)}
+                    min="1"
                     max="90"
-                    disabled
+                    disabled={!canEditCriteria}
                   />
                   <Form.Text className="text-muted">
                     База с постоянным числом подключений без изменений
@@ -995,19 +979,38 @@ function ServerDetails() {
                   <Form.Label>Порог низкой активности (подключений):</Form.Label>
                   <Form.Control 
                     type="number" 
-                    value={DB_ANALYSIS_CRITERIA.lowActivityThreshold}
+                    value={criteria.lowActivityThreshold}
+                    onChange={(e) => handleCriteriaChange('lowActivityThreshold', e.target.value)}
                     min="1"
                     max="20"
-                    disabled
+                    disabled={!canEditCriteria}
                   />
                   <Form.Text className="text-muted">
-                    Текущее значение: {DB_ANALYSIS_CRITERIA.lowActivityThreshold} подключений
+                    Среднее количество подключений для предупреждения о низкой активности
                   </Form.Text>
                 </Form.Group>
 
-                <Alert variant="info">
-                  Для изменения критериев обратитесь к администратору системы
-                </Alert>
+                {canEditCriteria ? (
+                  <div className="d-flex gap-2">
+                    <Button 
+                      variant="primary" 
+                      onClick={handleSaveCriteria}
+                      disabled={!criteriaChanged}
+                    >
+                      Сохранить изменения
+                    </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      onClick={handleResetCriteria}
+                    >
+                      Сбросить по умолчанию
+                    </Button>
+                  </div>
+                ) : (
+                  <Alert variant="info">
+                    Только администраторы и операторы могут изменять критерии анализа
+                  </Alert>
+                )}
               </Form>
             </Card.Body>
           </Card>
