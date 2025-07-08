@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { Card, Table, Form, Alert, Button, Pagination, Tabs, Tab, Badge } from 'react-bootstrap';
+import { Card, Table, Form, Alert, Button, Pagination, Tabs, Tab, Badge, Spinner } from 'react-bootstrap';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
@@ -14,9 +14,9 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineCont
 
 // Константы критериев анализа
 const DB_ANALYSIS_CRITERIA = {
-  deadDays: 90,              // 3 месяца без подключений
+  deadDays: 30,              // 30 дней без подключений (изменено с 90)
   staticConnectionsDays: 30,  // 1 месяц без изменений
-  lowActivityThreshold: 5     // порог низкой активности
+  lowActivityThreshold: 2     // порог низкой активности (изменено с 5)
 };
 
 function ServerDetails() {
@@ -25,18 +25,21 @@ function ServerDetails() {
   const [serverData, setServerData] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
-  const [hideDeleted, setHideDeleted] = useState(true);
+  const [hideDeleted] = useState(true); // Убираем setHideDeleted, так как она не используется
   const [showNoConnections, setShowNoConnections] = useState(false);
   const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
+  const [selectedDateRange, setSelectedDateRange] = useState(7); // По умолчанию 7 дней
   const [sortColumn, setSortColumn] = useState('size');
   const [sortDirection, setSortDirection] = useState('desc');
   const [nameFilter, setNameFilter] = useState('');
+  const [nameFilterType, setNameFilterType] = useState('contains'); // 'starts', 'contains', 'not_contains', 'ends'
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const [activeTab, setActiveTab] = useState('overview');
   const [analysisFilter, setAnalysisFilter] = useState('all');
+  const [isLoading, setIsLoading] = useState(false); // Для индикации загрузки
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
   const connectionsCanvasRef = useRef(null);
@@ -120,27 +123,63 @@ function ServerDetails() {
 
   // Функция экспорта
   const exportDeadDatabases = () => {
-    if (!dbAnalysis || dbAnalysis.dead.length === 0) return;
+    if (!dbAnalysis) return;
+    
+    // Определяем какие базы экспортировать в зависимости от текущих фильтров
+    let databasesToExport = [];
+    let fileName = 'databases_export';
+    
+    if (showNoConnections) {
+      // Экспортируем базы без подключений
+      databasesToExport = filteredDatabases.filter(db => {
+        const connections = getDatabaseConnections(db.name);
+        return connections.length === 0 || connections.every(conn => conn === 0);
+      });
+      fileName = 'no_connections_databases';
+    } else if (showStaticConnections) {
+      // Экспортируем неактивные базы
+      databasesToExport = dbAnalysis.dead;
+      fileName = 'inactive_databases';
+    } else {
+      // Экспортируем все отфильтрованные базы
+      databasesToExport = filteredDatabases;
+      fileName = 'all_databases';
+    }
+
+    if (databasesToExport.length === 0) {
+      alert('Нет данных для экспорта');
+      return;
+    }
 
     const csv = [
-      ['База данных', 'Размер (ГБ)', 'Дней без активности', 'Последняя активность', 'Дата создания'],
-      ...dbAnalysis.dead.map(db => [
-        db.name,
-        db.sizeGB.toFixed(2),
-        db.daysSinceActivity === Infinity ? 'Никогда' : db.daysSinceActivity,
-        db.lastActivity ? new Date(db.lastActivity).toLocaleDateString() : 'Никогда',
-        db.creation_time ? new Date(db.creation_time).toLocaleDateString() : 'Неизвестно'
-      ])
+      ['База данных', 'Размер (ГБ)', 'Последние подключения', 'Дней без активности', 'Последняя активность', 'Дата создания', 'Статус'],
+      ...databasesToExport.map(db => {
+        const connections = getDatabaseConnections(db.name);
+        const lastConnections = connections.length > 0 ? connections[connections.length - 1] : 0;
+        const sizeGB = getDatabaseSize(db.name) || 0;
+        const analysis = dbAnalysis?.all.find(a => a.name === db.name);
+        
+        return [
+          db.name,
+          sizeGB.toFixed(2),
+          lastConnections,
+          analysis?.daysSinceActivity === Infinity ? 'Никогда' : (analysis?.daysSinceActivity || 'N/A'),
+          analysis?.lastActivity ? new Date(analysis.lastActivity).toLocaleDateString('ru-RU') : 'Никогда',
+          db.creation_time ? new Date(db.creation_time).toLocaleDateString('ru-RU') : 'Неизвестно',
+          db.exists ? 'Активна' : 'Удалена'
+        ];
+      })
     ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `dead_databases_${name}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${fileName}_${name}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
 
   const fetchData = useCallback(async () => {
+    setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Токен отсутствует');
@@ -170,6 +209,10 @@ function ServerDetails() {
       console.error('Ошибка загрузки данных:', error);
       if (isMounted.current) {
         setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
       }
     }
   }, [name, startDate, endDate, serverCacheKey]);
@@ -383,6 +426,26 @@ function ServerDetails() {
     start.setDate(end.getDate() - days);
     setStartDate(start);
     setEndDate(end);
+    setSelectedDateRange(days);
+  };
+
+  // Функция фильтрации по имени с учетом типа фильтра
+  const filterByName = (dbName) => {
+    const nameLower = dbName.toLowerCase();
+    const filterLower = nameFilter.toLowerCase();
+    
+    switch (nameFilterType) {
+      case 'starts':
+        return nameLower.startsWith(filterLower);
+      case 'contains':
+        return nameLower.includes(filterLower);
+      case 'not_contains':
+        return !nameLower.includes(filterLower);
+      case 'ends':
+        return nameLower.endsWith(filterLower);
+      default:
+        return nameLower.includes(filterLower);
+    }
   };
 
   if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
@@ -393,9 +456,7 @@ function ServerDetails() {
   const allDatabases = stats.databases;
   const filteredDatabases = allDatabases.filter(db => {
     const connections = getDatabaseConnections(db.name);
-    const nameLower = db.name.toLowerCase();
-    const filterLower = nameFilter.toLowerCase();
-    let nameMatch = nameLower.includes(filterLower);
+    let nameMatch = !nameFilter || filterByName(db.name);
 
     return (
       nameMatch &&
@@ -472,30 +533,61 @@ function ServerDetails() {
         </div>
       </div>
 
-      {/* Выбор периода */}
+      {/* Выбор периода с индикацией загрузки */}
       <div className="filter-bar">
         <div className="filter-group">
           <label className="filter-label">Период:</label>
-          <button className="btn btn-sm btn-primary" onClick={() => setDateRange(1)}>24ч</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(7)}>7д</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(30)}>30д</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setDateRange(90)}>90д</button>
+          <button 
+            className={`btn btn-sm ${selectedDateRange === 1 ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setDateRange(1)}
+            disabled={isLoading}
+          >
+            24ч
+          </button>
+          <button 
+            className={`btn btn-sm ${selectedDateRange === 7 ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setDateRange(7)}
+            disabled={isLoading}
+          >
+            7д
+          </button>
+          <button 
+            className={`btn btn-sm ${selectedDateRange === 30 ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setDateRange(30)}
+            disabled={isLoading}
+          >
+            30д
+          </button>
+          <button 
+            className={`btn btn-sm ${selectedDateRange === 90 ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setDateRange(90)}
+            disabled={isLoading}
+          >
+            90д
+          </button>
         </div>
         <div className="filter-group" style={{ marginLeft: 'auto' }}>
           <DatePicker
             selected={startDate}
-            onChange={date => setStartDate(date)}
+            onChange={date => {
+              setStartDate(date);
+              setSelectedDateRange(null); // Сбрасываем выбранный период при ручном изменении
+            }}
             selectsStart
             startDate={startDate}
             endDate={endDate}
             className="form-control form-control-sm"
             dateFormat="dd.MM.yyyy"
             style={{ minWidth: 'auto' }}
+            disabled={isLoading}
           />
           <span>—</span>
           <DatePicker
             selected={endDate}
-            onChange={date => setEndDate(date)}
+            onChange={date => {
+              setEndDate(date);
+              setSelectedDateRange(null); // Сбрасываем выбранный период при ручном изменении
+            }}
             selectsEnd
             startDate={startDate}
             endDate={endDate}
@@ -503,12 +595,19 @@ function ServerDetails() {
             className="form-control form-control-sm"
             dateFormat="dd.MM.yyyy"
             style={{ minWidth: 'auto' }}
+            disabled={isLoading}
           />
         </div>
+        {isLoading && (
+          <div className="loading-indicator">
+            <Spinner animation="border" size="sm" />
+            <span>Обновление данных...</span>
+          </div>
+        )}
       </div>
 
       {/* Графики */}
-      <div className="charts-container">
+      <div className="charts-container" style={{ opacity: isLoading ? 0.5 : 1 }}>
         <div className="chart-card">
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>Подключения к серверу</h3>
           <canvas ref={connectionsCanvasRef} id="connectionsChart" />
@@ -523,29 +622,81 @@ function ServerDetails() {
       <div className="filter-bar">
         <div className="filter-group">
           <label className="filter-label">Поиск:</label>
-          <input type="text" className="form-control form-control-sm" placeholder="Имя базы..." value={nameFilter} onChange={(e) => { setNameFilter(e.target.value); setCurrentPage(1); }} style={{ maxWidth: '200px' }} />
+          <div className="search-with-type">
+            <div className="select-wrapper">
+              <select 
+                className="form-select form-select-sm"
+                value={nameFilterType}
+                onChange={(e) => setNameFilterType(e.target.value)}
+                style={{ width: '150px' }}
+              >
+                <option value="contains">Содержит</option>
+                <option value="starts">Начинается с</option>
+                <option value="ends">Заканчивается на</option>
+                <option value="not_contains">Не содержит</option>
+              </select>
+              <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7 10l5 5 5-5z"/>
+              </svg>
+            </div>
+            <input 
+              type="text" 
+              className="form-control form-control-sm" 
+              placeholder="Имя базы..." 
+              value={nameFilter} 
+              onChange={(e) => { 
+                setNameFilter(e.target.value); 
+                setCurrentPage(1); 
+              }} 
+              style={{ maxWidth: '200px' }} 
+            />
+          </div>
         </div>
         <div className="filter-group">
           <label className="filter-label">Показать:</label>
-          <select className="form-select form-select-sm" value={`${showNoConnections ? 'no-conn' : ''}${showStaticConnections ? 'static' : ''}`} onChange={(e) => {
-            const val = e.target.value;
-            setShowNoConnections(val === 'no-conn');
-            setShowStaticConnections(val === 'static');
-            setCurrentPage(1);
-          }} style={{ width: 'auto' }}>
-            <option value="">Все базы</option>
-            <option value="no-conn">Только активные</option>
-            <option value="static">Неактивные > 30 дней</option>
-          </select>
+          <div className="select-wrapper">
+            <select 
+              className="form-select form-select-sm" 
+              value={`${showNoConnections ? 'no-conn' : ''}${showStaticConnections ? 'static' : ''}`} 
+              onChange={(e) => {
+                const val = e.target.value;
+                setShowNoConnections(val === 'no-conn');
+                setShowStaticConnections(val === 'static');
+                setCurrentPage(1);
+              }} 
+              style={{ width: 'auto' }}
+            >
+              <option value="">Все базы</option>
+              <option value="no-conn">Только активные</option>
+              <option value="static">Неактивные > {DB_ANALYSIS_CRITERIA.deadDays} дней</option>
+            </select>
+            <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
+          </div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setHideDeleted(!hideDeleted)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+        <button 
+          className={`btn btn-sm ${showNoConnections ? 'btn-primary' : 'btn-outline-primary'}`}
+          onClick={() => {
+            setShowNoConnections(!showNoConnections);
+            if (!showNoConnections) {
+              setShowStaticConnections(false);
+            }
+            setCurrentPage(1);
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
           </svg>
           Без подключений
         </button>
         <div style={{ marginLeft: 'auto' }}>
-          <button className="btn btn-outline-secondary btn-sm" onClick={exportDeadDatabases}>Экспорт списка</button>
+          <button 
+            className="btn btn-outline-secondary btn-sm" 
+            onClick={exportDeadDatabases}
+          >
+            Экспорт списка
+          </button>
         </div>
       </div>
 
@@ -666,7 +817,7 @@ function ServerDetails() {
               {/* Метрики */}
               <div className="analysis-metrics">
                 <div className="metric-card danger">
-                  <div className="metric-label">Неактивные &gt; 3 месяцев</div>
+                  <div className="metric-label">Неактивные &gt; {DB_ANALYSIS_CRITERIA.deadDays} дней</div>
                   <div className="metric-value">{dbAnalysis.dead.length}</div>
                   <div className="metric-sublabel">
                     {dbAnalysis.dead.reduce((sum, db) => sum + db.sizeGB, 0).toFixed(1)} ГБ
@@ -675,7 +826,7 @@ function ServerDetails() {
                 <div className="metric-card warning">
                   <div className="metric-label">Низкая активность</div>
                   <div className="metric-value">{dbAnalysis.warning.length}</div>
-                  <div className="metric-sublabel">&lt; 5 подключений</div>
+                  <div className="metric-sublabel">&lt; {DB_ANALYSIS_CRITERIA.lowActivityThreshold} подключений</div>
                 </div>
                 <div className="metric-card info">
                   <div className="metric-label">Статичные подключения</div>
@@ -822,7 +973,7 @@ function ServerDetails() {
                     disabled
                   />
                   <Form.Text className="text-muted">
-                    По умолчанию: 90 дней (3 месяца)
+                    Текущее значение: {DB_ANALYSIS_CRITERIA.deadDays} дней
                   </Form.Text>
                 </Form.Group>
 
@@ -850,7 +1001,7 @@ function ServerDetails() {
                     disabled
                   />
                   <Form.Text className="text-muted">
-                    Среднее количество подключений для предупреждения
+                    Текущее значение: {DB_ANALYSIS_CRITERIA.lowActivityThreshold} подключений
                   </Form.Text>
                 </Form.Group>
 
