@@ -52,13 +52,70 @@
   background: var(--white);
 }
 
+/* Обертка для выпадающих списков с иконкой стрелки */
+.select-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.select-wrapper .form-select {
+  padding-right: 28px !important;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #6c757d;
+}
+
+/* Круговой прогресс-индикатор */
+.progress-circle-wrapper {
+  position: relative;
+  width: 36px;
+  height: 36px;
+}
+
+.progress-circle {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-circle-bg {
+  fill: none;
+  stroke: #e9ecef;
+  stroke-width: 3;
+}
+
+.progress-circle-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.3s ease;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Альтернативный стиль прогресса (старый) */
 .progress-indicator {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.progress-circle {
+.progress-circle-old {
   position: relative;
   width: 36px;
   height: 36px;
@@ -72,7 +129,7 @@
   justify-content: center;
 }
 
-.progress-circle::before {
+.progress-circle-old::before {
   content: '';
   position: absolute;
   width: 28px;
@@ -81,7 +138,7 @@
   background: var(--white);
 }
 
-.progress-circle span {
+.progress-circle-old span {
   position: relative;
   font-size: 11px;
   color: var(--text-primary);
@@ -348,17 +405,12 @@
     font-size: 20px;
   }
   
-  .progress-circle {
+  .progress-circle-wrapper {
     width: 32px;
     height: 32px;
   }
   
-  .progress-circle::before {
-    width: 24px;
-    height: 24px;
-  }
-  
-  .progress-circle span {
+  .progress-text {
     font-size: 10px;
   }
 }

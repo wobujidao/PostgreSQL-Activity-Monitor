@@ -286,16 +286,21 @@ function ServerList() {
             <Col md={4}>
               <div className="d-flex align-items-center gap-2">
                 <label className="mb-0 font-weight-medium">Статус:</label>
-                <Form.Select
-                  size="sm"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  style={{ width: 'auto' }}
-                >
-                  <option value="all">Все серверы</option>
-                  <option value="online">Только активные</option>
-                  <option value="error">С ошибками</option>
-                </Form.Select>
+                <div className="select-wrapper">
+                  <Form.Select
+                    size="sm"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{ width: 'auto' }}
+                  >
+                    <option value="all">Все серверы</option>
+                    <option value="online">Только активные</option>
+                    <option value="error">С ошибками</option>
+                  </Form.Select>
+                  <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 10l5 5 5-5z"/>
+                  </svg>
+                </div>
               </div>
             </Col>
             <Col md={4}>
@@ -314,21 +319,41 @@ function ServerList() {
               <div className="d-flex align-items-center justify-content-end gap-3">
                 <div className="d-flex align-items-center gap-2">
                   <label className="mb-0 font-weight-medium">Обновление:</label>
-                  <Form.Select
-                    size="sm"
-                    value={refreshInterval}
-                    onChange={handleIntervalChange}
-                    style={{ width: 'auto' }}
-                  >
-                    <option value={5000}>5 сек</option>
-                    <option value={10000}>10 сек</option>
-                    <option value={15000}>15 сек</option>
-                    <option value={30000}>30 сек</option>
-                    <option value={60000}>1 мин</option>
-                  </Form.Select>
+                  <div className="select-wrapper">
+                    <Form.Select
+                      size="sm"
+                      value={refreshInterval}
+                      onChange={handleIntervalChange}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value={5000}>5 сек</option>
+                      <option value={10000}>10 сек</option>
+                      <option value={15000}>15 сек</option>
+                      <option value={30000}>30 сек</option>
+                      <option value={60000}>1 мин</option>
+                    </Form.Select>
+                    <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7 10l5 5 5-5z"/>
+                    </svg>
+                  </div>
                 </div>
-                <div className="progress-circle" style={{ '--progress': `${progress}%` }}>
-                  <span>{timeLeft}с</span>
+                <div className="progress-circle-wrapper">
+                  <svg className="progress-circle" viewBox="0 0 36 36">
+                    <path className="progress-circle-bg"
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path className="progress-circle-fill"
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                      style={{
+                        strokeDasharray: `${progress}, 100`
+                      }}
+                    />
+                  </svg>
+                  <span className="progress-text">{timeLeft}с</span>
                 </div>
                 <Button
                   variant="primary"
