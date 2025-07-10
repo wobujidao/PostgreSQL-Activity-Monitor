@@ -56,42 +56,52 @@ def get_ssh_client(server: Server) -> paramiko.SSHClient:
     }
     
     # Определяем метод аутентификации
-    if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_private_key', None):
-        # Подключение по SSH-ключу
-        logger.debug(f"Подключение к {server.name} по SSH-ключу")
+    if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_key_id', None):
+        # Подключение по SSH-ключу из системы управления ключами
+        logger.debug(f"Подключение к {server.name} по SSH-ключу (ID: {server.ssh_key_id})")
         
-        # Расшифровываем приватный ключ
-        private_key_content = decrypt_password(server.ssh_private_key)
-        
-        # Расшифровываем passphrase если есть
-        passphrase = None
-        if getattr(server, 'ssh_key_passphrase', None):
-            passphrase = decrypt_password(server.ssh_key_passphrase)
-        
-        # Создаем временный файл для ключа
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
-            tmp_file.write(private_key_content)
-            tmp_file_path = tmp_file.name
+        # Импортируем ssh_key_storage здесь чтобы избежать циклических импортов
+        from app.services.ssh_key_storage import ssh_key_storage
         
         try:
-            # Пробуем загрузить ключ разных типов
-            pkey = None
-            for key_class in [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey]:
-                try:
-                    pkey = key_class.from_private_key_file(tmp_file_path, password=passphrase)
-                    logger.debug(f"Загружен {key_class.__name__} ключ для {server.name}")
-                    break
-                except Exception as e:
-                    continue
+            # Получаем содержимое ключа
+            passphrase = None
+            if getattr(server, 'ssh_key_passphrase', None):
+                passphrase = decrypt_password(server.ssh_key_passphrase)
             
-            if not pkey:
-                raise Exception("Не удалось загрузить приватный ключ")
+            private_key_content, key_passphrase = ssh_key_storage.get_private_key_content(
+                server.ssh_key_id, 
+                passphrase
+            )
             
-            connect_kwargs['pkey'] = pkey
+            # Создаем временный файл для ключа
+            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+                tmp_file.write(private_key_content)
+                tmp_file_path = tmp_file.name
             
-        finally:
-            # Удаляем временный файл
-            os.unlink(tmp_file_path)
+            try:
+                # Пробуем загрузить ключ разных типов
+                pkey = None
+                for key_class in [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey]:
+                    try:
+                        pkey = key_class.from_private_key_file(tmp_file_path, password=key_passphrase)
+                        logger.debug(f"Загружен {key_class.__name__} ключ для {server.name}")
+                        break
+                    except Exception as e:
+                        continue
+                
+                if not pkey:
+                    raise Exception("Не удалось загрузить приватный ключ")
+                
+                connect_kwargs['pkey'] = pkey
+                
+            finally:
+                # Удаляем временный файл
+                os.unlink(tmp_file_path)
+                
+        except Exception as e:
+            logger.error(f"Ошибка загрузки SSH-ключа для {server.name}: {e}")
+            raise
     else:
         # Подключение по паролю
         logger.debug(f"Подключение к {server.name} по паролю")

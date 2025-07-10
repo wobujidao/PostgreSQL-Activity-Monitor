@@ -31,9 +31,7 @@ def load_servers() -> List[Server]:
             item["password"] = decrypt_password(item["password"])
             item["ssh_password"] = decrypt_password(item["ssh_password"])
             
-            # Расшифровываем SSH-ключ и passphrase если есть
-            if item.get("ssh_private_key"):
-                item["ssh_private_key"] = decrypt_password(item["ssh_private_key"])
+            # Расшифровываем passphrase для SSH-ключа если есть
             if item.get("ssh_key_passphrase"):
                 item["ssh_key_passphrase"] = decrypt_password(item["ssh_key_passphrase"])
             
@@ -64,9 +62,8 @@ def save_servers(servers: List[Server]):
                 "ssh_password": encrypt_password(s.ssh_password),
                 "ssh_port": s.ssh_port,
                 "ssh_auth_type": getattr(s, "ssh_auth_type", "password"),
-                "ssh_private_key": encrypt_password(s.ssh_private_key) if getattr(s, "ssh_private_key", None) else None,
-                "ssh_key_passphrase": encrypt_password(s.ssh_key_passphrase) if getattr(s, "ssh_key_passphrase", None) else None,
-                "ssh_key_fingerprint": getattr(s, "ssh_key_fingerprint", None)
+                "ssh_key_id": getattr(s, "ssh_key_id", None),
+                "ssh_key_passphrase": encrypt_password(s.ssh_key_passphrase) if getattr(s, "ssh_key_passphrase", None) else None
             } for s in servers], f, indent=2)
         logger.info(f"Сохранено {len(servers)} серверов")
     except Exception as e:
@@ -102,6 +99,17 @@ def connect_to_server(server: Server) -> Dict[str, Any]:
                 cached["status"] = f"{cached['status']} (SSH: {ssh_status})"
         return cached
     
+    # Получаем информацию о ключе если используется
+    ssh_key_info = None
+    if getattr(server, "ssh_auth_type", "password") == "key" and getattr(server, "ssh_key_id", None):
+        from app.services.ssh_key_storage import ssh_key_storage
+        ssh_key = ssh_key_storage.get_key(server.ssh_key_id)
+        if ssh_key:
+            ssh_key_info = {
+                "name": ssh_key.name,
+                "fingerprint": ssh_key.fingerprint
+            }
+    
     # Базовая информация
     result = {
         "name": server.name,
@@ -113,7 +121,8 @@ def connect_to_server(server: Server) -> Dict[str, Any]:
         "has_password": bool(server.password),
         "has_ssh_password": bool(server.ssh_password),
         "ssh_auth_type": getattr(server, "ssh_auth_type", "password"),
-        "ssh_key_fingerprint": getattr(server, "ssh_key_fingerprint", None),
+        "ssh_key_id": getattr(server, "ssh_key_id", None),
+        "ssh_key_info": ssh_key_info,
         "version": None,
         "free_space": None,
         "total_space": None,

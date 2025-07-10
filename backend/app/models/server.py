@@ -12,8 +12,7 @@ class Server(BaseModel):
     ssh_user: str
     ssh_password: str
     ssh_port: int = 22
-    # Новые поля для SSH-ключей
+    # Поля для SSH-аутентификации
     ssh_auth_type: Optional[str] = "password"  # "password" или "key"
-    ssh_private_key: Optional[str] = None  # зашифрованное содержимое ключа
-    ssh_key_passphrase: Optional[str] = None  # зашифрованный passphrase
-    ssh_key_fingerprint: Optional[str] = None  # для отображения в UI
+    ssh_key_id: Optional[str] = None  # ID ключа из системы управления ключами
+    ssh_key_passphrase: Optional[str] = None  # зашифрованный passphrase для ключа

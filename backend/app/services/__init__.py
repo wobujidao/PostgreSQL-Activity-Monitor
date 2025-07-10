@@ -3,6 +3,7 @@ from .cache import cache_manager
 from .ssh import get_ssh_disk_usage, is_host_reachable
 from .server import load_servers, save_servers, connect_to_server
 from .ssh_key_manager import SSHKeyManager
+from .ssh_key_storage import ssh_key_storage
 
 __all__ = [
     "cache_manager", 
@@ -11,7 +12,8 @@ __all__ = [
     "load_servers",
     "save_servers", 
     "connect_to_server",
-    "SSHKeyManager"
+    "SSHKeyManager",
+    "ssh_key_storage"
 ]
 from .user_manager import UserManager
 
