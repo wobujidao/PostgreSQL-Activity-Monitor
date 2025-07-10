@@ -5,6 +5,7 @@ import { Container, Navbar, Button, Modal, Spinner, Form, Dropdown } from 'react
 import Login from './components/Login';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
+import ServerEdit from './components/ServerEdit';
 import DatabaseDetails from './components/DatabaseDetails';
 import UserManagement from './components/UserManagement';
 import SSHKeyManagement from './components/SSHKeyManagement';
@@ -273,6 +274,7 @@ function AppContent() {
         <Routes>
           <Route exact path="/" element={<ServerList />} />
           <Route path="/server/:name" element={<ServerDetails />} />
+          <Route path="/server/:serverName/edit" element={<ServerEdit />} />
           <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
           <Route path="/users" element={userRole === 'admin' ? <UserManagement /> : <Navigate to="/" />} />
           <Route path="/ssh-keys" element={userRole === 'admin' ? <SSHKeyManagement /> : <Navigate to="/" />} />

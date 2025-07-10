@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip, Spinner } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner';
 import './ServerList.css';
 
 function ServerList() {
+  const navigate = useNavigate();
   const [servers, setServers] = useState([]);
   const [sshKeys, setSSHKeys] = useState([]);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editServer, setEditServer] = useState(null);
   const [newServer, setNewServer] = useState({
     name: '',
     host: '',
@@ -58,8 +57,8 @@ function ServerList() {
 
     fetchServers();
     const interval = setInterval(() => {
-      // Не обновляем данные если открыты модальные окна
-      if (!showEditModal && !showAddModal) {
+      // Не обновляем данные если открыто модальное окно
+      if (!showAddModal) {
         fetchServers();
         setTimeLeft(refreshInterval / 1000);
       }
@@ -73,7 +72,7 @@ function ServerList() {
       clearInterval(interval);
       clearInterval(timer);
     };
-  }, [refreshInterval, showEditModal, showAddModal]);
+  }, [refreshInterval, showAddModal]);
 
   // Загрузка SSH-ключей
   useEffect(() => {
@@ -91,72 +90,6 @@ function ServerList() {
 
     fetchSSHKeys();
   }, []);
-
-  const handleEdit = (server) => {
-    setEditServer({ 
-      ...server, 
-      password: '', 
-      ssh_password: '',
-      ssh_auth_type: server.ssh_auth_type || 'password',
-      ssh_key_id: server.ssh_key_id || '',
-      ssh_key_passphrase: '',
-      stats_db: server.stats_db || ''
-    });
-    setShowEditModal(true);
-    setSSHTestResult(null);
-  };
-
-  const handleSaveEdit = async () => {
-    try {
-      // Подготавливаем данные для отправки
-      const dataToSend = {
-        ...editServer
-      };
-      
-      // Если используется ключ, добавляем passphrase если он указан
-      if (editServer.ssh_auth_type === 'key' && editServer.ssh_key_passphrase) {
-        dataToSend.ssh_key_passphrase = editServer.ssh_key_passphrase;
-      }
-      
-      const response = await axios.put(
-        `http://10.110.20.55:8000/servers/${editServer.name}`,
-        dataToSend,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setServers(servers.map(server => server.name === editServer.name ? response.data : server));
-      setShowEditModal(false);
-      setSSHTestResult(null);
-      console.log('Сервер успешно обновлён:', response.data);
-    } catch (error) {
-      console.error('Ошибка обновления сервера:', error);
-      setErrorMessage('Ошибка при сохранении изменений: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  const handleDeleteServer = async () => {
-    if (!editServer) {
-      console.error('editServer is null');
-      return;
-    }
-    
-    if (!window.confirm(`Вы уверены, что хотите удалить сервер ${editServer.name}?`)) {
-      return;
-    }
-    
-    try {
-      await axios.delete(
-        `http://10.110.20.55:8000/servers/${editServer.name}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setServers(servers.filter(s => s.name !== editServer.name));
-      setShowEditModal(false);
-      setErrorMessage('');
-      console.log('Сервер успешно удалён');
-    } catch (error) {
-      console.error('Ошибка удаления сервера:', error);
-      setErrorMessage('Ошибка при удалении сервера: ' + (error.response?.data?.detail || error.message));
-    }
-  };
 
   const handleAdd = () => {
     setErrorMessage('');
@@ -701,7 +634,7 @@ function ServerList() {
                       <td>
                         <button
                           className="btn btn-outline-primary btn-sm"
-                          onClick={() => handleEdit(server)}
+                          onClick={() => navigate(`/server/${server.name}/edit`)}
                         >
                           Управление
                         </button>
@@ -715,118 +648,7 @@ function ServerList() {
         </Card.Body>
       </Card>
 
-      {/* Модальное окно редактирования */}
-      <Modal show={showEditModal} onHide={() => { setShowEditModal(false); setSSHTestResult(null); }} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Управление сервером: {editServer?.name}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
-          {editServer && (
-            <Form className="modal-form">
-              <Form.Group className="mb-3">
-                <Form.Label>Название</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editServer.name}
-                  onChange={(e) => setEditServer({ ...editServer, name: e.target.value })}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Хост</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editServer.host}
-                  onChange={(e) => setEditServer({ ...editServer, host: e.target.value })}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>База для статистики</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editServer.stats_db || ''}
-                  onChange={(e) => setEditServer({ ...editServer, stats_db: e.target.value })}
-                  placeholder="stats_db (опционально)"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Пользователь PostgreSQL</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editServer.user || ''}
-                  onChange={(e) => setEditServer({ ...editServer, user: e.target.value })}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Пароль PostgreSQL</Form.Label>
-                <Form.Control
-                  type="password"
-                  value={editServer.password || ''}
-                  onChange={(e) => setEditServer({ ...editServer, password: e.target.value })}
-                  placeholder="Оставьте пустым, если не меняете"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Порт PostgreSQL</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editServer.port || 5432}
-                  onChange={(e) => setEditServer({ ...editServer, port: parseInt(e.target.value) })}
-                />
-              </Form.Group>
-              
-              <hr />
-              
-              <Form.Group className="mb-3">
-                <Form.Label>Пользователь SSH</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editServer.ssh_user || ''}
-                  onChange={(e) => setEditServer({ ...editServer, ssh_user: e.target.value })}
-                />
-              </Form.Group>
-
-              <SSHAuthSettings 
-                server={editServer} 
-                onChange={setEditServer}
-                isEdit={true}
-              />
-
-              <Form.Group className="mb-3">
-                <Form.Label>Порт SSH</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editServer.ssh_port || 22}
-                  onChange={(e) => setEditServer({ ...editServer, ssh_port: parseInt(e.target.value) })}
-                />
-              </Form.Group>
-              
-              {/* Опасная зона */}
-              <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
-                <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem', color: 'var(--danger)' }}>Опасная зона</h4>
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius)', padding: '1rem' }}>
-                  <p style={{ marginBottom: '1rem', fontSize: '14px' }}>
-                    Удаление сервера приведет к потере всей истории мониторинга. Это действие необратимо.
-                  </p>
-                  <Button variant="danger" onClick={handleDeleteServer}>
-                    🗑️ Удалить сервер
-                  </Button>
-                </div>
-              </div>
-            </Form>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowEditModal(false); setSSHTestResult(null); }}>
-            Отмена
-          </Button>
-          <Button variant="primary" onClick={handleSaveEdit}>
-            Сохранить изменения
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Модальное окно добавления */}
+      {/* Модальное окно добавления (остается только для добавления новых серверов) */}
       <Modal show={showAddModal} onHide={() => { setShowAddModal(false); setSSHTestResult(null); }} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Добавить сервер</Modal.Title>
