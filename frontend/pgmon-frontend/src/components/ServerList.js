@@ -22,6 +22,7 @@ function ServerList() {
     ssh_port: 22,
     ssh_auth_type: 'password',
     ssh_key_id: '',
+    ssh_key_passphrase: '',
     stats_db: ''
   });
   const [errorMessage, setErrorMessage] = useState('');
@@ -57,8 +58,11 @@ function ServerList() {
 
     fetchServers();
     const interval = setInterval(() => {
-      fetchServers();
-      setTimeLeft(refreshInterval / 1000);
+      // Не обновляем данные если открыты модальные окна
+      if (!showEditModal && !showAddModal) {
+        fetchServers();
+        setTimeLeft(refreshInterval / 1000);
+      }
     }, refreshInterval);
 
     const timer = setInterval(() => {
@@ -69,7 +73,7 @@ function ServerList() {
       clearInterval(interval);
       clearInterval(timer);
     };
-  }, [refreshInterval]);
+  }, [refreshInterval, showEditModal, showAddModal]);
 
   // Загрузка SSH-ключей
   useEffect(() => {
@@ -95,16 +99,28 @@ function ServerList() {
       ssh_password: '',
       ssh_auth_type: server.ssh_auth_type || 'password',
       ssh_key_id: server.ssh_key_id || '',
+      ssh_key_passphrase: '',
       stats_db: server.stats_db || ''
     });
     setShowEditModal(true);
+    setSSHTestResult(null);
   };
 
   const handleSaveEdit = async () => {
     try {
+      // Подготавливаем данные для отправки
+      const dataToSend = {
+        ...editServer
+      };
+      
+      // Если используется ключ, добавляем passphrase если он указан
+      if (editServer.ssh_auth_type === 'key' && editServer.ssh_key_passphrase) {
+        dataToSend.ssh_key_passphrase = editServer.ssh_key_passphrase;
+      }
+      
       const response = await axios.put(
         `http://10.110.20.55:8000/servers/${editServer.name}`,
-        editServer,
+        dataToSend,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       setServers(servers.map(server => server.name === editServer.name ? response.data : server));
@@ -150,12 +166,22 @@ function ServerList() {
 
   const handleSaveAdd = async () => {
     try {
+      // Подготавливаем данные для отправки
+      const dataToSend = {
+        ...newServer
+      };
+      
+      // Если используется ключ, добавляем passphrase если он указан
+      if (newServer.ssh_auth_type === 'key' && newServer.ssh_key_passphrase) {
+        dataToSend.ssh_key_passphrase = newServer.ssh_key_passphrase;
+      }
+      
       const response = await axios.post(
         'http://10.110.20.55:8000/servers',
-        newServer,
+        dataToSend,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      if (response.data.status !== "ok") {
+      if (response.data.status !== "ok" && response.data.status !== undefined) {
         setErrorMessage(`Ошибка: ${response.data.status}`);
       } else {
         setServers([...servers, response.data]);
@@ -170,6 +196,7 @@ function ServerList() {
           ssh_port: 22,
           ssh_auth_type: 'password',
           ssh_key_id: '',
+          ssh_key_passphrase: '',
           stats_db: ''
         });
         setShowAddModal(false);
@@ -376,33 +403,50 @@ function ServerList() {
             />
           </Form.Group>
         ) : (
-          <Form.Group className="mb-3">
-            <Form.Label>SSH-ключ</Form.Label>
-            <Form.Select
-              value={server.ssh_key_id || ''}
-              onChange={(e) => onChange({ ...server, ssh_key_id: e.target.value })}
-            >
-              <option value="">Выберите ключ...</option>
-              {sshKeys.map(key => (
-                <option key={key.id} value={key.id}>
-                  {key.name} ({key.key_type.toUpperCase()}) - {key.fingerprint.substring(0, 16)}...
-                </option>
-              ))}
-            </Form.Select>
-            {selectedKey && (
-              <div className="mt-2">
-                <small className="text-muted">
-                  Fingerprint: <code>{selectedKey.fingerprint}</code>
-                </small>
-              </div>
+          <>
+            <Form.Group className="mb-3">
+              <Form.Label>SSH-ключ</Form.Label>
+              <Form.Select
+                value={server.ssh_key_id || ''}
+                onChange={(e) => onChange({ ...server, ssh_key_id: e.target.value })}
+              >
+                <option value="">Выберите ключ...</option>
+                {sshKeys.map(key => (
+                  <option key={key.id} value={key.id}>
+                    {key.name} ({key.key_type.toUpperCase()}) - {key.fingerprint.substring(0, 16)}...
+                  </option>
+                ))}
+              </Form.Select>
+              {selectedKey && (
+                <div className="mt-2">
+                  <small className="text-muted">
+                    Fingerprint: <code>{selectedKey.fingerprint}</code>
+                  </small>
+                </div>
+              )}
+              {sshKeys.length === 0 && (
+                <Form.Text className="text-muted">
+                  Нет доступных SSH-ключей. 
+                  <Link to="/ssh-keys"> Перейти к управлению ключами</Link>
+                </Form.Text>
+              )}
+            </Form.Group>
+            
+            {selectedKey && selectedKey.has_passphrase && (
+              <Form.Group className="mb-3">
+                <Form.Label>Пароль от SSH-ключа</Form.Label>
+                <Form.Control
+                  type="password"
+                  value={server.ssh_key_passphrase || ''}
+                  onChange={(e) => onChange({ ...server, ssh_key_passphrase: e.target.value })}
+                  placeholder="Введите пароль от ключа"
+                />
+                <Form.Text className="text-muted">
+                  Этот ключ защищен паролем
+                </Form.Text>
+              </Form.Group>
             )}
-            {sshKeys.length === 0 && (
-              <Form.Text className="text-muted">
-                Нет доступных SSH-ключей. 
-                <Link to="/ssh-keys"> Перейти к управлению ключами</Link>
-              </Form.Text>
-            )}
-          </Form.Group>
+          </>
         )}
 
         {server.name && server.ssh_auth_type && (

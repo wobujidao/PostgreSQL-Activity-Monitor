@@ -259,8 +259,33 @@ function SSHKeyManagement() {
 
   // Копирование в буфер обмена
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    alert('Скопировано в буфер обмена');
+    // Проверяем доступность Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text)
+        .then(() => alert('Скопировано в буфер обмена'))
+        .catch(() => fallbackCopyToClipboard(text));
+    } else {
+      // Используем fallback метод для HTTP
+      fallbackCopyToClipboard(text);
+    }
+  };
+
+  // Fallback метод копирования для HTTP
+  const fallbackCopyToClipboard = (text) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      alert('Скопировано в буфер обмена');
+    } catch (err) {
+      alert('Не удалось скопировать. Выделите текст и нажмите Ctrl+C');
+    }
+    document.body.removeChild(textArea);
   };
 
   if (loading) {
