@@ -7,6 +7,7 @@ import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
 import DatabaseDetails from './components/DatabaseDetails';
 import UserManagement from './components/UserManagement';
+import SSHKeyManagement from './components/SSHKeyManagement';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -251,6 +252,9 @@ function AppContent() {
                         <Dropdown.Item onClick={() => navigate('/users')}>
                           ⚙️ Управление пользователями
                         </Dropdown.Item>
+                        <Dropdown.Item onClick={() => navigate('/ssh-keys')}>
+                          🔑 Управление SSH-ключами
+                        </Dropdown.Item>
                         <Dropdown.Divider />
                       </>
                     )}
@@ -271,6 +275,7 @@ function AppContent() {
           <Route path="/server/:name" element={<ServerDetails />} />
           <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
           <Route path="/users" element={userRole === 'admin' ? <UserManagement /> : <Navigate to="/" />} />
+          <Route path="/ssh-keys" element={userRole === 'admin' ? <SSHKeyManagement /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Container>
