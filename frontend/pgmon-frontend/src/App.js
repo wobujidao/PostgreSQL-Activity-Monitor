@@ -247,12 +247,18 @@ function AppContent() {
                       </div>
                     </Dropdown.Header>
                     <Dropdown.Divider />
-                    {/* Показываем только админам */}
+                    {/* Показываем управление пользователями только админам */}
                     {userRole === 'admin' && (
                       <>
                         <Dropdown.Item onClick={() => navigate('/users')}>
                           ⚙️ Управление пользователями
                         </Dropdown.Item>
+                        <Dropdown.Divider />
+                      </>
+                    )}
+                    {/* Показываем SSH-ключи админам и операторам */}
+                    {(userRole === 'admin' || userRole === 'operator') && (
+                      <>
                         <Dropdown.Item onClick={() => navigate('/ssh-keys')}>
                           🔑 Управление SSH-ключами
                         </Dropdown.Item>
@@ -277,7 +283,7 @@ function AppContent() {
           <Route path="/server/:serverName/edit" element={<ServerEdit />} />
           <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
           <Route path="/users" element={userRole === 'admin' ? <UserManagement /> : <Navigate to="/" />} />
-          <Route path="/ssh-keys" element={userRole === 'admin' ? <SSHKeyManagement /> : <Navigate to="/" />} />
+          <Route path="/ssh-keys" element={(userRole === 'admin' || userRole === 'operator') ? <SSHKeyManagement /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Container>
