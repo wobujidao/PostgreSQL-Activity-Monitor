@@ -9,8 +9,8 @@ import logging
 import uvicorn
 from app.config import ALLOWED_ORIGINS, LOG_LEVEL
 from app.api import auth_router, servers_router, health_router, stats_router, users_router
-from app.api.ssh_keys import router as ssh_keys_router
 from app.database import db_pool
+from app.api.ssh_keys import router as ssh_keys_router
 
 # Настройка логирования
 logging.basicConfig(
@@ -58,7 +58,6 @@ app.include_router(health_router)
 app.include_router(stats_router)
 app.include_router(users_router, tags=["users"])
 app.include_router(ssh_keys_router, tags=["ssh-keys"])
-
 # Корневой маршрут
 @app.get("/")
 async def root():
