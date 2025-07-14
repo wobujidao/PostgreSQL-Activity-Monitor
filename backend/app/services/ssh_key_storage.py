@@ -235,6 +235,30 @@ class SSHKeyStorage:
             logger.error(f"Ошибка импорта SSH-ключа: {e}")
             raise
     
+    def update_key(self, key_id: str, updates: dict) -> Optional[SSHKey]:
+        """Обновить информацию о SSH-ключе"""
+        metadata = self._load_metadata()
+        
+        # Находим ключ
+        key_index = None
+        for idx, key_data in enumerate(metadata):
+            if key_data.get('id') == key_id:
+                key_index = idx
+                break
+        
+        if key_index is None:
+            return None
+        
+        # Обновляем поля
+        for field, value in updates.items():
+            metadata[key_index][field] = value
+        
+        # Сохраняем метаданные
+        self._save_metadata(metadata)
+        
+        logger.info(f"Обновлен SSH-ключ {key_id}: {updates}")
+        return SSHKey(**metadata[key_index])
+    
     def delete_key(self, key_id: str) -> bool:
         """Удалить SSH-ключ"""
         metadata = self._load_metadata()
