@@ -26,8 +26,21 @@ def require_admin_or_operator(current_user: User = Depends(get_current_user)) ->
 @router.get("", response_model=List[SSHKeyResponse])
 async def list_ssh_keys(current_user: User = Depends(get_current_user)):
     """Получить список всех SSH-ключей"""
+    # Viewer не может видеть SSH-ключи
+    if current_user.role == "viewer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для просмотра SSH-ключей"
+        )
+    
     try:
         keys = ssh_key_storage.list_keys()
+        # Для оператора скрываем публичные ключи
+        if current_user.role == "operator":
+            for key in keys:
+                key_dict = key.dict()
+                key_dict['public_key'] = "[Скрыто для оператора]"
+                keys[keys.index(key)] = SSHKeyResponse(**key_dict)
         return [SSHKeyResponse(**key.dict()) for key in keys]
     except Exception as e:
         logger.error(f"Ошибка получения списка ключей: {e}")
@@ -36,9 +49,23 @@ async def list_ssh_keys(current_user: User = Depends(get_current_user)):
 @router.get("/{key_id}", response_model=SSHKeyResponse)
 async def get_ssh_key(key_id: str, current_user: User = Depends(get_current_user)):
     """Получить информацию о конкретном SSH-ключе"""
+    # Viewer не может видеть SSH-ключи
+    if current_user.role == "viewer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для просмотра SSH-ключей"
+        )
+    
     key = ssh_key_storage.get_key(key_id)
     if not key:
         raise HTTPException(status_code=404, detail="SSH-ключ не найден")
+    
+    # Для оператора скрываем публичный ключ
+    if current_user.role == "operator":
+        key_dict = key.dict()
+        key_dict['public_key'] = "[Скрыто для оператора]"
+        return SSHKeyResponse(**key_dict)
+    
     return SSHKeyResponse(**key.dict())
 
 @router.post("/generate", response_model=SSHKeyResponse)
@@ -292,6 +319,13 @@ async def download_public_key(
     current_user: User = Depends(get_current_user)
 ):
     """Скачать публичный ключ"""
+    # Только администратор может скачивать публичные ключи
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только администраторы могут скачивать публичные ключи"
+        )
+    
     key = ssh_key_storage.get_key(key_id)
     if not key:
         raise HTTPException(status_code=404, detail="SSH-ключ не найден")

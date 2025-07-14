@@ -52,6 +52,7 @@ function SSHKeyManagement() {
   const [importDescription, setImportDescription] = useState('');
 
   const token = localStorage.getItem('token');
+  const userRole = localStorage.getItem('userRole') || 'viewer';
 
   // Загрузка списка ключей
   const fetchKeys = async () => {
@@ -366,19 +367,23 @@ function SSHKeyManagement() {
             >
               ← Назад
             </Button>
-            <Button 
-              variant="success" 
-              onClick={openGenerateModal}
-            >
-              + Сгенерировать ключ
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={openImportModal}
-              className="ms-2"
-            >
-              📥 Импортировать
-            </Button>
+            {userRole === 'admin' && (
+              <>
+                <Button 
+                  variant="success" 
+                  onClick={openGenerateModal}
+                >
+                  + Сгенерировать ключ
+                </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={openImportModal}
+                  className="ms-2"
+                >
+                  📥 Импортировать
+                </Button>
+              </>
+            )}
           </div>
         </Card.Header>
         <Card.Body className="p-0">
@@ -431,15 +436,19 @@ function SSHKeyManagement() {
                       )}
                     </td>
                     <td>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => openEditModal(key)}
-                        className="me-1"
-                        title="Редактировать"
-                      >
-                        ✏️
-                      </Button>
+                      {userRole === 'admin' && (
+                        <>
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => openEditModal(key)}
+                            className="me-1"
+                            title="Редактировать"
+                          >
+                            ✏️
+                          </Button>
+                        </>
+                      )}
                       <Button
                         variant="outline-info"
                         size="sm"
@@ -449,24 +458,28 @@ function SSHKeyManagement() {
                       >
                         👁️
                       </Button>
-                      <Button
-                        variant="outline-success"
-                        size="sm"
-                        onClick={() => handleDownloadPublicKey(key)}
-                        className="me-1"
-                        title="Скачать публичный ключ"
-                      >
-                        💾
-                      </Button>
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => handleDeleteKey(key.id, key.name)}
-                        disabled={key.servers_count > 0}
-                        title={key.servers_count > 0 ? 'Ключ используется на серверах' : 'Удалить'}
-                      >
-                        🗑️
-                      </Button>
+                      {userRole === 'admin' && (
+                        <>
+                          <Button
+                            variant="outline-success"
+                            size="sm"
+                            onClick={() => handleDownloadPublicKey(key)}
+                            className="me-1"
+                            title="Скачать публичный ключ"
+                          >
+                            💾
+                          </Button>
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => handleDeleteKey(key.id, key.name)}
+                            disabled={key.servers_count > 0}
+                            title={key.servers_count > 0 ? 'Ключ используется на серверах' : 'Удалить'}
+                          >
+                            🗑️
+                          </Button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 );
@@ -761,17 +774,25 @@ function SSHKeyManagement() {
               
               <div className="mb-3">
                 <strong>Публичный ключ:</strong>
-                <Form.Control
-                  as="textarea"
-                  rows={6}
-                  value={selectedKey.public_key}
-                  readOnly
-                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
-                  className="mt-1"
-                />
-                <Button size="sm" variant="outline-secondary" onClick={() => copyToClipboard(selectedKey.public_key)} className="mt-1">
-                  📋 Копировать
-                </Button>
+                {userRole === 'admin' ? (
+                  <>
+                    <Form.Control
+                      as="textarea"
+                      rows={6}
+                      value={selectedKey.public_key}
+                      readOnly
+                      style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                      className="mt-1"
+                    />
+                    <Button size="sm" variant="outline-secondary" onClick={() => copyToClipboard(selectedKey.public_key)} className="mt-1">
+                      📋 Копировать
+                    </Button>
+                  </>
+                ) : (
+                  <div className="alert alert-info mt-2">
+                    <small>Публичный ключ доступен только администраторам</small>
+                  </div>
+                )}
               </div>
               
               <div className="mb-3">
@@ -783,9 +804,11 @@ function SSHKeyManagement() {
               </div>
               
               <div className="d-flex gap-2">
-                <Button variant="success" onClick={() => handleDownloadPublicKey(selectedKey)}>
-                  💾 Скачать публичный ключ
-                </Button>
+                {userRole === 'admin' && (
+                  <Button variant="success" onClick={() => handleDownloadPublicKey(selectedKey)}>
+                    💾 Скачать публичный ключ
+                  </Button>
+                )}
               </div>
             </>
           )}
