@@ -28,6 +28,12 @@ function SSHKeyManagement() {
   const [modalMode, setModalMode] = useState('generate'); // 'generate' или 'import'
   const [selectedKey, setSelectedKey] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: ''
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   
@@ -119,9 +125,45 @@ function SSHKeyManagement() {
       setSuccess('SSH-ключ успешно импортирован');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Ошибка импорта ключа: ' + (err.response?.data?.detail || err.message));
+      const errorMessage = err.response?.data?.detail || err.message;
+      // Проверяем, является ли это ошибкой дубликата
+      if (errorMessage.includes('уже существует в системе')) {
+        setError(errorMessage);
+      } else {
+        setError('Ошибка импорта ключа: ' + errorMessage);
+      }
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  // Открыть модальное окно редактирования
+  const openEditModal = (key) => {
+    setEditingKey(key);
+    setEditFormData({
+      name: key.name,
+      description: key.description || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // Сохранить изменения ключа
+  const handleUpdateKey = async () => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/ssh-keys/${editingKey.id}`,
+        editFormData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Обновляем список ключей
+      setKeys(keys.map(k => k.id === editingKey.id ? response.data : k));
+      setShowEditModal(false);
+      setEditingKey(null);
+      setSuccess('SSH-ключ успешно обновлен');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Ошибка обновления ключа: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -163,38 +205,6 @@ function SSHKeyManagement() {
       URL.revokeObjectURL(url);
     } catch (err) {
       setError('Ошибка загрузки ключа: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  // Загрузка скрипта установки
-  const handleDownloadInstallScript = async (key) => {
-    const serverHost = prompt('Введите адрес сервера (например, 192.168.1.100):');
-    const serverUser = prompt('Введите имя пользователя SSH (например, postgres):');
-    
-    if (!serverHost || !serverUser) {
-      return;
-    }
-
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/ssh-keys/${key.id}/installation-script`,
-        { 
-          headers: { Authorization: `Bearer ${token}` },
-          params: { server_host: serverHost, server_user: serverUser }
-        }
-      );
-      
-      const blob = new Blob([response.data.content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = response.data.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Ошибка загрузки скрипта: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -385,59 +395,82 @@ function SSHKeyManagement() {
               </tr>
             </thead>
             <tbody>
-              {keys.map(key => (
-                <tr key={key.id}>
-                  <td>
-                    <strong>{key.name}</strong>
-                    {key.description && (
-                      <div className="text-muted small">{key.description}</div>
-                    )}
-                  </td>
-                  <td>
-                    <Badge bg={key.key_type === 'rsa' ? 'primary' : 'success'}>
-                      {key.key_type.toUpperCase()}
-                    </Badge>
-                  </td>
-                  <td>
-                    <code className="fingerprint">{key.fingerprint}</code>
-                  </td>
-                  <td>{formatDate(key.created_at)}</td>
-                  <td>{key.created_by}</td>
-                  <td>
-                    {key.servers_count > 0 ? (
-                      <Badge bg="info">{key.servers_count}</Badge>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => showKeyDetails(key)}
-                      className="me-1"
-                    >
-                      👁️
-                    </Button>
-                    <Button
-                      variant="outline-success"
-                      size="sm"
-                      onClick={() => handleDownloadPublicKey(key)}
-                      className="me-1"
-                    >
-                      💾
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDeleteKey(key.id, key.name)}
-                      disabled={key.servers_count > 0}
-                    >
-                      🗑️
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {keys.map(key => {
+                // Проверяем, есть ли другие ключи с таким же fingerprint
+                const duplicateKeys = keys.filter(k => k.fingerprint === key.fingerprint && k.id !== key.id);
+                const hasDuplicates = duplicateKeys.length > 0;
+                
+                return (
+                  <tr key={key.id} className={hasDuplicates ? 'table-warning' : ''}>
+                    <td>
+                      <strong>{key.name}</strong>
+                      {key.description && (
+                        <div className="text-muted small">{key.description}</div>
+                      )}
+                      {hasDuplicates && (
+                        <div className="text-warning small mt-1">
+                          ⚠️ Дубликат ключа (используется также как: {duplicateKeys.map(k => k.name).join(', ')})
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <Badge bg={key.key_type === 'rsa' ? 'primary' : 'success'}>
+                        {key.key_type.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td>
+                      <code className="fingerprint">{key.fingerprint}</code>
+                    </td>
+                    <td>{formatDate(key.created_at)}</td>
+                    <td>{key.created_by}</td>
+                    <td>
+                      {key.servers_count > 0 ? (
+                        <Badge bg="info">{key.servers_count}</Badge>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => openEditModal(key)}
+                        className="me-1"
+                        title="Редактировать"
+                      >
+                        ✏️
+                      </Button>
+                      <Button
+                        variant="outline-info"
+                        size="sm"
+                        onClick={() => showKeyDetails(key)}
+                        className="me-1"
+                        title="Просмотр"
+                      >
+                        👁️
+                      </Button>
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        onClick={() => handleDownloadPublicKey(key)}
+                        className="me-1"
+                        title="Скачать публичный ключ"
+                      >
+                        💾
+                      </Button>
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => handleDeleteKey(key.id, key.name)}
+                        disabled={key.servers_count > 0}
+                        title={key.servers_count > 0 ? 'Ключ используется на серверах' : 'Удалить'}
+                      >
+                        🗑️
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
           {keys.length === 0 && (
@@ -650,6 +683,57 @@ function SSHKeyManagement() {
         </Modal.Footer>
       </Modal>
 
+      {/* Модальное окно редактирования ключа */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Редактировать SSH-ключ</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Название <span className="text-danger">*</span></Form.Label>
+              <Form.Control
+                type="text"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                placeholder="Например: prod-servers-key"
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Описание</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={editFormData.description}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                placeholder="Опишите назначение ключа"
+              />
+            </Form.Group>
+
+            {editingKey && (
+              <div className="alert alert-info">
+                <strong>Тип ключа:</strong> {editingKey.key_type.toUpperCase()}<br/>
+                <strong>Fingerprint:</strong> <code>{editingKey.fingerprint}</code><br/>
+                <strong>Создан:</strong> {formatDate(editingKey.created_at)}
+              </div>
+            )}
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+            Отмена
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleUpdateKey}
+            disabled={!editFormData.name.trim()}
+          >
+            Сохранить изменения
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       {/* Модальное окно деталей ключа */}
       <Modal show={showDetailsModal} onHide={() => setShowDetailsModal(false)} size="lg">
         <Modal.Header closeButton>
@@ -701,9 +785,6 @@ function SSHKeyManagement() {
               <div className="d-flex gap-2">
                 <Button variant="success" onClick={() => handleDownloadPublicKey(selectedKey)}>
                   💾 Скачать публичный ключ
-                </Button>
-                <Button variant="primary" onClick={() => handleDownloadInstallScript(selectedKey)}>
-                  📄 Скачать скрипт установки
                 </Button>
               </div>
             </>

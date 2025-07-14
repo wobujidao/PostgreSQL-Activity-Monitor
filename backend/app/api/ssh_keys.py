@@ -58,7 +58,20 @@ async def generate_ssh_key(
         
         # Создаем ключ
         key = ssh_key_storage.create_key(key_data, current_user.login)
+        
+        # Проверяем, не существует ли уже ключ с таким fingerprint
+        # (теоретически невозможно для сгенерированных ключей, но проверим)
+        if any(k.fingerprint == key.fingerprint and k.id != key.id for k in existing_keys):
+            # Удаляем созданный ключ
+            ssh_key_storage.delete_key(key.id)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ключ с таким fingerprint уже существует в системе"
+            )
+        
         return SSHKeyResponse(**key.dict())
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -80,9 +93,30 @@ async def import_ssh_key(
                 detail=f"Ключ с именем '{key_data.name}' уже существует"
             )
         
+        # Сначала валидируем ключ и получаем его fingerprint
+        from app.services.ssh_key_manager import SSHKeyManager
+        is_valid, error_msg, fingerprint = SSHKeyManager.validate_private_key(
+            key_data.private_key,
+            key_data.passphrase
+        )
+        
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"Невалидный приватный ключ: {error_msg}")
+        
+        # Проверяем, не существует ли уже ключ с таким fingerprint
+        existing_key = next((k for k in existing_keys if k.fingerprint == fingerprint), None)
+        if existing_key:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Этот ключ уже существует в системе под именем '{existing_key.name}'. "
+                       f"Fingerprint: {fingerprint}"
+            )
+        
         # Импортируем ключ
         key = ssh_key_storage.import_key(key_data, current_user.login)
         return SSHKeyResponse(**key.dict())
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -107,6 +141,33 @@ async def import_ssh_key_file(
         if not name:
             name = file.filename.replace('.pem', '').replace('.key', '')
         
+        # Проверяем уникальность имени
+        existing_keys = ssh_key_storage.list_keys()
+        if any(k.name == name for k in existing_keys):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ключ с именем '{name}' уже существует"
+            )
+        
+        # Валидируем ключ и получаем fingerprint
+        from app.services.ssh_key_manager import SSHKeyManager
+        is_valid, error_msg, fingerprint = SSHKeyManager.validate_private_key(
+            private_key,
+            passphrase
+        )
+        
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"Невалидный приватный ключ: {error_msg}")
+        
+        # Проверяем, не существует ли уже ключ с таким fingerprint
+        existing_key = next((k for k in existing_keys if k.fingerprint == fingerprint), None)
+        if existing_key:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Этот ключ уже существует в системе под именем '{existing_key.name}'. "
+                       f"Fingerprint: {fingerprint}"
+            )
+        
         # Создаем объект для импорта
         key_import = SSHKeyImport(
             name=name,
@@ -118,10 +179,55 @@ async def import_ssh_key_file(
         # Импортируем ключ
         key = ssh_key_storage.import_key(key_import, current_user.login)
         return SSHKeyResponse(**key.dict())
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Ошибка импорта ключа из файла: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{key_id}", response_model=SSHKeyResponse)
+async def update_ssh_key(
+    key_id: str,
+    update_data: dict,
+    current_user: User = Depends(require_admin_or_operator)
+):
+    """Обновить информацию о SSH-ключе"""
+    try:
+        # Получаем текущий ключ
+        key = ssh_key_storage.get_key(key_id)
+        if not key:
+            raise HTTPException(status_code=404, detail="SSH-ключ не найден")
+        
+        # Обновляем только разрешенные поля
+        allowed_fields = ['name', 'description']
+        updates = {}
+        
+        for field in allowed_fields:
+            if field in update_data:
+                updates[field] = update_data[field]
+        
+        # Проверяем уникальность имени если оно меняется
+        if 'name' in updates and updates['name'] != key.name:
+            existing_keys = ssh_key_storage.list_keys()
+            if any(k.name == updates['name'] for k in existing_keys):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Ключ с именем '{updates['name']}' уже существует"
+                )
+        
+        # Обновляем ключ
+        updated_key = ssh_key_storage.update_key(key_id, updates)
+        if not updated_key:
+            raise HTTPException(status_code=500, detail="Ошибка обновления ключа")
+        
+        return SSHKeyResponse(**updated_key.dict())
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка обновления ключа {key_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{key_id}")
@@ -193,66 +299,6 @@ async def download_public_key(
     return {
         "filename": f"{key.name}_id_{key.key_type}.pub",
         "content": key.public_key,
-        "content_type": "text/plain"
-    }
-
-@router.get("/{key_id}/installation-script")
-async def get_installation_script(
-    key_id: str,
-    server_host: str,
-    server_user: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Получить скрипт для установки ключа на сервер"""
-    key = ssh_key_storage.get_key(key_id)
-    if not key:
-        raise HTTPException(status_code=404, detail="SSH-ключ не найден")
-    
-    script = f"""#!/bin/bash
-# Скрипт установки SSH-ключа '{key.name}'
-# Сгенерировано: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-SERVER_HOST="{server_host}"
-SERVER_USER="{server_user}"
-PUBLIC_KEY="{key.public_key}"
-
-echo "🔐 Установка SSH-ключа для PostgreSQL Activity Monitor"
-echo "Ключ: {key.name}"
-echo "Fingerprint: {key.fingerprint}"
-echo "Сервер: $SERVER_USER@$SERVER_HOST"
-echo ""
-
-# Проверка подключения
-echo "1. Проверка подключения к серверу..."
-ssh -o ConnectTimeout=5 $SERVER_USER@$SERVER_HOST "echo 'Подключение успешно'" || {{
-    echo "❌ Ошибка подключения. Проверьте доступность сервера."
-    exit 1
-}}
-
-# Установка ключа
-echo "2. Установка публичного ключа..."
-ssh $SERVER_USER@$SERVER_HOST "
-    mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys
-    chmod 600 ~/.ssh/authorized_keys
-    echo '✅ Ключ установлен успешно'
-"
-
-# Тест подключения по ключу
-echo "3. Тест подключения по ключу..."
-ssh -o PasswordAuthentication=no $SERVER_USER@$SERVER_HOST "echo '✅ Подключение по ключу работает'" || {{
-    echo "❌ Ошибка подключения по ключу"
-    exit 1
-}}
-
-echo ""
-echo "🎉 Установка завершена успешно!"
-echo "Теперь вы можете использовать этот ключ в настройках сервера."
-"""
-    
-    return {
-        "filename": f"install_{key.name}_{server_host}.sh",
-        "content": script,
         "content_type": "text/plain"
     }
 
