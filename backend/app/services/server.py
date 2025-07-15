@@ -31,9 +31,9 @@ def load_servers() -> List[Server]:
             item["password"] = decrypt_password(item["password"])
             item["ssh_password"] = decrypt_password(item["ssh_password"])
             
-            # Расшифровываем passphrase для SSH-ключа если есть
-            if item.get("ssh_key_passphrase"):
-                item["ssh_key_passphrase"] = decrypt_password(item["ssh_key_passphrase"])
+            # НЕ расшифровываем passphrase для SSH-ключа - он должен расшифровываться только при использовании
+            # if item.get("ssh_key_passphrase"):
+            #     item["ssh_key_passphrase"] = decrypt_password(item["ssh_key_passphrase"])
             
             # Устанавливаем значение по умолчанию для ssh_auth_type
             if "ssh_auth_type" not in item:
