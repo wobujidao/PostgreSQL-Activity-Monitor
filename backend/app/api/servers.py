@@ -130,6 +130,17 @@ async def update_server(
             if not ssh_key:
                 raise HTTPException(status_code=400, detail="SSH key not found: {}".format(updated_server.ssh_key_id))
         
+        # ВАЖНО: Проверяем, не пытаемся ли мы сохранить уже зашифрованный passphrase
+        # Если passphrase начинается с "gAAAAA", значит он уже зашифрован
+        if hasattr(updated_server, 'ssh_key_passphrase') and updated_server.ssh_key_passphrase:
+            if updated_server.ssh_key_passphrase.startswith('gAAAAA'):
+                logger.warning(f"Попытка сохранить уже зашифрованный passphrase для {server_name}")
+                # Используем существующий passphrase из старого сервера
+                if hasattr(old_server, 'ssh_key_passphrase'):
+                    updated_server.ssh_key_passphrase = old_server.ssh_key_passphrase
+                else:
+                    updated_server.ssh_key_passphrase = None
+        
         # Clear caches when server changes
         cache_key = "{}:{}".format(old_server.host, old_server.port)
         cache_manager.invalidate_server_cache(cache_key)
