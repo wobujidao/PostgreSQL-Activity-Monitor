@@ -34,7 +34,17 @@ async def list_ssh_keys(current_user: User = Depends(get_current_user)):
         )
     
     try:
+        # Обновляем счетчики серверов для всех ключей
+        servers = load_servers()
         keys = ssh_key_storage.list_keys()
+        
+        for key in keys:
+            count = len([s for s in servers if getattr(s, 'ssh_key_id', None) == key.id])
+            ssh_key_storage.update_servers_count(key.id, count)
+        
+        # Загружаем обновленный список
+        keys = ssh_key_storage.list_keys()
+        
         # Для оператора скрываем публичные ключи
         if current_user.role == "operator":
             for key in keys:
