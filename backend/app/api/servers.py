@@ -130,27 +130,6 @@ async def update_server(
             if not ssh_key:
                 raise HTTPException(status_code=400, detail="SSH key not found: {}".format(updated_server.ssh_key_id))
         
-        # ВАЖНО: Проверяем passphrase при обновлении
-        if hasattr(updated_server, 'ssh_key_passphrase') and updated_server.ssh_key_passphrase:
-            # Если passphrase начинается с "gAAAAA", значит он уже зашифрован
-            if updated_server.ssh_key_passphrase.startswith('gAAAAA'):
-                logger.warning(f"Попытка сохранить уже зашифрованный passphrase для {server_name}")
-                # Используем существующий passphrase из старого сервера
-                if hasattr(old_server, 'ssh_key_passphrase'):
-                    updated_server.ssh_key_passphrase = old_server.ssh_key_passphrase
-                else:
-                    updated_server.ssh_key_passphrase = None
-            # Проверяем, не совпадает ли новый passphrase с расшифрованным старым
-            elif hasattr(old_server, 'ssh_key_passphrase') and old_server.ssh_key_passphrase:
-                try:
-                    from app.utils.crypto import decrypt_password
-                    decrypted_old = decrypt_password(old_server.ssh_key_passphrase)
-                    if updated_server.ssh_key_passphrase == decrypted_old:
-                        logger.info(f"Passphrase не изменился для {server_name}, используем существующий зашифрованный")
-                        updated_server.ssh_key_passphrase = old_server.ssh_key_passphrase
-                except Exception as e:
-                    logger.error(f"Ошибка при проверке passphrase: {e}")
-        
         # Clear caches when server changes
         cache_key = "{}:{}".format(old_server.host, old_server.port)
         cache_manager.invalidate_server_cache(cache_key)
@@ -214,11 +193,13 @@ async def test_ssh_connection(
         if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_key_id', None):
             # Импортируем ssh_key_storage здесь чтобы избежать циклических импортов
             from app.services.ssh_key_storage import ssh_key_storage
+            from app.utils import ensure_decrypted
             
             # Получаем содержимое ключа
             passphrase = None
             if getattr(server, 'ssh_key_passphrase', None):
-                passphrase = server.ssh_key_passphrase
+                # Расшифровываем passphrase
+                passphrase = ensure_decrypted(server.ssh_key_passphrase)
             
             private_key_content, key_passphrase = ssh_key_storage.get_private_key_content(
                 server.ssh_key_id, 

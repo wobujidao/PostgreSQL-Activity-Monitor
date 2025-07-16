@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone
 from app.models import Server
 from app.config import SERVERS_FILE, SERVER_STATUS_CACHE_TTL
-from app.utils import encrypt_password, decrypt_password
+from app.utils import ensure_encrypted, ensure_decrypted, is_encrypted, fix_double_encryption
 from app.database import db_pool
 from app.services.cache import cache_manager
 from app.services.ssh import get_ssh_disk_usage, is_host_reachable
@@ -28,12 +28,12 @@ def load_servers() -> List[Server]:
         servers = []
         for item in data:
             # Расшифровываем пароли
-            item["password"] = decrypt_password(item["password"])
-            item["ssh_password"] = decrypt_password(item["ssh_password"])
+            item["password"] = ensure_decrypted(item["password"])
+            item["ssh_password"] = ensure_decrypted(item["ssh_password"])
             
-            # НЕ расшифровываем passphrase для SSH-ключа - он должен расшифровываться только при использовании
-            # if item.get("ssh_key_passphrase"):
-            #     item["ssh_key_passphrase"] = decrypt_password(item["ssh_key_passphrase"])
+            # Исправляем двойное шифрование ssh_key_passphrase если есть
+            if item.get("ssh_key_passphrase"):
+                item["ssh_key_passphrase"] = fix_double_encryption(item["ssh_key_passphrase"])
             
             # Устанавливаем значение по умолчанию для ssh_auth_type
             if "ssh_auth_type" not in item:
@@ -56,14 +56,14 @@ def save_servers(servers: List[Server]):
                 "host": s.host,
                 "stats_db": s.stats_db,
                 "user": s.user,
-                "password": encrypt_password(s.password),
+                "password": ensure_encrypted(s.password),
                 "port": s.port,
                 "ssh_user": s.ssh_user,
-                "ssh_password": encrypt_password(s.ssh_password),
+                "ssh_password": ensure_encrypted(s.ssh_password),
                 "ssh_port": s.ssh_port,
                 "ssh_auth_type": getattr(s, "ssh_auth_type", "password"),
                 "ssh_key_id": getattr(s, "ssh_key_id", None),
-                "ssh_key_passphrase": encrypt_password(s.ssh_key_passphrase) if getattr(s, "ssh_key_passphrase", None) else None
+                "ssh_key_passphrase": ensure_encrypted(getattr(s, "ssh_key_passphrase", None)) if getattr(s, "ssh_key_passphrase", None) else None
             } for s in servers], f, indent=2)
         logger.info(f"Сохранено {len(servers)} серверов")
     except Exception as e:

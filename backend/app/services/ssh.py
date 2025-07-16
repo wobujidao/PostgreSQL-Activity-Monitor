@@ -8,7 +8,7 @@ from typing import Tuple, Optional
 from app.models import Server
 from app.services.cache import cache_manager
 from app.config import SSH_CACHE_TTL
-from app.utils import decrypt_password
+from app.utils import ensure_decrypted
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,9 @@ def get_ssh_client(server: Server) -> paramiko.SSHClient:
             # Получаем содержимое ключа
             passphrase = None
             if getattr(server, 'ssh_key_passphrase', None):
-                passphrase = decrypt_password(server.ssh_key_passphrase)
+                # Расшифровываем passphrase
+                passphrase = ensure_decrypted(server.ssh_key_passphrase)
+                logger.debug(f"Passphrase для ключа {server.ssh_key_id} расшифрован")
             
             private_key_content, key_passphrase = ssh_key_storage.get_private_key_content(
                 server.ssh_key_id, 
