@@ -38,12 +38,12 @@ function DatabaseDetails() {
       }
 
       console.log('Fetching stats for:', name, db_name);
-      const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}`, {
+      const statsResponse = await axios.get(`https://pam.cbmo.mosreg.ru/server/${name}/db/${db_name}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Stats response:', statsResponse.data);
 
-      const historyResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/db/${db_name}/stats`, {
+      const historyResponse = await axios.get(`https://pam.cbmo.mosreg.ru/server/${name}/db/${db_name}/stats`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           start_date: startDate.toISOString(),

@@ -13,7 +13,7 @@ import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 import './UserManagement.css';
 
-const API_BASE_URL = 'http://10.110.20.55:8000';
+const API_BASE_URL = 'https://pam.cbmo.mosreg.ru';
 
 function UserManagement() {
   const [users, setUsers] = useState([]);

@@ -210,7 +210,7 @@ function ServerDetails() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Токен отсутствует');
 
-      const serverResponse = await axios.get('http://10.110.20.55:8000/servers', {
+      const serverResponse = await axios.get('https://pam.cbmo.mosreg.ru/servers', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const server = serverResponse.data.find(s => s.name === name);
@@ -220,7 +220,7 @@ function ServerDetails() {
         localStorage.setItem(serverCacheKey, JSON.stringify(server));
       }
 
-      const statsResponse = await axios.get(`http://10.110.20.55:8000/server/${name}/stats`, {
+      const statsResponse = await axios.get(`https://pam.cbmo.mosreg.ru/server/${name}/stats`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           start_date: startDate.toISOString(),

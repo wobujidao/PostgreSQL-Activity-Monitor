@@ -43,7 +43,7 @@ function ServerList() {
         if (!token) {
           throw new Error('Токен отсутствует, требуется авторизация');
         }
-        const response = await axios.get('http://10.110.20.55:8000/servers', {
+        const response = await axios.get('https://pam.cbmo.mosreg.ru/servers', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setServers(response.data);
@@ -79,7 +79,7 @@ function ServerList() {
     const fetchSSHKeys = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://10.110.20.55:8000/ssh-keys', {
+        const response = await axios.get('https://pam.cbmo.mosreg.ru/ssh-keys', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSSHKeys(response.data);
@@ -110,7 +110,7 @@ function ServerList() {
       }
       
       const response = await axios.post(
-        'http://10.110.20.55:8000/servers',
+        'https://pam.cbmo.mosreg.ru/servers',
         dataToSend,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
@@ -148,7 +148,7 @@ function ServerList() {
     setSSHTestResult(null);
     try {
       const response = await axios.post(
-        `http://10.110.20.55:8000/servers/${server.name}/test-ssh`,
+        `https://pam.cbmo.mosreg.ru/servers/${server.name}/test-ssh`,
         {},
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );

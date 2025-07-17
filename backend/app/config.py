@@ -28,4 +28,4 @@ SSH_CACHE_TTL = 30  # секунд
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # CORS
-ALLOWED_ORIGINS = ["http://10.110.20.55:3000"]
+ALLOWED_ORIGINS = ["http://10.110.20.55:3000", "https://pam.cbmo.mosreg.ru"]

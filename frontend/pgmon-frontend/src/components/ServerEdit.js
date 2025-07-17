@@ -5,7 +5,7 @@ import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 import './ServerEdit.css';
 
-const API_BASE_URL = 'http://10.110.20.55:8000';
+const API_BASE_URL = 'https://pam.cbmo.mosreg.ru';
 
 function ServerEdit() {
   const { serverName } = useParams();

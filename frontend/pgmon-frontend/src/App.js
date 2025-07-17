@@ -49,7 +49,7 @@ function AppContent() {
     setIsRefreshing(true);
     try {
       const response = await axios.post(
-        'http://10.110.20.55:8000/token',
+        'https://pam.cbmo.mosreg.ru/token',
         `username=${storedUsername}&password=${refreshPassword}`,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
@@ -89,7 +89,7 @@ function AppContent() {
       try {
         const storedToken = localStorage.getItem('token');
         if (storedToken) {
-          await axios.get('http://10.110.20.55:8000/servers', {
+          await axios.get('https://pam.cbmo.mosreg.ru/servers', {
             headers: { Authorization: `Bearer ${storedToken}` }
           });
           setBackendStatus('available');
@@ -111,7 +111,7 @@ function AppContent() {
     const fetchUserInfo = async () => {
       if (token) {
         try {
-          const response = await axios.get('http://10.110.20.55:8000/users/me', {
+          const response = await axios.get('https://pam.cbmo.mosreg.ru/users/me', {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUserRole(response.data.role);
@@ -179,7 +179,7 @@ function AppContent() {
   const login = async (username, password) => {
     try {
       const response = await axios.post(
-        'http://10.110.20.55:8000/token',
+        'https://pam.cbmo.mosreg.ru/token',
         `username=${username}&password=${password}`,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
