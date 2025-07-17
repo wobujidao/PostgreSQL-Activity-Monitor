@@ -46,7 +46,11 @@ class DatabasePool:
                         password=server.password,
                         port=server.port,
                         connect_timeout=5,
-                        options='-c statement_timeout=5000 -c tcp_user_timeout=5000'
+                        options='-c statement_timeout=5000 -c tcp_user_timeout=5000',
+                        keepalives=1,
+                        keepalives_idle=30,
+                        keepalives_interval=5,
+                        keepalives_count=5
                     )
                 except Exception as e:
                     logger.error(f"Ошибка создания пула для {server.name}: {e}")
@@ -61,6 +65,26 @@ class DatabasePool:
         conn = None
         try:
             conn = pool.getconn()
+            
+            # Проверяем, что соединение живое
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                    cur.fetchone()
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                logger.warning(f"Мёртвое соединение обнаружено для {server.name}, переподключение...")
+                if conn:
+                    try:
+                        pool.putconn(conn, close=True)
+                    except:
+                        pass
+                # Получаем новое соединение
+                conn = pool.getconn()
+                # Проверяем новое соединение
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                    cur.fetchone()
+            
             logger.debug(f"Получено соединение из пула для {server.name}")
             yield conn
             conn.commit()
