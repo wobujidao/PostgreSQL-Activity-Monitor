@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { Container, Navbar, Button, Modal, Spinner, Form, Dropdown } from 'react-bootstrap';
 import Login from './components/Login';
@@ -9,6 +9,7 @@ import ServerEdit from './components/ServerEdit';
 import DatabaseDetails from './components/DatabaseDetails';
 import UserManagement from './components/UserManagement';
 import SSHKeyManagement from './components/SSHKeyManagement';
+import ScrollToTop from './components/ScrollToTop';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -213,7 +214,7 @@ function AppContent() {
     <div className="App">
       <Navbar bg="dark" variant="dark" className="px-0">
         <Container>
-          <Navbar.Brand>
+          <Navbar.Brand as={Link} to="/" style={{ cursor: 'pointer' }}>
             <div className="logo-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                 <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
@@ -225,6 +226,18 @@ function AppContent() {
             </span>
           </Navbar.Brand>
           <div className="d-flex align-items-center">
+            <Button 
+              variant="outline-light" 
+              size="sm" 
+              onClick={() => navigate('/')}
+              className="me-3 home-button"
+              title="На главную"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+              </svg>
+              <span className="ms-2">Главная</span>
+            </Button>
             {currentUser && (
               <>
                 <span className="user-info">
@@ -287,6 +300,9 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Container>
+
+      {/* Кнопка "Наверх" */}
+      <ScrollToTop />
 
       {/* Модальное окно продления сессии с новым дизайном */}
       <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false} centered className="session-modal">
