@@ -23,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, ArrowLeft, Users, ShieldCheck, Settings, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowLeft, Users, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 const INITIAL_FORM = { login: '', password: '', role: 'viewer', email: '' };
