@@ -5,7 +5,7 @@ After=network.target
 [Service]
 #ExecStart=/home/pgmonitor/.nvm/versions/node/v23.9.0/bin/npm start
 ExecStart=/bin/bash -c 'source /home/pgmonitor/.nvm/nvm.sh && nvm use 23.9.0 && npm start'
-WorkingDirectory=/home/pgmonitor/pg_activity_monitor/frontend/pgmon-frontend
+WorkingDirectory=/home/pgmonitor/pg_activity_monitor/frontend
 Restart=always
 RestartSec=1s
 User=pgmonitor

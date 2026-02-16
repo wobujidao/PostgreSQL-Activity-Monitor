@@ -13,12 +13,12 @@ PostgreSQL Activity Monitor — веб-приложение для монито�
 
 ## Структура
 - `backend/` — FastAPI REST API (Python)
-- `frontend/pgmon-frontend/` — React SPA
+- `frontend/` — React SPA (Vite + shadcn/ui)
 - `stats_db/` — скрипты сбора статистики
 - Конфиги серверов: `/etc/pg_activity_monitor/`
 
 ## Стек
 - Backend: FastAPI, psycopg2, paramiko, PyJWT, bcrypt
-- Frontend: React 19, Bootstrap 5, Chart.js, axios
+- Frontend: React 19, Vite, Tailwind CSS v4, shadcn/ui, Chart.js, axios
 - БД: PostgreSQL
 - Деплой: systemd, Nginx, HTTPS

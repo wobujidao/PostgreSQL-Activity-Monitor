@@ -91,11 +91,10 @@ PostgreSQL-Activity-Monitor/
 │       │   └── ssh_key_storage.py    # Хранение SSH ключей (JSON + файлы)
 │       └── utils/
 │           └── crypto.py       # Fernet шифрование/расшифровка
-├── frontend/                   # React SPA
-│   └── pgmon-frontend/
+├── frontend/                   # React SPA (Vite + shadcn/ui)
 │       ├── package.json
-│       ├── .env                # NODE_OPTIONS
-│       ├── .env.production     # REACT_APP_API_URL
+│       ├── vite.config.js
+│       ├── index.html
 │       └── src/
 │           ├── App.js          # Роутинг, JWT сессия
 │           ├── App.css
@@ -208,7 +207,7 @@ print('Пользователь admin создан')
 ### 6. Frontend
 
 ```bash
-cd frontend/pgmon-frontend
+cd frontend
 npm install
 ```
 
@@ -417,7 +416,7 @@ sudo systemctl restart pgmon-frontend
 git pull
 cd backend && source venv/bin/activate && pip install -r requirements.txt
 sudo systemctl restart pgmon-backend
-cd ../frontend/pgmon-frontend && npm install
+cd ../frontend && npm install
 sudo systemctl restart pgmon-frontend
 ```
 
