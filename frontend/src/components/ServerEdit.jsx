@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatBytesGB } from '@/lib/format';
 import LoadingSpinner from './LoadingSpinner';
+import PageHeader from './PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,17 +106,10 @@ function ServerEdit() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div>
-        <h1 className="text-2xl font-bold">Редактирование сервера</h1>
-        <nav className="text-sm text-muted-foreground mt-1">
-          <Link to="/" className="hover:text-foreground">Главная</Link>
-          <span className="mx-1">/</span>
-          <Link to="/" className="hover:text-foreground">Серверы</Link>
-          <span className="mx-1">/</span>
-          <span>{serverName}</span>
-        </nav>
-      </div>
+      <PageHeader title="Редактирование сервера" breadcrumbs={[
+        { label: 'Серверы', href: '/' },
+        { label: serverName },
+      ]} />
 
       {error && (
         <Alert variant="destructive">

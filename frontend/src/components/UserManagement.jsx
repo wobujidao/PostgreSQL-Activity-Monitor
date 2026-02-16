@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import { formatTimestamp } from '@/lib/format';
 import { LS_USERNAME } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
+import PageHeader from './PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,14 +107,9 @@ function UserManagement() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Управление пользователями</h1>
-        <nav className="text-sm text-muted-foreground mt-1">
-          <Link to="/" className="hover:text-foreground">Главная</Link>
-          <span className="mx-1">/</span>
-          <span>Пользователи</span>
-        </nav>
-      </div>
+      <PageHeader title="Управление пользователями" breadcrumbs={[
+        { label: 'Пользователи' },
+      ]} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

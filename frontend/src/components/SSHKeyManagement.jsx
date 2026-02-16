@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import { formatTimestamp } from '@/lib/format';
 import { LS_USER_ROLE } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
+import PageHeader from './PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -182,14 +183,9 @@ function SSHKeyManagement() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Управление SSH-ключами</h1>
-        <nav className="text-sm text-muted-foreground mt-1">
-          <Link to="/" className="hover:text-foreground">Главная</Link>
-          <span className="mx-1">/</span>
-          <span>SSH-ключи</span>
-        </nav>
-      </div>
+      <PageHeader title="Управление SSH-ключами" breadcrumbs={[
+        { label: 'SSH-ключи' },
+      ]} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

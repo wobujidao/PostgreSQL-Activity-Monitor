@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { formatBytesGB, formatTimestamp } from '@/lib/format';
 import { DEFAULT_CRITERIA, LS_CRITERIA, LS_USER_ROLE, ITEMS_PER_PAGE } from '@/lib/constants';
 import ServerDetailsSkeleton from './skeletons/ServerDetailsSkeleton';
+import PageHeader from './PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -353,17 +354,10 @@ function ServerDetails() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Сервер: {name}</h1>
-        <nav className="text-sm text-muted-foreground mt-1">
-          <Link to="/" className="hover:text-foreground">Главная</Link>
-          <span className="mx-1">/</span>
-          <Link to="/" className="hover:text-foreground">Серверы</Link>
-          <span className="mx-1">/</span>
-          <span>{name}</span>
-        </nav>
-      </div>
+      <PageHeader title={`Сервер: ${name}`} breadcrumbs={[
+        { label: 'Серверы', href: '/' },
+        { label: name },
+      ]} />
 
       {/* Server info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

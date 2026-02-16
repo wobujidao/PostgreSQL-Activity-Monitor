@@ -3,6 +3,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import 'chartjs-adapter-date-fns';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
+import PageHeader from './PageHeader';
 import { formatTimestamp } from '@/lib/format';
 import { DB_STATS_REFRESH_INTERVAL } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
@@ -128,19 +129,11 @@ function DatabaseDetails() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">База данных: {db_name}</h1>
-        <nav className="text-sm text-muted-foreground mt-1">
-          <Link to="/" className="hover:text-foreground">Главная</Link>
-          <span className="mx-1">/</span>
-          <Link to="/" className="hover:text-foreground">Серверы</Link>
-          <span className="mx-1">/</span>
-          <Link to={`/server/${name}`} className="hover:text-foreground">{name}</Link>
-          <span className="mx-1">/</span>
-          <span>{db_name}</span>
-        </nav>
-      </div>
+      <PageHeader title={`База данных: ${db_name}`} breadcrumbs={[
+        { label: 'Серверы', href: '/' },
+        { label: name, href: `/server/${name}` },
+        { label: db_name },
+      ]} />
 
       {/* Info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
