@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Home, User, Users, KeyRound, LogOut, Shield, AlertCircle, Lock, Loader2, ChevronDown, Sun, Moon, Search } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { formatTimeLeft } from '@/lib/format';
@@ -120,7 +121,11 @@ function AppContent() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-white hover:text-white hover:bg-white/10">
-                  <User className="h-4 w-4 mr-1" />
+                  <Avatar className="h-6 w-6 mr-1">
+                    <AvatarFallback className="text-[10px] bg-cyan-600 text-white">
+                      {currentUser?.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <span className="hidden sm:inline">{currentUser}</span>
                   <ChevronDown className="h-3 w-3 ml-1" />
                 </Button>

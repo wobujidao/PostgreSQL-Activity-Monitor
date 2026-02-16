@@ -5,6 +5,7 @@ import { formatBytes, formatUptime } from '@/lib/format';
 import { DEFAULT_SSH_PORT, DEFAULT_PG_PORT, DEFAULT_SSH_AUTH_TYPE } from '@/lib/constants';
 import { useServers } from '@/hooks/use-servers';
 import ServerListSkeleton from './skeletons/ServerListSkeleton';
+import EmptyState from './EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -367,8 +368,12 @@ function ServerList() {
                 })}
                 {filteredServers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      {searchTerm || statusFilter !== 'all' ? 'Серверы не найдены' : 'Нет добавленных серверов'}
+                    <TableCell colSpan={9}>
+                      {searchTerm || statusFilter !== 'all' ? (
+                        <EmptyState icon={Search} title="Серверы не найдены" description="Попробуйте изменить условия поиска" />
+                      ) : (
+                        <EmptyState icon={Server} title="Нет добавленных серверов" description="Добавьте первый сервер для мониторинга" actionLabel="Добавить сервер" onAction={() => { setErrorMessage(''); setShowAddModal(true); }} />
+                      )}
                     </TableCell>
                   </TableRow>
                 )}
