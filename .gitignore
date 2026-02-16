@@ -11,6 +11,11 @@ __pycache__/
 .Python
 venv/
 
+# Node
+node_modules/
+build/
+dist/
+
 # Logs
 *.log
 

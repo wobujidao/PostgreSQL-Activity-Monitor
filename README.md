@@ -5,6 +5,8 @@
   <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19"/>
   <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/Python_3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13"/>
+  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS"/>
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/>
 </div>
 
 <div align="center">
@@ -44,10 +46,12 @@
 
 ### Frontend
 - **React 19** + React Router 7
-- **Bootstrap 5.3** + react-bootstrap
-- **Chart.js** + react-chartjs-2 - графики
+- **Vite 7** - сборка и dev-сервер
+- **Tailwind CSS v4** + **shadcn/ui** - UI компоненты
+- **Chart.js** - графики
 - **axios** - HTTP клиент
-- **date-fns** + react-datepicker - работа с датами
+- **sonner** - toast-уведомления
+- **lucide-react** - иконки
 
 ### Инфраструктура
 - **PostgreSQL 9.6+** - целевые серверы
@@ -63,7 +67,6 @@ PostgreSQL-Activity-Monitor/
 │   ├── main.py                 # Точка входа
 │   ├── requirements.txt        # Python зависимости
 │   ├── pgmon-backend.service   # systemd сервис
-│   ├── venv/                   # Python virtualenv (не в git)
 │   └── app/
 │       ├── config.py           # Конфигурация
 │       ├── api/                # REST endpoints
@@ -92,22 +95,33 @@ PostgreSQL-Activity-Monitor/
 │       └── utils/
 │           └── crypto.py       # Fernet шифрование/расшифровка
 ├── frontend/                   # React SPA (Vite + shadcn/ui)
-│       ├── package.json
-│       ├── vite.config.js
-│       ├── index.html
-│       └── src/
-│           ├── App.js          # Роутинг, JWT сессия
-│           ├── App.css
-│           └── components/
-│               ├── Login.js             # Авторизация
-│               ├── ServerList.js        # Список серверов (главная)
-│               ├── ServerDetails.js     # Детали сервера + БД
-│               ├── ServerEdit.js        # Редактирование сервера
-│               ├── DatabaseDetails.js   # Статистика БД + графики
-│               ├── UserManagement.js    # Управление пользователями
-│               ├── SSHKeyManagement.js  # Управление SSH ключами
-│               ├── ScrollToTop.js       # Навигация
-│               └── LoadingSpinner.js    # Индикатор загрузки
+│   ├── index.html              # Точка входа Vite
+│   ├── vite.config.js          # Конфигурация Vite
+│   ├── package.json            # Node.js зависимости
+│   └── src/
+│       ├── main.jsx            # Точка входа React
+│       ├── index.css           # Tailwind + CSS переменные shadcn
+│       ├── App.jsx             # Роутинг, хедер, модалы сессии
+│       ├── lib/
+│       │   ├── api.js          # Централизованный axios + JWT interceptor
+│       │   ├── constants.js    # Все константы приложения
+│       │   ├── format.js       # Утилиты форматирования
+│       │   └── utils.js        # cn() для Tailwind классов
+│       ├── contexts/
+│       │   └── auth-context.jsx  # AuthProvider (JWT lifecycle)
+│       ├── hooks/
+│       │   └── use-auth.js     # useAuth hook
+│       └── components/
+│           ├── Login.jsx             # Авторизация
+│           ├── ServerList.jsx        # Список серверов (главная)
+│           ├── ServerDetails.jsx     # Детали сервера + анализ БД
+│           ├── ServerEdit.jsx        # Редактирование сервера
+│           ├── DatabaseDetails.jsx   # Статистика БД + графики
+│           ├── UserManagement.jsx    # Управление пользователями
+│           ├── SSHKeyManagement.jsx  # Управление SSH ключами
+│           ├── ScrollToTop.jsx       # Кнопка "наверх"
+│           ├── LoadingSpinner.jsx    # Индикатор загрузки
+│           └── ui/                   # shadcn/ui компоненты
 ├── stats_db/                   # Сбор исторической статистики
 │   ├── create_stats_db.sh      # Создание таблиц
 │   ├── stats_collection.sh     # Скрипт сбора (для cron)
@@ -219,7 +233,7 @@ sudo cp backend/pgmon-backend.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pgmon-backend
 
-# Frontend (создайте аналогичный сервис или используйте nginx + build)
+# Frontend (создайте сервис или используйте nginx + build)
 sudo systemctl enable --now pgmon-frontend
 
 # Проверка
