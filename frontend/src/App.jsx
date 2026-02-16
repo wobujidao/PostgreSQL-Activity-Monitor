@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, Link } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/auth-context';
 import { useAuth } from '@/hooks/use-auth';
@@ -23,9 +24,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Home, User, Users, KeyRound, LogOut, Shield, AlertCircle, Lock, Loader2, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Home, User, Users, KeyRound, LogOut, Shield, AlertCircle, Lock, Loader2, ChevronDown, Sun, Moon, Search } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { formatTimeLeft } from '@/lib/format';
+import { ServersProvider } from '@/contexts/servers-context';
+import CommandPalette from './components/CommandPalette';
 import Login from './components/Login';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
@@ -46,6 +49,19 @@ function AppContent() {
   } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const [commandOpen, setCommandOpen] = useState(false);
+
+  // Ctrl+K / Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandOpen(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   if (!token) {
     return <Login onLogin={login} error={error} />;
@@ -76,6 +92,19 @@ function AppContent() {
             >
               <Home className="h-4 w-4 mr-1" />
               <span className="hidden sm:inline">Главная</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCommandOpen(true)}
+              className="text-white/60 hover:text-white hover:bg-white/10 hidden md:flex items-center gap-2"
+            >
+              <Search className="h-4 w-4" />
+              <span className="text-xs">Поиск...</span>
+              <kbd className="ml-1 pointer-events-none inline-flex h-5 items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 font-mono text-[10px] font-medium">
+                Ctrl+K
+              </kbd>
             </Button>
 
             <Button
@@ -138,6 +167,7 @@ function AppContent() {
         </Routes>
       </main>
 
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <ScrollToTop />
 
       {/* Session expiration dialog */}
@@ -214,10 +244,12 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <TooltipProvider>
-          <AppContent />
-          <Toaster richColors position="top-right" />
-        </TooltipProvider>
+        <ServersProvider>
+          <TooltipProvider>
+            <AppContent />
+            <Toaster richColors position="top-right" />
+          </TooltipProvider>
+        </ServersProvider>
       </AuthProvider>
     </Router>
   );

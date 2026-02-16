@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatBytes, formatUptime } from '@/lib/format';
-import { SERVERS_REFRESH_INTERVAL, DEFAULT_SSH_PORT, DEFAULT_PG_PORT, DEFAULT_SSH_AUTH_TYPE } from '@/lib/constants';
+import { DEFAULT_SSH_PORT, DEFAULT_PG_PORT, DEFAULT_SSH_AUTH_TYPE } from '@/lib/constants';
+import { useServers } from '@/hooks/use-servers';
 import ServerListSkeleton from './skeletons/ServerListSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,41 +39,21 @@ const INITIAL_SERVER = {
 
 function ServerList() {
   const navigate = useNavigate();
-  const [servers, setServers] = useState([]);
+  const { servers, loading, timeLeft, refreshInterval, setRefreshInterval, setPaused, refresh } = useServers();
   const [sshKeys, setSSHKeys] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newServer, setNewServer] = useState(INITIAL_SERVER);
   const [errorMessage, setErrorMessage] = useState('');
-  const [refreshInterval, setRefreshInterval] = useState(SERVERS_REFRESH_INTERVAL);
-  const [timeLeft, setTimeLeft] = useState(refreshInterval / 1000);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [loading, setLoading] = useState(true);
   const [testingSSH, setTestingSSH] = useState(false);
   const [sshTestResult, setSSHTestResult] = useState(null);
 
   useEffect(() => {
-    const fetchServers = async () => {
-      try {
-        const response = await api.get('/servers');
-        setServers(response.data);
-        setLoading(false);
-      } catch (error) {
-        setErrorMessage('Ошибка загрузки серверов: ' + (error.message || 'Неизвестная ошибка'));
-        setLoading(false);
-      }
-    };
-    fetchServers();
-    const interval = setInterval(() => {
-      if (!showAddModal) { fetchServers(); setTimeLeft(refreshInterval / 1000); }
-    }, refreshInterval);
-    const timer = setInterval(() => {
-      setTimeLeft(prev => (prev > 0 ? prev - 1 : refreshInterval / 1000));
-    }, 1000);
-    return () => { clearInterval(interval); clearInterval(timer); };
-  }, [refreshInterval, showAddModal]);
+    setPaused(showAddModal);
+  }, [showAddModal, setPaused]);
 
   useEffect(() => {
     api.get('/ssh-keys').then(res => setSSHKeys(res.data)).catch(() => {});
@@ -84,11 +65,11 @@ function ServerList() {
       if (response.data.status !== "ok" && response.data.status !== undefined) {
         setErrorMessage(`Ошибка: ${response.data.status}`);
       } else {
-        setServers([...servers, response.data]);
         setNewServer(INITIAL_SERVER);
         setShowAddModal(false);
         setSSHTestResult(null);
         toast.success('Сервер добавлен');
+        refresh();
       }
     } catch (error) {
       setErrorMessage('Ошибка при добавлении: ' + (error.response?.data?.detail || error.message));
@@ -244,7 +225,7 @@ function ServerList() {
               />
             </div>
             <div className="flex items-center gap-3 ml-auto">
-              <Select value={String(refreshInterval)} onValueChange={(v) => { setRefreshInterval(Number(v)); setTimeLeft(Number(v) / 1000); }}>
+              <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
