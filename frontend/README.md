@@ -8,14 +8,14 @@
 
 <br/>
 
-<img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React 19"/>
+<img src="https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React 19.2"/>
 <img src="https://img.shields.io/badge/Vite-7.3-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite 7.3"/>
 <img src="https://img.shields.io/badge/Tailwind_CSS-4.1-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4.1"/>
 <img src="https://img.shields.io/badge/shadcn/ui-New_York-000000?style=for-the-badge&logo=shadcnui&logoColor=white" alt="shadcn/ui"/>
 
-<img src="https://img.shields.io/badge/Chart.js-4.4-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white" alt="Chart.js 4.4"/>
-<img src="https://img.shields.io/badge/React_Router-7.2-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white" alt="React Router 7.2"/>
-<img src="https://img.shields.io/badge/Axios-1.8-5A29E4?style=for-the-badge&logo=axios&logoColor=white" alt="Axios 1.8"/>
+<img src="https://img.shields.io/badge/Chart.js-4.5-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white" alt="Chart.js 4.5"/>
+<img src="https://img.shields.io/badge/React_Router-7.13-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white" alt="React Router 7.13"/>
+<img src="https://img.shields.io/badge/Axios-1.13-5A29E4?style=for-the-badge&logo=axios&logoColor=white" alt="Axios 1.13"/>
 <img src="https://img.shields.io/badge/Radix_UI-Primitives-161618?style=for-the-badge&logo=radixui&logoColor=white" alt="Radix UI"/>
 
 <img src="https://img.shields.io/badge/Lucide-Icons-F56565?style=for-the-badge&logo=lucide&logoColor=white" alt="Lucide Icons"/>
@@ -38,16 +38,16 @@
 
 | Категория | Технология | Версия | Описание |
 |-----------|-----------|--------|----------|
-| Фреймворк | [React](https://react.dev) | 19 | UI-библиотека с хуками и Context API |
+| Фреймворк | [React](https://react.dev) | 19.2 | UI-библиотека с хуками и Context API |
 | Сборщик | [Vite](https://vite.dev) | 7.3 | Мгновенный HMR, ESBuild + Rollup |
 | CSS | [Tailwind CSS](https://tailwindcss.com) | 4.1 | Utility-first CSS с CSS-переменными |
 | UI-компоненты | [shadcn/ui](https://ui.shadcn.com) | New York | 18 Radix-примитивов с кастомизацией |
-| Графики | [Chart.js](https://www.chartjs.org) | 4.4 | Canvas-графики временных рядов |
-| HTTP-клиент | [axios](https://axios-http.com) | 1.8 | Запросы к API с JWT interceptors |
-| Маршрутизация | [React Router](https://reactrouter.com) | 7.2 | SPA-роутинг с защитой маршрутов |
+| Графики | [Chart.js](https://www.chartjs.org) | 4.5 | Canvas-графики временных рядов |
+| HTTP-клиент | [axios](https://axios-http.com) | 1.13 | Запросы к API с JWT interceptors |
+| Маршрутизация | [React Router](https://reactrouter.com) | 7.13 | SPA-роутинг с защитой маршрутов |
 | Иконки | [Lucide React](https://lucide.dev) | 0.564 | 1500+ SVG-иконок как React-компоненты |
 | Уведомления | [Sonner](https://sonner.emilkowal.dev) | 2.0 | Toast-уведомления (success/error/info) |
-| Даты | [date-fns](https://date-fns.org) + [react-datepicker](https://reactdatepicker.com) | 4.1 / 8.4 | Форматирование и выбор диапазона дат |
+| Даты | [date-fns](https://date-fns.org) + [react-datepicker](https://reactdatepicker.com) | 4.1 / 9.1 | Форматирование и выбор диапазона дат |
 
 ## Структура проекта
 

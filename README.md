@@ -45,12 +45,13 @@
 - **cryptography** - шифрование (Fernet)
 
 ### Frontend
-- **React 19** + React Router 7
-- **Vite 7** - сборка и dev-сервер
-- **Tailwind CSS v4** + **shadcn/ui** - UI компоненты
-- **Chart.js** - графики
-- **axios** - HTTP клиент
-- **sonner** - toast-уведомления
+- **React 19.2** + React Router 7.13
+- **Vite 7.3** - сборка и dev-сервер
+- **Tailwind CSS v4.1** + **shadcn/ui** - UI компоненты
+- **Chart.js 4.5** - графики
+- **axios 1.13** - HTTP клиент
+- **react-datepicker 9.1** - выбор диапазона дат
+- **sonner 2.0** - toast-уведомления
 - **lucide-react** - иконки
 
 ### Инфраструктура
