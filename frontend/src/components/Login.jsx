@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Shield, AlertCircle } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Sun, Moon } from 'lucide-react';
 
 function Login({ onLogin, error: parentError }) {
   const [username, setUsername] = useState('');
@@ -25,9 +26,19 @@ function Login({ onLogin, error: parentError }) {
   };
 
   const error = parentError || localError;
+  const { theme, setTheme } = useTheme();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        className="absolute top-4 right-4 text-white/60 hover:text-white hover:bg-white/10 h-9 w-9"
+      >
+        <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+      </Button>
       <Card className="w-full max-w-md border-0 shadow-2xl bg-card/95 backdrop-blur-sm">
         <CardHeader className="text-center pb-2 pt-8">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg">
@@ -85,7 +96,7 @@ function Login({ onLogin, error: parentError }) {
         </CardContent>
 
         <CardFooter className="justify-center pb-6">
-          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.1</p>
+          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.2</p>
         </CardFooter>
       </Card>
     </div>

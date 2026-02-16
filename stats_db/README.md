@@ -1,6 +1,6 @@
 # 📊 PostgreSQL Stats Collector
 
-[![Version](https://img.shields.io/badge/version-2.1-blue.svg)](https://github.com/wobujidao/PostgreSQL-Activity-Monitor/tree/main/stats_db)
+[![Version](https://img.shields.io/badge/version-2.2-blue.svg)](https://github.com/wobujidao/PostgreSQL-Activity-Monitor/tree/main/stats_db)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../LICENSE)
 
@@ -226,7 +226,7 @@ GROUP BY datname;
 
 Проект распространяется под лицензией MIT. См. файл [LICENSE](../LICENSE).
 
-## 👨�💻 Автор
+## 👨�💻 Автор
 
 **Demidov V.E.**
 - GitHub: [@wobujidao](https://github.com/wobujidao)

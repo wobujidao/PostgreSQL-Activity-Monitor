@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("=" * 60)
-    logger.info("PostgreSQL Activity Monitor API v2.0")
+    logger.info("PostgreSQL Activity Monitor API v2.2")
     logger.info(f"Уровень логирования: {LOG_LEVEL}")
     logger.info("=" * 60)
     yield
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="PostgreSQL Activity Monitor API",
     description="API для мониторинга активности PostgreSQL серверов",
-    version="2.1",
+    version="2.2",
     lifespan=lifespan
 )
 
