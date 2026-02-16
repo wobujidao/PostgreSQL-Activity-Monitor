@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/auth-context';
 import { useAuth } from '@/hooks/use-auth';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -49,7 +49,9 @@ function AppContent() {
     setShowSessionModal, setShowRefreshLoginModal,
   } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, setTheme } = useTheme();
+  const isHome = location.pathname === '/';
   const [commandOpen, setCommandOpen] = useState(false);
 
   // Ctrl+K / Cmd+K
@@ -89,7 +91,7 @@ function AppContent() {
               variant="ghost"
               size="sm"
               onClick={() => navigate('/')}
-              className="text-white hover:text-white hover:bg-white/10"
+              className={`text-white hover:text-white hover:bg-white/10 ${isHome ? 'border-b-2 border-cyan-400 rounded-b-none' : ''}`}
             >
               <Home className="h-4 w-4 mr-1" />
               <span className="hidden sm:inline">Главная</span>

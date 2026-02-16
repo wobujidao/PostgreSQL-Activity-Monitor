@@ -4,8 +4,10 @@ import api from '@/lib/api';
 import { formatBytes, formatUptime } from '@/lib/format';
 import { DEFAULT_SSH_PORT, DEFAULT_PG_PORT, DEFAULT_SSH_AUTH_TYPE } from '@/lib/constants';
 import { useServers } from '@/hooks/use-servers';
+import { isValidServerName, isValidHostname, isValidPort } from '@/lib/validation';
 import ServerListSkeleton from './skeletons/ServerListSkeleton';
 import EmptyState from './EmptyState';
+import Sparkline from './Sparkline';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -160,6 +162,29 @@ function ServerList() {
     );
   };
 
+  // Sparkline: сохраняем историю значений в localStorage
+  const [sparkData, setSparkData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pam_spark') || '{}'); } catch { return {}; }
+  });
+
+  useEffect(() => {
+    if (!servers.length) return;
+    const onlineCount = servers.filter(s => getServerStatus(s).variant === 'default').length;
+    const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
+    const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
+
+    setSparkData(prev => {
+      const next = {
+        total: [...(prev.total || []), servers.length].slice(-12),
+        online: [...(prev.online || []), onlineCount].slice(-12),
+        errors: [...(prev.errors || []), errorCount].slice(-12),
+        warnings: [...(prev.warnings || []), warningCount].slice(-12),
+      };
+      try { localStorage.setItem('pam_spark', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [servers]);
+
   if (loading) {
     return <ServerListSkeleton />;
   }
@@ -175,26 +200,46 @@ function ServerList() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{servers.length}</div>
-            <p className="text-xs text-muted-foreground">Всего серверов</p>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-2xl font-bold">{servers.length}</div>
+                <p className="text-xs text-muted-foreground">Всего серверов</p>
+              </div>
+              <Sparkline data={sparkData.total} color="var(--color-foreground)" className="opacity-40" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">{onlineCount}</div>
-            <p className="text-xs text-muted-foreground">Активных</p>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-2xl font-bold text-green-600">{onlineCount}</div>
+                <p className="text-xs text-muted-foreground">Активных</p>
+              </div>
+              <Sparkline data={sparkData.online} color="#16a34a" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-red-600">{errorCount}</div>
-            <p className="text-xs text-muted-foreground">С ошибками</p>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-2xl font-bold text-red-600">{errorCount}</div>
+                <p className="text-xs text-muted-foreground">С ошибками</p>
+              </div>
+              <Sparkline data={sparkData.errors} color="#dc2626" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-amber-600">{warningCount}</div>
-            <p className="text-xs text-muted-foreground">Нагрузка</p>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-2xl font-bold text-amber-600">{warningCount}</div>
+                <p className="text-xs text-muted-foreground">Нагрузка</p>
+              </div>
+              <Sparkline data={sparkData.warnings} color="#d97706" />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -398,12 +443,18 @@ function ServerList() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Название</Label>
+                <Label>Название *</Label>
                 <Input value={newServer.name} onChange={(e) => setNewServer({ ...newServer, name: e.target.value })} />
+                {newServer.name && !isValidServerName(newServer.name) && (
+                  <p className="text-xs text-destructive">Только буквы, цифры, дефис и подчёркивание</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>Хост</Label>
+                <Label>Хост *</Label>
                 <Input value={newServer.host} onChange={(e) => setNewServer({ ...newServer, host: e.target.value })} />
+                {newServer.host && !isValidHostname(newServer.host) && (
+                  <p className="text-xs text-destructive">Некорректный IP-адрес или hostname</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -412,17 +463,20 @@ function ServerList() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Пользователь PG</Label>
+                <Label>Пользователь PG *</Label>
                 <Input value={newServer.user} onChange={(e) => setNewServer({ ...newServer, user: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Пароль PG</Label>
+                <Label>Пароль PG *</Label>
                 <Input type="password" value={newServer.password} onChange={(e) => setNewServer({ ...newServer, password: e.target.value })} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Порт PG</Label>
               <Input type="number" value={newServer.port} onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })} className="w-32" />
+              {newServer.port && !isValidPort(newServer.port) && (
+                <p className="text-xs text-destructive">Порт: 1-65535</p>
+              )}
             </div>
 
             <Separator />
@@ -506,7 +560,12 @@ function ServerList() {
             <Button variant="outline" onClick={() => { setShowAddModal(false); setSSHTestResult(null); }}>
               Отмена
             </Button>
-            <Button onClick={handleSaveAdd}>
+            <Button onClick={handleSaveAdd} disabled={
+              !newServer.name || !isValidServerName(newServer.name) ||
+              !newServer.host || !isValidHostname(newServer.host) ||
+              !newServer.user || !newServer.password ||
+              !isValidPort(newServer.port)
+            }>
               Добавить
             </Button>
           </DialogFooter>

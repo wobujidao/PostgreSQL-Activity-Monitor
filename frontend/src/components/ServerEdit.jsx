@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatBytesGB } from '@/lib/format';
 import LoadingSpinner from './LoadingSpinner';
@@ -19,6 +19,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { isValidHostname, isValidPort } from '@/lib/validation';
 import { Save, ArrowLeft, Trash2, Loader2, KeyRound, Lock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,6 +33,27 @@ function ServerEdit() {
   const [error, setError] = useState('');
   const [testingSSH, setTestingSSH] = useState(false);
   const [sshTestResult, setSSHTestResult] = useState(null);
+  const initialServerRef = useRef(null);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Отслеживание несохранённых изменений
+  const checkDirty = useCallback((current) => {
+    if (!initialServerRef.current || !current) return false;
+    const init = initialServerRef.current;
+    return ['host', 'port', 'user', 'password', 'stats_db', 'ssh_user', 'ssh_port', 'ssh_password', 'ssh_auth_type', 'ssh_key_id', 'ssh_key_passphrase']
+      .some(k => String(current[k] ?? '') !== String(init[k] ?? ''));
+  }, []);
+
+  // Предупреждение при закрытии вкладки
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // Блокировка навигации react-router
+  const blocker = useBlocker(isDirty);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,7 +61,9 @@ function ServerEdit() {
         const [serversRes, keysRes] = await Promise.all([api.get('/servers'), api.get('/ssh-keys')]);
         const s = serversRes.data.find(s => s.name === serverName);
         if (!s) throw new Error('Сервер не найден');
-        setServer({ ...s, password: '', ssh_password: '', ssh_auth_type: s.ssh_auth_type || 'password', ssh_key_id: s.ssh_key_id || '', ssh_key_passphrase: '', stats_db: s.stats_db || '' });
+        const initial = { ...s, password: '', ssh_password: '', ssh_auth_type: s.ssh_auth_type || 'password', ssh_key_id: s.ssh_key_id || '', ssh_key_passphrase: '', stats_db: s.stats_db || '' };
+        setServer(initial);
+        initialServerRef.current = { ...initial };
         setSSHKeys(keysRes.data);
       } catch (err) {
         setError(err.message || 'Ошибка загрузки');
@@ -55,6 +79,7 @@ function ServerEdit() {
     setError('');
     try {
       await api.put(`/servers/${serverName}`, server);
+      setIsDirty(false);
       toast.success('Изменения сохранены');
       setTimeout(() => navigate('/'), 1000);
     } catch (err) {
@@ -87,7 +112,13 @@ function ServerEdit() {
     }
   };
 
-  const update = (field, value) => setServer(prev => ({ ...prev, [field]: value }));
+  const update = (field, value) => {
+    setServer(prev => {
+      const next = { ...prev, [field]: value };
+      setIsDirty(checkDirty(next));
+      return next;
+    });
+  };
 
   if (loading) return <LoadingSpinner text="Загрузка данных сервера..." />;
 
@@ -134,10 +165,16 @@ function ServerEdit() {
                 <div className="col-span-2 space-y-2">
                   <Label>Хост</Label>
                   <Input value={server.host} onChange={(e) => update('host', e.target.value)} placeholder="192.168.1.100" />
+                  {server.host && !isValidHostname(server.host) && (
+                    <p className="text-xs text-destructive">Некорректный IP-адрес или hostname</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Порт PG</Label>
                   <Input type="number" value={server.port} onChange={(e) => update('port', parseInt(e.target.value))} />
+                  {server.port && !isValidPort(server.port) && (
+                    <p className="text-xs text-destructive">Порт: 1-65535</p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -172,6 +209,9 @@ function ServerEdit() {
                 <div className="space-y-2">
                   <Label>Порт SSH</Label>
                   <Input type="number" value={server.ssh_port} onChange={(e) => update('ssh_port', parseInt(e.target.value))} />
+                  {server.ssh_port && !isValidPort(server.ssh_port) && (
+                    <p className="text-xs text-destructive">Порт: 1-65535</p>
+                  )}
                 </div>
               </div>
 
@@ -280,6 +320,7 @@ function ServerEdit() {
               <Button className="w-full" onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Сохранить
+                {isDirty && <span className="ml-1.5 h-2 w-2 rounded-full bg-amber-400 inline-block" />}
               </Button>
               <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -325,6 +366,24 @@ function ServerEdit() {
           </Card>
         </div>
       </div>
+
+      {/* Диалог несохранённых изменений */}
+      <AlertDialog open={blocker.state === 'blocked'}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
+            <AlertDialogDescription>
+              У вас есть несохранённые изменения. Покинуть страницу?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset()}>Остаться</AlertDialogCancel>
+            <AlertDialogAction onClick={() => blocker.proceed()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Покинуть
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
