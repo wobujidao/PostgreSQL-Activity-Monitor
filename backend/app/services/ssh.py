@@ -4,7 +4,6 @@ import socket
 import logging
 import tempfile
 import os
-from typing import Tuple, Optional
 from app.models import Server
 from app.services.cache import cache_manager
 from app.config import SSH_CACHE_TTL
@@ -112,7 +111,7 @@ def get_ssh_client(server: Server) -> paramiko.SSHClient:
     ssh.connect(**connect_kwargs)
     return ssh
 
-def get_ssh_disk_usage(server: Server, data_dir: str) -> Tuple[Optional[int], Optional[int], str]:
+def get_ssh_disk_usage(server: Server, data_dir: str) -> tuple[int | None, int | None, str]:
     """Получение информации о диске через SSH"""
     cache_key = f"{server.host}:{server.ssh_port}"
     

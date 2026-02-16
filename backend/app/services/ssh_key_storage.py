@@ -4,8 +4,7 @@ import json
 import uuid
 import logging
 from pathlib import Path
-from datetime import datetime
-from typing import List, Optional, Tuple
+from datetime import datetime, timezone
 import fcntl
 import shutil
 from cryptography.hazmat.primitives import serialization
@@ -43,7 +42,7 @@ class SSHKeyStorage:
         if not self.metadata_file.exists():
             self._save_metadata([])
     
-    def _load_metadata(self) -> List[dict]:
+    def _load_metadata(self) -> list[dict]:
         """Загрузка метаданных ключей"""
         try:
             with open(self.metadata_file, 'r') as f:
@@ -57,12 +56,12 @@ class SSHKeyStorage:
             logger.error(f"Ошибка загрузки метаданных ключей: {e}")
             return []
     
-    def _save_metadata(self, metadata: List[dict]):
+    def _save_metadata(self, metadata: list[dict]):
         """Сохранение метаданных ключей с бэкапом"""
         try:
             # Создаем бэкап если файл существует
             if self.metadata_file.exists():
-                backup_file = self.backup_dir / f"keys_{datetime.now():%Y%m%d_%H%M%S}.json"
+                backup_file = self.backup_dir / f"keys_{datetime.now(timezone.utc):%Y%m%d_%H%M%S}.json"
                 shutil.copy2(self.metadata_file, backup_file)
             
             # Сохраняем новую версию
@@ -76,7 +75,7 @@ class SSHKeyStorage:
             logger.error(f"Ошибка сохранения метаданных ключей: {e}")
             raise
     
-    def list_keys(self) -> List[SSHKey]:
+    def list_keys(self) -> list[SSHKey]:
         """Получить список всех ключей"""
         metadata = self._load_metadata()
         keys = []
@@ -95,7 +94,7 @@ class SSHKeyStorage:
         
         return keys
     
-    def get_key(self, key_id: str) -> Optional[SSHKey]:
+    def get_key(self, key_id: str) -> SSHKey | None:
         """Получить ключ по ID"""
         metadata = self._load_metadata()
         
@@ -144,7 +143,7 @@ class SSHKeyStorage:
                 name=key_create.name,
                 fingerprint=fingerprint,
                 key_type=key_create.key_type,
-                created_at=datetime.now(),
+                created_at=datetime.now(timezone.utc),
                 created_by=created_by,
                 public_key=public_key_str,
                 private_key_path=str(private_key_path),
@@ -155,7 +154,7 @@ class SSHKeyStorage:
             
             # Добавляем в метаданные
             metadata = self._load_metadata()
-            metadata.append(ssh_key.dict())
+            metadata.append(ssh_key.model_dump())
             self._save_metadata(metadata)
             
             logger.info(f"Создан SSH-ключ: {ssh_key.name} (ID: {key_id})")
@@ -211,7 +210,7 @@ class SSHKeyStorage:
                 name=key_import.name,
                 fingerprint=fingerprint,
                 key_type=key_type,
-                created_at=datetime.now(),
+                created_at=datetime.now(timezone.utc),
                 created_by=created_by,
                 public_key=public_key,
                 private_key_path=str(private_key_path),
@@ -222,7 +221,7 @@ class SSHKeyStorage:
             
             # Добавляем в метаданные
             metadata = self._load_metadata()
-            metadata.append(ssh_key.dict())
+            metadata.append(ssh_key.model_dump())
             self._save_metadata(metadata)
             
             logger.info(f"Импортирован SSH-ключ: {ssh_key.name} (ID: {key_id})")
@@ -235,7 +234,7 @@ class SSHKeyStorage:
             logger.error(f"Ошибка импорта SSH-ключа: {e}")
             raise
     
-    def update_key(self, key_id: str, updates: dict) -> Optional[SSHKey]:
+    def update_key(self, key_id: str, updates: dict) -> SSHKey | None:
         """Обновить информацию о SSH-ключе"""
         metadata = self._load_metadata()
         
@@ -292,7 +291,7 @@ class SSHKeyStorage:
         logger.info(f"Удален SSH-ключ: {key_data.get('name')} (ID: {key_id})")
         return True
     
-    def get_private_key_content(self, key_id: str, passphrase: Optional[str] = None) -> Tuple[str, Optional[str]]:
+    def get_private_key_content(self, key_id: str, passphrase: str | None = None) -> tuple[str, str | None]:
         """Получить расшифрованное содержимое приватного ключа"""
         key = self.get_key(key_id)
         if not key:

@@ -1,6 +1,5 @@
 # app/api/stats.py
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional
 from datetime import datetime, timedelta, timezone
 import logging
 from app.auth import get_current_user
@@ -33,8 +32,8 @@ async def get_server_stats(server_name: str, current_user: dict = Depends(get_cu
 @router.get("/server/{server_name}/stats")
 async def get_server_stats_details(
     server_name: str, 
-    start_date: Optional[str] = None, 
-    end_date: Optional[str] = None, 
+    start_date: str | None = None, 
+    end_date: str | None = None, 
     current_user: dict = Depends(get_current_user)
 ):
     """Получить детальную статистику сервера за период"""
@@ -178,8 +177,8 @@ async def get_database_stats(
 async def get_database_stats_details(
     server_name: str, 
     db_name: str, 
-    start_date: Optional[str] = None, 
-    end_date: Optional[str] = None, 
+    start_date: str | None = None, 
+    end_date: str | None = None, 
     current_user: dict = Depends(get_current_user)
 ):
     """Получить детальную статистику по базе данных за период"""

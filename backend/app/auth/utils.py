@@ -1,7 +1,7 @@
 # app/auth/utils.py
 import jwt
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 from app.config import SECRET_KEY, ALGORITHM, TOKEN_EXPIRATION, USERS_FILE
@@ -41,9 +41,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     """Создание JWT токена"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRATION)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=TOKEN_EXPIRATION)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # app/api/servers.py
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any
+from typing import Any
 import logging
 from app.models import Server
 from app.auth import get_current_user
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
-@router.get("", response_model=List[dict])
+@router.get("", response_model=list[dict])
 async def get_servers(current_user: dict = Depends(get_current_user)):
     """Get list of all servers with their status"""
     servers = load_servers()

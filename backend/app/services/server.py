@@ -2,7 +2,7 @@
 import socket
 import json
 import logging
-from typing import List, Dict, Any
+from typing import Any
 from datetime import datetime, timezone
 from app.models import Server
 from app.config import SERVERS_FILE, SERVER_STATUS_CACHE_TTL
@@ -15,7 +15,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
-def load_servers() -> List[Server]:
+def load_servers() -> list[Server]:
     """Загрузка списка серверов"""
     try:
         if not SERVERS_FILE.exists() or SERVERS_FILE.stat().st_size == 0:
@@ -47,7 +47,7 @@ def load_servers() -> List[Server]:
         logger.error(f"Ошибка загрузки серверов: {e}")
         raise
 
-def save_servers(servers: List[Server]):
+def save_servers(servers: list[Server]):
     """Сохранение списка серверов"""
     try:
         with SERVERS_FILE.open("w") as f:
@@ -76,7 +76,7 @@ class TimeoutError(Exception):
 def timeout_handler(signum, frame):
     raise TimeoutError("Превышено время ожидания подключения")
 
-def connect_to_server(server: Server) -> Dict[str, Any]:
+def connect_to_server(server: Server) -> dict[str, Any]:
     """Получение информации о сервере с кэшированием и таймаутами"""
     cache_key = f"{server.host}:{server.port}"
     

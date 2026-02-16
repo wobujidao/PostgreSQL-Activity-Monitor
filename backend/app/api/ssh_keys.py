@@ -1,6 +1,5 @@
 # app/api/ssh_keys.py
 from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
-from typing import List, Optional
 import logging
 import io
 from datetime import datetime
@@ -23,7 +22,7 @@ def require_admin_or_operator(current_user: User = Depends(get_current_user)) ->
         )
     return current_user
 
-@router.get("", response_model=List[SSHKeyResponse])
+@router.get("", response_model=list[SSHKeyResponse])
 async def list_ssh_keys(current_user: User = Depends(get_current_user)):
     """Получить список всех SSH-ключей"""
     # Viewer не может видеть SSH-ключи
@@ -48,10 +47,10 @@ async def list_ssh_keys(current_user: User = Depends(get_current_user)):
         # Для оператора скрываем публичные ключи
         if current_user.role == "operator":
             for key in keys:
-                key_dict = key.dict()
+                key_dict = key.model_dump()
                 key_dict['public_key'] = "[Скрыто для оператора]"
                 keys[keys.index(key)] = SSHKeyResponse(**key_dict)
-        return [SSHKeyResponse(**key.dict()) for key in keys]
+        return [SSHKeyResponse(**key.model_dump()) for key in keys]
     except Exception as e:
         logger.error(f"Ошибка получения списка ключей: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -72,11 +71,11 @@ async def get_ssh_key(key_id: str, current_user: User = Depends(get_current_user
     
     # Для оператора скрываем публичный ключ
     if current_user.role == "operator":
-        key_dict = key.dict()
+        key_dict = key.model_dump()
         key_dict['public_key'] = "[Скрыто для оператора]"
         return SSHKeyResponse(**key_dict)
     
-    return SSHKeyResponse(**key.dict())
+    return SSHKeyResponse(**key.model_dump())
 
 @router.post("/generate", response_model=SSHKeyResponse)
 async def generate_ssh_key(
@@ -106,7 +105,7 @@ async def generate_ssh_key(
                 detail=f"Ключ с таким fingerprint уже существует в системе"
             )
         
-        return SSHKeyResponse(**key.dict())
+        return SSHKeyResponse(**key.model_dump())
     except HTTPException:
         raise
     except ValueError as e:
@@ -151,7 +150,7 @@ async def import_ssh_key(
         
         # Импортируем ключ
         key = ssh_key_storage.import_key(key_data, current_user.login)
-        return SSHKeyResponse(**key.dict())
+        return SSHKeyResponse(**key.model_dump())
     except HTTPException:
         raise
     except ValueError as e:
@@ -164,8 +163,8 @@ async def import_ssh_key(
 async def import_ssh_key_file(
     file: UploadFile = File(...),
     name: str = None,
-    passphrase: Optional[str] = None,
-    description: Optional[str] = None,
+    passphrase: str | None = None,
+    description: str | None = None,
     current_user: User = Depends(require_admin_or_operator)
 ):
     """Импортировать SSH-ключ из файла"""
@@ -215,7 +214,7 @@ async def import_ssh_key_file(
         
         # Импортируем ключ
         key = ssh_key_storage.import_key(key_import, current_user.login)
-        return SSHKeyResponse(**key.dict())
+        return SSHKeyResponse(**key.model_dump())
     except HTTPException:
         raise
     except ValueError as e:
@@ -259,7 +258,7 @@ async def update_ssh_key(
         if not updated_key:
             raise HTTPException(status_code=500, detail="Ошибка обновления ключа")
         
-        return SSHKeyResponse(**updated_key.dict())
+        return SSHKeyResponse(**updated_key.model_dump())
         
     except HTTPException:
         raise

@@ -4,7 +4,6 @@ from psycopg2 import pool
 import threading
 import logging
 from contextlib import contextmanager
-from typing import Dict, Optional
 from app.models import Server
 from app.config import POOL_CONFIGS
 
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class DatabasePool:
     def __init__(self):
-        self.pools: Dict[str, psycopg2.pool.ThreadedConnectionPool] = {}
+        self.pools: dict[str, psycopg2.pool.ThreadedConnectionPool] = {}
         self.lock = threading.Lock()
         
     def get_pool_key(self, server: Server, db_name: str = None) -> str:
@@ -76,7 +75,7 @@ class DatabasePool:
                 if conn:
                     try:
                         pool.putconn(conn, close=True)
-                    except:
+                    except Exception:
                         pass
                 # Получаем новое соединение
                 conn = pool.getconn()

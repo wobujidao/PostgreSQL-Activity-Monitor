@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from typing import List
 from app.models.user import UserCreate, UserUpdate, UserResponse, UserRole
 from app.services import user_manager
 from app.auth.dependencies import get_current_user
@@ -16,7 +15,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=list[UserResponse])
 async def list_users(
     current_user: User = Depends(require_admin)
 ):

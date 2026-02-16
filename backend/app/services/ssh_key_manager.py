@@ -2,7 +2,6 @@
 import os
 import tempfile
 import logging
-from typing import Tuple, Optional
 import paramiko
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ed25519
@@ -16,7 +15,7 @@ class SSHKeyManager:
     """Менеджер для работы с SSH-ключами"""
     
     @staticmethod
-    def generate_ssh_key_pair(key_type: str = "rsa", key_size: int = 2048, passphrase: str = None) -> Tuple[str, str, str]:
+    def generate_ssh_key_pair(key_type: str = "rsa", key_size: int = 2048, passphrase: str = None) -> tuple[str, str, str]:
         """
         Генерирует пару SSH-ключей
         
@@ -74,7 +73,7 @@ class SSHKeyManager:
             raise
     
     @staticmethod
-    def validate_private_key(private_key_content: str, passphrase: str = None) -> Tuple[bool, Optional[str], Optional[str]]:
+    def validate_private_key(private_key_content: str, passphrase: str = None) -> tuple[bool, str | None, str | None]:
         """
         Валидирует приватный SSH-ключ
         
@@ -100,7 +99,7 @@ class SSHKeyManager:
                     try:
                         key = key_class.from_private_key_file(tmp_file_path, password=passphrase)
                         break
-                    except:
+                    except Exception:
                         continue
                 
                 if not key:
@@ -155,7 +154,7 @@ class SSHKeyManager:
             return "unknown"
     
     @staticmethod
-    def get_public_key_from_private(private_key_content: str, passphrase: str = None) -> Optional[str]:
+    def get_public_key_from_private(private_key_content: str, passphrase: str = None) -> str | None:
         """
         Извлекает публичный ключ из приватного
         
@@ -178,7 +177,7 @@ class SSHKeyManager:
                         key = key_class.from_private_key_file(tmp_file_path, password=passphrase)
                         public_key = f"{key.get_name()} {key.get_base64()} pgmon@activity-monitor"
                         return public_key
-                    except:
+                    except Exception:
                         continue
                 
                 return None
@@ -191,10 +190,10 @@ class SSHKeyManager:
             return None
     
     @staticmethod
-    def test_ssh_connection(host: str, port: int, username: str, 
-                          private_key_content: str = None, 
+    def test_ssh_connection(host: str, port: int, username: str,
+                          private_key_content: str = None,
                           passphrase: str = None,
-                          password: str = None) -> Tuple[bool, str]:
+                          password: str = None) -> tuple[bool, str]:
         """
         Тестирует SSH-подключение
         
@@ -228,9 +227,9 @@ class SSHKeyManager:
                         try:
                             pkey = key_class.from_private_key_file(tmp_file_path, password=passphrase)
                             break
-                        except:
+                        except Exception:
                             continue
-                    
+
                     if not pkey:
                         return False, "Не удалось загрузить приватный ключ"
                     

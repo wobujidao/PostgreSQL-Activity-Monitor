@@ -1,7 +1,6 @@
 import json
 import fcntl
-from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import bcrypt
 import logging
@@ -26,7 +25,7 @@ class UserManager:
             with open(self.users_file, 'w') as f:
                 json.dump([], f)
     
-    def _load_users(self) -> List[dict]:
+    def _load_users(self) -> list[dict]:
         """Загружаем пользователей с блокировкой файла"""
         try:
             with open(self.users_file, 'r') as f:
@@ -40,12 +39,12 @@ class UserManager:
             logger.error(f"Ошибка загрузки пользователей: {e}")
             return []
     
-    def _save_users(self, users: List[dict]):
+    def _save_users(self, users: list[dict]):
         """Сохраняем с блокировкой и бэкапом"""
         try:
             # Создаем бэкап если файл существует
             if self.users_file.exists():
-                backup_file = self.backup_dir / f"users_{datetime.now():%Y%m%d_%H%M%S}.json"
+                backup_file = self.backup_dir / f"users_{datetime.now(timezone.utc):%Y%m%d_%H%M%S}.json"
                 with open(self.users_file, 'rb') as src, open(backup_file, 'wb') as dst:
                     dst.write(src.read())
             
@@ -60,7 +59,7 @@ class UserManager:
             logger.error(f"Ошибка сохранения пользователей: {e}")
             raise
     
-    def get_user(self, username: str) -> Optional[User]:
+    def get_user(self, username: str) -> User | None:
         """Получить пользователя по логину"""
         users = self._load_users()
         for user_data in users:
@@ -85,7 +84,7 @@ class UserManager:
             'password': hashed,
             'role': user_create.role,
             'email': user_create.email,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'is_active': True
         }
         
@@ -95,7 +94,7 @@ class UserManager:
         logger.info(f"Создан пользователь: {user_create.login}")
         return UserResponse(**user_data)
     
-    def update_user(self, username: str, user_update: UserUpdate) -> Optional[UserResponse]:
+    def update_user(self, username: str, user_update: UserUpdate) -> UserResponse | None:
         """Обновить пользователя"""
         users = self._load_users()
         
@@ -117,7 +116,7 @@ class UserManager:
                 if user_update.is_active is not None:
                     user_data['is_active'] = user_update.is_active
                 
-                user_data['updated_at'] = datetime.now().isoformat()
+                user_data['updated_at'] = datetime.now(timezone.utc).isoformat()
                 self._save_users(users)
                 
                 logger.info(f"Обновлен пользователь: {username}")
@@ -138,7 +137,7 @@ class UserManager:
         
         return False
     
-    def list_users(self) -> List[UserResponse]:
+    def list_users(self) -> list[UserResponse]:
         """Список всех пользователей"""
         users = self._load_users()
         return [UserResponse(**u) for u in users]
@@ -149,6 +148,6 @@ class UserManager:
         
         for user_data in users:
             if user_data.get('login') == username:
-                user_data['last_login'] = datetime.now().isoformat()
+                user_data['last_login'] = datetime.now(timezone.utc).isoformat()
                 self._save_users(users)
                 break
