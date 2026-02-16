@@ -28,12 +28,12 @@ function Login({ onLogin, error: parentError }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <Card className="w-full max-w-md border-0 shadow-2xl bg-white/95 backdrop-blur-sm">
+      <Card className="w-full max-w-md border-0 shadow-2xl bg-card/95 backdrop-blur-sm">
         <CardHeader className="text-center pb-2 pt-8">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">PostgreSQL Monitor</h1>
+          <h1 className="text-2xl font-bold text-foreground">PostgreSQL Monitor</h1>
           <p className="text-sm text-muted-foreground">Система мониторинга активности баз</p>
         </CardHeader>
 

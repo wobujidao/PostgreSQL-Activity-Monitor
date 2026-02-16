@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatBytes, formatUptime } from '@/lib/format';
 import { SERVERS_REFRESH_INTERVAL, DEFAULT_SSH_PORT, DEFAULT_PG_PORT, DEFAULT_SSH_AUTH_TYPE } from '@/lib/constants';
-import LoadingSpinner from './LoadingSpinner';
+import ServerListSkeleton from './skeletons/ServerListSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -179,7 +179,7 @@ function ServerList() {
   };
 
   if (loading) {
-    return <LoadingSpinner text="Загрузка серверов..." subtext="Подключение к базам данных" />;
+    return <ServerListSkeleton />;
   }
 
   // Dashboard карточки
@@ -256,7 +256,10 @@ function ServerList() {
                   <SelectItem value="60000">1 мин</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-xs text-muted-foreground tabular-nums w-8">{timeLeft}с</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${timeLeft <= 3 ? 'bg-amber-500 animate-pulse' : 'bg-green-500 animate-pulse'}`} />
+                <span className="text-xs text-muted-foreground tabular-nums">{timeLeft}с</span>
+              </div>
               <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
                 <RefreshCw className="h-4 w-4" />
               </Button>

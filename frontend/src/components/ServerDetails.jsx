@@ -7,7 +7,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatBytesGB, formatTimestamp } from '@/lib/format';
 import { DEFAULT_CRITERIA, LS_CRITERIA, LS_USER_ROLE, ITEMS_PER_PAGE } from '@/lib/constants';
-import LoadingSpinner from './LoadingSpinner';
+import ServerDetailsSkeleton from './skeletons/ServerDetailsSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -296,7 +296,7 @@ function ServerDetails() {
 
   // --- Render ---
   if (error && !serverData) return <Alert variant="destructive"><AlertDescription>Ошибка: {error}</AlertDescription></Alert>;
-  if (!serverData || !stats) return <LoadingSpinner text="Загрузка данных сервера..." subtext="Получение статистики" />;
+  if (!serverData || !stats) return <ServerDetailsSkeleton />;
 
   const allDatabases = stats.databases;
   const filteredDatabases = allDatabases.filter(db => {

@@ -27,6 +27,7 @@ function DatabaseDetails() {
   const [dbHistory, setDbHistory] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 86400000));
   const [endDate, setEndDate] = useState(new Date());
   const [dateRangeLabel, setDateRangeLabel] = useState('7 дней');
@@ -49,6 +50,7 @@ function DatabaseDetails() {
       setDbStats(statsRes.data);
       setDbHistory(historyRes.data);
       setError(null);
+      setLastUpdated(new Date());
     } catch (err) {
       setError('Ошибка загрузки: ' + (err.response?.data?.detail || err.message));
       setDbStats(null);
@@ -202,10 +204,18 @@ function DatabaseDetails() {
                 <SelectItem value="3 месяца">3 месяца</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={fetchDbStats} disabled={loading} className="ml-auto">
-              {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-              Обновить
-            </Button>
+            <div className="flex items-center gap-3 ml-auto">
+              {lastUpdated && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  {lastUpdated.toLocaleTimeString('ru-RU')}
+                </span>
+              )}
+              <Button variant="outline" size="sm" onClick={fetchDbStats} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                Обновить
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -23,7 +23,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Home, User, Users, KeyRound, LogOut, Shield, AlertCircle, Lock, Loader2, ChevronDown } from 'lucide-react';
+import { Home, User, Users, KeyRound, LogOut, Shield, AlertCircle, Lock, Loader2, ChevronDown, Sun, Moon } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { formatTimeLeft } from '@/lib/format';
 import Login from './components/Login';
 import ServerList from './components/ServerList';
@@ -44,6 +45,7 @@ function AppContent() {
     setShowSessionModal, setShowRefreshLoginModal,
   } = useAuth();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   if (!token) {
     return <Login onLogin={login} error={error} />;
@@ -74,6 +76,16 @@ function AppContent() {
             >
               <Home className="h-4 w-4 mr-1" />
               <span className="hidden sm:inline">Главная</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="text-white hover:text-white hover:bg-white/10 h-8 w-8"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
             </Button>
 
             <DropdownMenu>
