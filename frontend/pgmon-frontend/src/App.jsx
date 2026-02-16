@@ -1,7 +1,30 @@
-import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
-import { Container, Navbar, Button, Modal, Spinner, Form, Dropdown } from 'react-bootstrap';
+import { AuthProvider } from '@/contexts/auth-context';
+import { useAuth } from '@/hooks/use-auth';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Home, User, Users, KeyRound, LogOut, Shield, AlertCircle, Lock, Loader2, ChevronDown } from 'lucide-react';
+import { formatTimeLeft } from '@/lib/format';
 import Login from './components/Login';
 import ServerList from './components/ServerList';
 import ServerDetails from './components/ServerDetails';
@@ -10,284 +33,88 @@ import DatabaseDetails from './components/DatabaseDetails';
 import UserManagement from './components/UserManagement';
 import SSHKeyManagement from './components/SSHKeyManagement';
 import ScrollToTop from './components/ScrollToTop';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
 
 function AppContent() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [currentUser, setCurrentUser] = useState(localStorage.getItem('username') || '');
-  const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || '');
-  const [refreshPassword, setRefreshPassword] = useState('');
-  const [error, setError] = useState(null);
-  const [backendStatus, setBackendStatus] = useState('unknown');
-  const [showSessionModal, setShowSessionModal] = useState(false);
-  const [showRefreshLoginModal, setShowRefreshLoginModal] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 минут в секундах
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const {
+    token, currentUser, userRole, backendStatus,
+    showSessionModal, showRefreshLoginModal,
+    timeLeft, isRefreshing, error,
+    refreshPassword, setRefreshPassword,
+    login, logout, refreshToken,
+    setShowSessionModal, setShowRefreshLoginModal,
+  } = useAuth();
   const navigate = useNavigate();
-
-  const WARNING_TIME_MS = 5 * 60 * 1000; // 5 минут до истечения
-
-  const decodeToken = (token) => {
-    try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-      return JSON.parse(jsonPayload);
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const refreshToken = async () => {
-    const storedUsername = localStorage.getItem('username');
-    if (!storedUsername || !refreshPassword) {
-      setShowSessionModal(false);
-      setShowRefreshLoginModal(true);
-      return;
-    }
-    setIsRefreshing(true);
-    try {
-      const response = await axios.post(
-        'https://pam.cbmo.mosreg.ru/token',
-        `username=${storedUsername}&password=${refreshPassword}`,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-      const newToken = response.data.access_token;
-      localStorage.setItem('token', newToken);
-      setToken(newToken);
-      setShowSessionModal(false);
-      setShowRefreshLoginModal(false);
-      setRefreshPassword('');
-      setTimeLeft(300);
-      setBackendStatus('available');
-    } catch (error) {
-      setError('Ошибка продления сессии: ' + (error.response?.data?.detail || 'Неизвестная ошибка'));
-      setShowRefreshLoginModal(true);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const handleLogout = () => {
-    setToken(null);
-    setCurrentUser('');
-    setUserRole('');
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('userRole');
-    setShowSessionModal(false);
-    setShowRefreshLoginModal(false);
-    setBackendStatus('unavailable');
-    navigate('/');
-  };
-
-  useEffect(() => {
-    const checkBackendStatus = async () => {
-      try {
-        const storedToken = localStorage.getItem('token');
-        if (storedToken) {
-          await axios.get('https://pam.cbmo.mosreg.ru/servers', {
-            headers: { Authorization: `Bearer ${storedToken}` }
-          });
-          setBackendStatus('available');
-        }
-      } catch (error) {
-        setBackendStatus('unavailable');
-      }
-    };
-
-    if (token) {
-      checkBackendStatus();
-      const interval = setInterval(checkBackendStatus, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [token]);
-
-  // Получение информации о текущем пользователе
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      if (token) {
-        try {
-          const response = await axios.get('https://pam.cbmo.mosreg.ru/users/me', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setUserRole(response.data.role);
-          localStorage.setItem('userRole', response.data.role);
-        } catch (error) {
-          // Ошибка получения информации о пользователе
-        }
-      }
-    };
-
-    fetchUserInfo();
-  }, [token]);
-
-  useEffect(() => {
-    const checkTokenExpiration = () => {
-      const currentToken = localStorage.getItem('token');
-      if (currentToken) {
-        const decoded = decodeToken(currentToken);
-        if (decoded && decoded.exp) {
-          const expTime = decoded.exp * 1000;
-          const now = Date.now();
-          const timeRemaining = Math.floor((expTime - now) / 1000);
-          if (timeRemaining <= 300 && timeRemaining > 0) {
-            setShowSessionModal(true);
-            setTimeLeft(timeRemaining);
-          } else if (timeRemaining <= 0) {
-            handleLogout();
-          }
-        }
-      }
-    };
-
-    checkTokenExpiration();
-    const tokenCheckInterval = setInterval(() => {
-      checkTokenExpiration();
-      if (showSessionModal && timeLeft > 0) {
-        setTimeLeft(prev => prev - 1);
-      }
-    }, 1000);
-
-    const handleActivity = () => {
-      const currentToken = localStorage.getItem('token');
-      if (currentToken) {
-        const decoded = decodeToken(currentToken);
-        if (decoded && decoded.exp) {
-          const expTime = decoded.exp * 1000;
-          const now = Date.now();
-          if (expTime - now < WARNING_TIME_MS && !showSessionModal && !showRefreshLoginModal) {
-            setShowSessionModal(true);
-            setTimeLeft(Math.floor((expTime - now) / 1000));
-          }
-        }
-      }
-    };
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-
-    return () => {
-      clearInterval(tokenCheckInterval);
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, showSessionModal, showRefreshLoginModal]);
-
-  const login = async (username, password) => {
-    try {
-      const response = await axios.post(
-        'https://pam.cbmo.mosreg.ru/token',
-        `username=${username}&password=${password}`,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-      setToken(response.data.access_token);
-      setCurrentUser(username);
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('username', username);
-      setError(null);
-    } catch (err) {
-      setError('Ошибка авторизации: ' + (err.response?.data?.detail || 'Неизвестная ошибка'));
-    }
-  };
-
-  const handleRefreshLogin = async () => {
-    await refreshToken();
-  };
-
-  const formatTimeLeft = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}:${secs < 10 ? '0' + secs : secs}`;
-  };
 
   if (!token) {
     return <Login onLogin={login} error={error} />;
   }
 
-  const storedUsername = localStorage.getItem('username') || '';
+  const roleLabel = userRole === 'admin' ? 'Администратор' : userRole === 'operator' ? 'Оператор' : 'Просмотр';
 
   return (
-    <div className="App">
-      <Navbar bg="dark" variant="dark" className="px-0">
-        <Container>
-          <Navbar.Brand as={Link} to="/" style={{ cursor: 'pointer' }}>
-            <div className="logo-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-              </svg>
-            </div>
-            PostgreSQL Activity Monitor
-            <span className={`backend-status ${backendStatus === 'available' ? 'available' : 'unavailable'}`}>
-              {backendStatus === 'available' ? 'Backend Active' : 'Backend Unavailable'}
-            </span>
-          </Navbar.Brand>
-          <div className="d-flex align-items-center">
-            <Button 
-              variant="outline-light" 
-              size="sm" 
-              onClick={() => navigate('/')}
-              className="me-3 home-button"
-              title="На главную"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-              </svg>
-              <span className="ms-2">Главная</span>
-            </Button>
-            {currentUser && (
-              <>
-                <span className="user-info">
-                  {currentUser}@pgmon
-                </span>
-                <Dropdown align="end" className="ms-2">
-                  <Dropdown.Toggle variant="secondary" size="sm" id="user-dropdown">
-                    👤
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M7 10l5 5 5-5z"/>
-                    </svg>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Header>
-                      {currentUser}
-                      <div className="text-muted small">
-                        {userRole === 'admin' ? '👑 Администратор' : 
-                         userRole === 'operator' ? '⚙️ Оператор' : 
-                         '👁️ Просмотр'}
-                      </div>
-                    </Dropdown.Header>
-                    <Dropdown.Divider />
-                    {/* Показываем управление пользователями только админам */}
-                    {userRole === 'admin' && (
-                      <>
-                        <Dropdown.Item onClick={() => navigate('/users')}>
-                          ⚙️ Управление пользователями
-                        </Dropdown.Item>
-                        <Dropdown.Divider />
-                      </>
-                    )}
-                    {/* Показываем SSH-ключи админам и операторам */}
-                    {(userRole === 'admin' || userRole === 'operator') && (
-                      <>
-                        <Dropdown.Item onClick={() => navigate('/ssh-keys')}>
-                          🔑 Управление SSH-ключами
-                        </Dropdown.Item>
-                        <Dropdown.Divider />
-                      </>
-                    )}
-                    <Dropdown.Item onClick={handleLogout}>
-                      🚪 Выход
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </>
-            )}
-          </div>
-        </Container>
-      </Navbar>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b bg-slate-900 text-white">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-2 no-underline text-white hover:text-white/90">
+            <Shield className="h-5 w-5 text-cyan-400" />
+            <span className="font-semibold hidden sm:inline">PostgreSQL Activity Monitor</span>
+            <span className="font-semibold sm:hidden">PAM</span>
+            <Badge variant={backendStatus === 'available' ? 'default' : 'destructive'} className="ml-2 text-xs">
+              {backendStatus === 'available' ? 'Online' : 'Offline'}
+            </Badge>
+          </Link>
 
-      <Container className="mt-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/')}
+              className="text-white hover:text-white hover:bg-white/10"
+            >
+              <Home className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Главная</span>
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-white hover:text-white hover:bg-white/10">
+                  <User className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">{currentUser}</span>
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div>{currentUser}</div>
+                  <div className="text-xs font-normal text-muted-foreground">{roleLabel}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {userRole === 'admin' && (
+                  <DropdownMenuItem onClick={() => navigate('/users')}>
+                    <Users className="mr-2 h-4 w-4" />
+                    Управление пользователями
+                  </DropdownMenuItem>
+                )}
+                {(userRole === 'admin' || userRole === 'operator') && (
+                  <DropdownMenuItem onClick={() => navigate('/ssh-keys')}>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    SSH-ключи
+                  </DropdownMenuItem>
+                )}
+                {(userRole === 'admin' || userRole === 'operator') && <DropdownMenuSeparator />}
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Выход
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6">
         <Routes>
           <Route exact path="/" element={<ServerList />} />
           <Route path="/server/:name" element={<ServerDetails />} />
@@ -297,83 +124,76 @@ function AppContent() {
           <Route path="/ssh-keys" element={(userRole === 'admin' || userRole === 'operator') ? <SSHKeyManagement /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
-      </Container>
+      </main>
 
-      {/* Кнопка "Наверх" */}
       <ScrollToTop />
 
-      {/* Модальное окно продления сессии с новым дизайном */}
-      <Modal show={showSessionModal} onHide={() => {}} backdrop="static" keyboard={false} centered className="session-modal">
-        <Modal.Header className="border-0">
-          <Modal.Title className="d-flex align-items-center">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="me-2 text-warning">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
-            Сессия истекает
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="text-center">
-            <div className="session-timer mb-3">
-              <h2 className="mb-1">{formatTimeLeft(timeLeft)}</h2>
-              <p className="text-muted">Время вашей сессии истекает</p>
-            </div>
-            <p>Хотите продлить сессию или выйти?</p>
+      {/* Session expiration dialog */}
+      <Dialog open={showSessionModal} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Сессия истекает
+            </DialogTitle>
+            <DialogDescription>
+              Время вашей сессии подходит к концу
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <div className="text-4xl font-bold tabular-nums">{formatTimeLeft(timeLeft)}</div>
+            <p className="text-sm text-muted-foreground mt-2">Хотите продлить сессию или выйти?</p>
           </div>
-        </Modal.Body>
-        <Modal.Footer className="border-0 justify-content-center">
-          <Button 
-            variant="success" 
-            onClick={refreshToken} 
-            disabled={isRefreshing}
-            className="px-4"
-          >
-            {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Продолжить'}
-          </Button>
-          <Button variant="danger" onClick={handleLogout} className="px-4">
-            Выйти
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button onClick={refreshToken} disabled={isRefreshing}>
+              {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Продолжить
+            </Button>
+            <Button variant="destructive" onClick={logout}>
+              Выйти
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Модальное окно ввода пароля для продления сессии */}
-      <Modal show={showRefreshLoginModal} onHide={() => {}} backdrop="static" keyboard={false} centered className="refresh-modal">
-        <Modal.Header className="border-0">
-          <Modal.Title className="d-flex align-items-center">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="me-2 text-primary">
-              <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-            </svg>
-            Продление сессии
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div>
-            <p className="mb-3">Введите пароль для пользователя <strong>{storedUsername}</strong>:</p>
-            <Form.Control
+      {/* Password refresh dialog */}
+      <Dialog open={showRefreshLoginModal} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" />
+              Продление сессии
+            </DialogTitle>
+            <DialogDescription>
+              Введите пароль для пользователя <strong>{currentUser}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Input
               type="password"
-              className="mb-3 form-control-styled"
               placeholder="Пароль"
               value={refreshPassword}
               onChange={(e) => setRefreshPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleRefreshLogin()}
+              onKeyDown={(e) => e.key === 'Enter' && refreshToken()}
             />
-            {error && <div className="alert alert-danger py-2">{error}</div>}
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </div>
-        </Modal.Body>
-        <Modal.Footer className="border-0 justify-content-center">
-          <Button 
-            variant="success" 
-            onClick={handleRefreshLogin} 
-            disabled={isRefreshing || !refreshPassword}
-            className="px-4"
-          >
-            {isRefreshing ? <Spinner as="span" animation="border" size="sm" /> : 'Войти'}
-          </Button>
-          <Button variant="danger" onClick={handleLogout} className="px-4">
-            Выйти
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button onClick={refreshToken} disabled={isRefreshing || !refreshPassword}>
+              {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Войти
+            </Button>
+            <Button variant="destructive" onClick={logout}>
+              Выйти
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -381,7 +201,12 @@ function AppContent() {
 export default function App() {
   return (
     <Router>
-      <AppContent />
+      <AuthProvider>
+        <TooltipProvider>
+          <AppContent />
+          <Toaster richColors position="top-right" />
+        </TooltipProvider>
+      </AuthProvider>
     </Router>
   );
 }

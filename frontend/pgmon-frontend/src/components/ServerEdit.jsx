@@ -1,11 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Container, Card, Form, Button, Alert, Spinner, Row, Col } from 'react-bootstrap';
-import axios from 'axios';
+import api from '@/lib/api';
+import { formatBytesGB } from '@/lib/format';
 import LoadingSpinner from './LoadingSpinner';
-import './ServerEdit.css';
-
-const API_BASE_URL = 'https://pam.cbmo.mosreg.ru';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Save, ArrowLeft, Trash2, Loader2, KeyRound, Lock, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 function ServerEdit() {
   const { serverName } = useParams();
@@ -15,508 +29,309 @@ function ServerEdit() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [testingSSH, setTestingSSH] = useState(false);
   const [sshTestResult, setSSHTestResult] = useState(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const token = localStorage.getItem('token');
-
-  // Загрузка данных сервера
   useEffect(() => {
-    const fetchServerData = async () => {
+    const fetchData = async () => {
       try {
-        const [serversResponse, keysResponse] = await Promise.all([
-          axios.get(`${API_BASE_URL}/servers`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axios.get(`${API_BASE_URL}/ssh-keys`, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-        ]);
-
-        const serverData = serversResponse.data.find(s => s.name === serverName);
-        if (!serverData) {
-          throw new Error('Сервер не найден');
-        }
-
-        setServer({
-          ...serverData,
-          password: '',
-          ssh_password: '',
-          ssh_auth_type: serverData.ssh_auth_type || 'password',
-          ssh_key_id: serverData.ssh_key_id || '',
-          ssh_key_passphrase: '',
-          stats_db: serverData.stats_db || ''
-        });
-        setSSHKeys(keysResponse.data);
-        setLoading(false);
+        const [serversRes, keysRes] = await Promise.all([api.get('/servers'), api.get('/ssh-keys')]);
+        const s = serversRes.data.find(s => s.name === serverName);
+        if (!s) throw new Error('Сервер не найден');
+        setServer({ ...s, password: '', ssh_password: '', ssh_auth_type: s.ssh_auth_type || 'password', ssh_key_id: s.ssh_key_id || '', ssh_key_passphrase: '', stats_db: s.stats_db || '' });
+        setSSHKeys(keysRes.data);
       } catch (err) {
-        console.error('Ошибка загрузки:', err);
-        setError(err.message || 'Ошибка загрузки данных сервера');
+        setError(err.message || 'Ошибка загрузки');
+      } finally {
         setLoading(false);
       }
     };
+    fetchData();
+  }, [serverName]);
 
-    fetchServerData();
-  }, [serverName, token]);
-
-  // Сохранение изменений
   const handleSave = async () => {
     setSaving(true);
     setError('');
-    setSuccess('');
-
     try {
-      const dataToSend = { ...server };
-      
-      // Если используется ключ, добавляем passphrase если он указан
-      if (server.ssh_auth_type === 'key' && server.ssh_key_passphrase) {
-        dataToSend.ssh_key_passphrase = server.ssh_key_passphrase;
-      }
-      
-      await axios.put(
-        `${API_BASE_URL}/servers/${serverName}`,
-        dataToSend,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      setSuccess('Изменения успешно сохранены');
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      await api.put(`/servers/${serverName}`, server);
+      toast.success('Изменения сохранены');
+      setTimeout(() => navigate('/'), 1000);
     } catch (err) {
-      console.error('Ошибка сохранения:', err);
-      setError('Ошибка при сохранении: ' + (err.response?.data?.detail || err.message));
+      setError('Ошибка сохранения: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSaving(false);
     }
   };
 
-  // Удаление сервера
   const handleDelete = async () => {
     try {
-      await axios.delete(
-        `${API_BASE_URL}/servers/${serverName}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      setSuccess('Сервер успешно удален');
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      await api.delete(`/servers/${serverName}`);
+      toast.success('Сервер удалён');
+      navigate('/');
     } catch (err) {
-      console.error('Ошибка удаления:', err);
-      setError('Ошибка при удалении: ' + (err.response?.data?.detail || err.message));
+      setError('Ошибка удаления: ' + (err.response?.data?.detail || err.message));
     }
   };
 
-  // Тест SSH подключения
   const handleTestSSH = async () => {
     setTestingSSH(true);
     setSSHTestResult(null);
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/servers/${serverName}/test-ssh`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setSSHTestResult(response.data);
+      const res = await api.post(`/servers/${serverName}/test-ssh`);
+      setSSHTestResult(res.data);
     } catch (err) {
-      setSSHTestResult({
-        success: false,
-        message: err.response?.data?.detail || err.message
-      });
+      setSSHTestResult({ success: false, message: err.response?.data?.detail || err.message });
     } finally {
       setTestingSSH(false);
     }
   };
 
-  // Обновление поля сервера
-  const updateServerField = (field, value) => {
-    setServer(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const update = (field, value) => setServer(prev => ({ ...prev, [field]: value }));
 
-  if (loading) {
-    return <LoadingSpinner text="Загрузка данных сервера..." subtext="Получение информации" />;
-  }
+  if (loading) return <LoadingSpinner text="Загрузка данных сервера..." />;
 
   if (!server) {
     return (
-      <Container className="mt-4">
-        <Alert variant="danger">
-          Сервер не найден
-          <div className="mt-2">
-            <Button variant="outline-secondary" onClick={() => navigate('/')}>
-              ← Вернуться к списку
-            </Button>
-          </div>
-        </Alert>
-      </Container>
+      <Alert variant="destructive">
+        <AlertDescription>
+          Сервер не найден.{' '}
+          <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/')}>Вернуться к списку</Button>
+        </AlertDescription>
+      </Alert>
     );
   }
 
   const selectedKey = server.ssh_key_id ? sshKeys.find(k => k.id === server.ssh_key_id) : null;
 
   return (
-    <Container className="mt-4 server-edit-page">
-      {/* Заголовок страницы */}
-      <div className="page-header">
-        <h1 className="page-title">Редактирование сервера</h1>
-        <div className="breadcrumb">
-          <Link to="/">Главная</Link>
-          <span>/</span>
-          <Link to="/">Серверы</Link>
-          <span>/</span>
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div>
+        <h1 className="text-2xl font-bold">Редактирование сервера</h1>
+        <nav className="text-sm text-muted-foreground mt-1">
+          <Link to="/" className="hover:text-foreground">Главная</Link>
+          <span className="mx-1">/</span>
+          <Link to="/" className="hover:text-foreground">Серверы</Link>
+          <span className="mx-1">/</span>
           <span>{serverName}</span>
-        </div>
+        </nav>
       </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
-      {success && <Alert variant="success">{success}</Alert>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <Row>
-        {/* Основные настройки */}
-        <Col lg={8}>
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="mb-0">Основные настройки</h5>
-            </Card.Header>
-            <Card.Body>
-              <Form>
-                <Form.Group className="mb-3">
-                  <Form.Label>Название сервера</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={server.name}
-                    onChange={(e) => updateServerField('name', e.target.value)}
-                    disabled
-                  />
-                  <Form.Text className="text-muted">
-                    Название сервера нельзя изменить
-                  </Form.Text>
-                </Form.Group>
-
-                <Row>
-                  <Col md={8}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Хост</Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={server.host}
-                        onChange={(e) => updateServerField('host', e.target.value)}
-                        placeholder="192.168.1.100"
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={4}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Порт PostgreSQL</Form.Label>
-                      <Form.Control
-                        type="number"
-                        value={server.port}
-                        onChange={(e) => updateServerField('port', parseInt(e.target.value))}
-                        placeholder="5432"
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>База данных для статистики</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={server.stats_db}
-                    onChange={(e) => updateServerField('stats_db', e.target.value)}
-                    placeholder="stats_db (опционально)"
-                  />
-                  <Form.Text className="text-muted">
-                    Укажите имя базы данных для хранения статистики
-                  </Form.Text>
-                </Form.Group>
-
-                <hr />
-
-                <h6 className="mb-3">Учетные данные PostgreSQL</h6>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>Пользователь PostgreSQL</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={server.user}
-                    onChange={(e) => updateServerField('user', e.target.value)}
-                    placeholder="postgres"
-                  />
-                </Form.Group>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>Пароль PostgreSQL</Form.Label>
-                  <Form.Control
-                    type="password"
-                    value={server.password}
-                    onChange={(e) => updateServerField('password', e.target.value)}
-                    placeholder="Оставьте пустым, если не меняете"
-                    autoComplete="new-password"
-                  />
-                </Form.Group>
-              </Form>
-            </Card.Body>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main settings */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Основные настройки</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Название сервера</Label>
+                <Input value={server.name} disabled />
+                <p className="text-xs text-muted-foreground">Название нельзя изменить</p>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label>Хост</Label>
+                  <Input value={server.host} onChange={(e) => update('host', e.target.value)} placeholder="192.168.1.100" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Порт PG</Label>
+                  <Input type="number" value={server.port} onChange={(e) => update('port', parseInt(e.target.value))} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>База для статистики</Label>
+                <Input value={server.stats_db} onChange={(e) => update('stats_db', e.target.value)} placeholder="stats_db (опционально)" />
+              </div>
+              <Separator />
+              <h4 className="font-medium">Учетные данные PostgreSQL</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Пользователь</Label>
+                  <Input value={server.user} onChange={(e) => update('user', e.target.value)} placeholder="postgres" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Пароль</Label>
+                  <Input type="password" value={server.password} onChange={(e) => update('password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" />
+                </div>
+              </div>
+            </CardContent>
           </Card>
 
-          {/* SSH настройки */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="mb-0">Настройки SSH</h5>
-            </Card.Header>
-            <Card.Body>
-              <Form>
-                <Row>
-                  <Col md={8}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Пользователь SSH</Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={server.ssh_user}
-                        onChange={(e) => updateServerField('ssh_user', e.target.value)}
-                        placeholder="root"
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={4}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Порт SSH</Form.Label>
-                      <Form.Control
-                        type="number"
-                        value={server.ssh_port}
-                        onChange={(e) => updateServerField('ssh_port', parseInt(e.target.value))}
-                        placeholder="22"
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
+          <Card>
+            <CardHeader>
+              <CardTitle>Настройки SSH</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label>Пользователь SSH</Label>
+                  <Input value={server.ssh_user} onChange={(e) => update('ssh_user', e.target.value)} placeholder="root" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Порт SSH</Label>
+                  <Input type="number" value={server.ssh_port} onChange={(e) => update('ssh_port', parseInt(e.target.value))} />
+                </div>
+              </div>
 
-                <Form.Group className="mb-3">
-                  <Form.Label>Метод аутентификации</Form.Label>
-                  <div>
-                    <Form.Check
-                      inline
-                      type="radio"
-                      label="По паролю"
-                      name="sshAuth"
-                      value="password"
-                      checked={server.ssh_auth_type === 'password'}
-                      onChange={(e) => updateServerField('ssh_auth_type', e.target.value)}
-                    />
-                    <Form.Check
-                      inline
-                      type="radio"
-                      label="По SSH-ключу"
-                      name="sshAuth"
-                      value="key"
-                      checked={server.ssh_auth_type === 'key'}
-                      onChange={(e) => updateServerField('ssh_auth_type', e.target.value)}
-                    />
+              <div className="space-y-2">
+                <Label>Метод аутентификации</Label>
+                <RadioGroup value={server.ssh_auth_type} onValueChange={(v) => update('ssh_auth_type', v)} className="flex gap-4">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="password" id="edit-ssh-pw" />
+                    <Label htmlFor="edit-ssh-pw" className="font-normal">По паролю</Label>
                   </div>
-                </Form.Group>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="key" id="edit-ssh-key" />
+                    <Label htmlFor="edit-ssh-key" className="font-normal">По SSH-ключу</Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-                {server.ssh_auth_type === 'password' ? (
-                  <Form.Group className="mb-3">
-                    <Form.Label>Пароль SSH</Form.Label>
-                    <Form.Control
-                      type="password"
-                      value={server.ssh_password}
-                      onChange={(e) => updateServerField('ssh_password', e.target.value)}
-                      placeholder="Оставьте пустым, если не меняете"
-                      autoComplete="new-password"
-                    />
-                  </Form.Group>
-                ) : (
-                  <>
-                    <Form.Group className="mb-3">
-                      <Form.Label>SSH-ключ</Form.Label>
-                      <Form.Select
-                        value={server.ssh_key_id}
-                        onChange={(e) => updateServerField('ssh_key_id', e.target.value)}
-                      >
-                        <option value="">Выберите ключ...</option>
+              {server.ssh_auth_type === 'password' ? (
+                <div className="space-y-2">
+                  <Label>Пароль SSH</Label>
+                  <Input type="password" value={server.ssh_password} onChange={(e) => update('ssh_password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>SSH-ключ</Label>
+                    <Select value={server.ssh_key_id} onValueChange={(v) => update('ssh_key_id', v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите ключ..." />
+                      </SelectTrigger>
+                      <SelectContent>
                         {sshKeys.map(key => (
-                          <option key={key.id} value={key.id}>
-                            {key.name} ({key.key_type.toUpperCase()}) - {key.fingerprint.substring(0, 16)}...
-                          </option>
+                          <SelectItem key={key.id} value={key.id}>
+                            {key.name} ({key.key_type.toUpperCase()})
+                          </SelectItem>
                         ))}
-                      </Form.Select>
-                      {selectedKey && (
-                        <div className="mt-2">
-                          <small className="text-muted">
-                            Fingerprint: <code>{selectedKey.fingerprint}</code>
-                          </small>
-                        </div>
-                      )}
-                      {sshKeys.length === 0 && (
-                        <Form.Text className="text-muted">
-                          Нет доступных SSH-ключей. 
-                          <Link to="/ssh-keys"> Перейти к управлению ключами</Link>
-                        </Form.Text>
-                      )}
-                    </Form.Group>
-                    
-                    {selectedKey && selectedKey.has_passphrase && (
-                      <Form.Group className="mb-3">
-                        <Form.Label>Пароль от SSH-ключа</Form.Label>
-                        <Form.Control
-                          type="password"
-                          value={server.ssh_key_passphrase}
-                          onChange={(e) => updateServerField('ssh_key_passphrase', e.target.value)}
-                          placeholder="Введите пароль от ключа"
-                          autoComplete="new-password"
-                        />
-                        <Form.Text className="text-muted">
-                          Этот ключ защищен паролем
-                        </Form.Text>
-                      </Form.Group>
+                      </SelectContent>
+                    </Select>
+                    {selectedKey && (
+                      <p className="text-xs text-muted-foreground">Fingerprint: <code>{selectedKey.fingerprint}</code></p>
                     )}
-                  </>
-                )}
-
-                <div className="mt-3">
-                  <Button
-                    variant="outline-success"
-                    onClick={handleTestSSH}
-                    disabled={testingSSH}
-                  >
-                    {testingSSH ? <Spinner size="sm" /> : '🔧 Тест SSH подключения'}
-                  </Button>
-                  {sshTestResult && (
-                    <Alert 
-                      variant={sshTestResult.success ? 'success' : 'danger'} 
-                      className="mt-3"
-                    >
-                      {sshTestResult.success ? '✅' : '❌'} {sshTestResult.message}
-                    </Alert>
+                  </div>
+                  {selectedKey?.has_passphrase && (
+                    <div className="space-y-2">
+                      <Label>Пароль от ключа</Label>
+                      <Input type="password" value={server.ssh_key_passphrase} onChange={(e) => update('ssh_key_passphrase', e.target.value)} autoComplete="new-password" />
+                    </div>
                   )}
                 </div>
-              </Form>
-            </Card.Body>
-          </Card>
-        </Col>
+              )}
 
-        {/* Боковая панель */}
-        <Col lg={4}>
-          {/* Информация о сервере */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="mb-0">Информация о сервере</h5>
-            </Card.Header>
-            <Card.Body>
-              <div className="server-info-item">
-                <span className="info-label">Статус:</span>
-                <span className={`status-badge status-${server.status === 'ok' ? 'ok' : 'error'}`}>
+              <div className="pt-2">
+                <Button variant="outline" size="sm" onClick={handleTestSSH} disabled={testingSSH}>
+                  {testingSSH ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                  Тест SSH
+                </Button>
+                {sshTestResult && (
+                  <Alert variant={sshTestResult.success ? 'default' : 'destructive'} className="mt-3">
+                    <AlertDescription>{sshTestResult.success ? '✅ ' : '❌ '}{sshTestResult.message}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Информация</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Статус</span>
+                <Badge variant={server.status === 'ok' ? 'default' : 'destructive'}>
                   {server.status === 'ok' ? 'Активен' : 'Недоступен'}
-                </span>
+                </Badge>
               </div>
               {server.version && (
-                <div className="server-info-item">
-                  <span className="info-label">Версия PostgreSQL:</span>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">PostgreSQL</span>
                   <span>{server.version}</span>
                 </div>
               )}
-              {server.uptime_hours && (
-                <div className="server-info-item">
-                  <span className="info-label">Uptime:</span>
+              {server.uptime_hours != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Uptime</span>
                   <span>{Math.floor(server.uptime_hours / 24)} дней</span>
                 </div>
               )}
               {server.free_space && server.total_space && (
-                <div className="server-info-item">
-                  <span className="info-label">Свободное место:</span>
-                  <span>
-                    {(server.free_space / 1073741824).toFixed(1)} ГБ из {(server.total_space / 1073741824).toFixed(1)} ГБ
-                  </span>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Диск</span>
+                  <span>{formatBytesGB(server.free_space)} / {formatBytesGB(server.total_space)}</span>
                 </div>
               )}
-            </Card.Body>
+            </CardContent>
           </Card>
 
-          {/* Действия */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="mb-0">Действия</h5>
-            </Card.Header>
-            <Card.Body>
-              <div className="d-grid gap-2">
-                <Button 
-                  variant="primary" 
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <>
-                      <Spinner size="sm" className="me-2" />
-                      Сохранение...
-                    </>
-                  ) : (
-                    '💾 Сохранить изменения'
-                  )}
-                </Button>
-                <Button 
-                  variant="outline-secondary" 
-                  onClick={() => navigate('/')}
-                >
-                  ← Вернуться к списку
-                </Button>
-              </div>
-            </Card.Body>
+          <Card>
+            <CardHeader>
+              <CardTitle>Действия</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button className="w-full" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Сохранить
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                К списку
+              </Button>
+            </CardContent>
           </Card>
 
-          {/* Опасная зона */}
-          <Card className="border-danger">
-            <Card.Header className="bg-danger text-white">
-              <h5 className="mb-0">⚠️ Опасная зона</h5>
-            </Card.Header>
-            <Card.Body>
-              <p className="text-muted small">
-                Удаление сервера приведет к потере всей истории мониторинга. 
-                Это действие необратимо.
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Опасная зона
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">
+                Удаление сервера приведет к потере всей истории мониторинга. Это действие необратимо.
               </p>
-              {!showDeleteConfirm ? (
-                <Button 
-                  variant="outline-danger" 
-                  size="sm"
-                  onClick={() => setShowDeleteConfirm(true)}
-                >
-                  🗑️ Удалить сервер
-                </Button>
-              ) : (
-                <div>
-                  <Alert variant="danger" className="mb-2">
-                    Вы уверены? Это действие нельзя отменить!
-                  </Alert>
-                  <div className="d-flex gap-2">
-                    <Button 
-                      variant="danger" 
-                      size="sm"
-                      onClick={handleDelete}
-                    >
-                      Да, удалить
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="sm"
-                      onClick={() => setShowDeleteConfirm(false)}
-                    >
-                      Отмена
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card.Body>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="w-full">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Удалить сервер
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Удалить сервер?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Вы уверены что хотите удалить сервер <strong>{serverName}</strong>? Это действие нельзя отменить.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
           </Card>
-        </Col>
-      </Row>
-    </Container>
+        </div>
+      </div>
+    </div>
   );
 }
 

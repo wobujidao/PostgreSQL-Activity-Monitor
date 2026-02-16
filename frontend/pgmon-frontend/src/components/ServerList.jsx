@@ -1,31 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Table, Button, Modal, Form, Card, Alert, Row, Col, OverlayTrigger, Tooltip, Spinner } from 'react-bootstrap';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '@/lib/api';
+import { formatBytes, formatUptime } from '@/lib/format';
+import { SERVERS_REFRESH_INTERVAL, DEFAULT_SSH_PORT, DEFAULT_PG_PORT, DEFAULT_SSH_AUTH_TYPE } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
-import './ServerList.css';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Tooltip, TooltipContent, TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Filter, Settings,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+const INITIAL_SERVER = {
+  name: '', host: '', user: '', password: '', port: DEFAULT_PG_PORT,
+  ssh_user: '', ssh_password: '', ssh_port: DEFAULT_SSH_PORT,
+  ssh_auth_type: DEFAULT_SSH_AUTH_TYPE, ssh_key_id: '', ssh_key_passphrase: '', stats_db: '',
+};
 
 function ServerList() {
   const navigate = useNavigate();
   const [servers, setServers] = useState([]);
   const [sshKeys, setSSHKeys] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newServer, setNewServer] = useState({
-    name: '',
-    host: '',
-    user: '',
-    password: '',
-    port: 5432,
-    ssh_user: '',
-    ssh_password: '',
-    ssh_port: 22,
-    ssh_auth_type: 'password',
-    ssh_key_id: '',
-    ssh_key_passphrase: '',
-    stats_db: ''
-  });
+  const [newServer, setNewServer] = useState(INITIAL_SERVER);
   const [errorMessage, setErrorMessage] = useState('');
-  const [refreshInterval, setRefreshInterval] = useState(60000);
+  const [refreshInterval, setRefreshInterval] = useState(SERVERS_REFRESH_INTERVAL);
   const [timeLeft, setTimeLeft] = useState(refreshInterval / 1000);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,17 +53,10 @@ function ServerList() {
   const [testingSSH, setTestingSSH] = useState(false);
   const [sshTestResult, setSSHTestResult] = useState(null);
 
-  // Загрузка серверов
   useEffect(() => {
     const fetchServers = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('Токен отсутствует, требуется авторизация');
-        }
-        const response = await axios.get('https://pam.cbmo.mosreg.ru/servers', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/servers');
         setServers(response.data);
         setLoading(false);
       } catch (error) {
@@ -53,89 +64,34 @@ function ServerList() {
         setLoading(false);
       }
     };
-
     fetchServers();
     const interval = setInterval(() => {
-      // Не обновляем данные если открыто модальное окно
-      if (!showAddModal) {
-        fetchServers();
-        setTimeLeft(refreshInterval / 1000);
-      }
+      if (!showAddModal) { fetchServers(); setTimeLeft(refreshInterval / 1000); }
     }, refreshInterval);
-
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : refreshInterval / 1000));
+      setTimeLeft(prev => (prev > 0 ? prev - 1 : refreshInterval / 1000));
     }, 1000);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(timer);
-    };
+    return () => { clearInterval(interval); clearInterval(timer); };
   }, [refreshInterval, showAddModal]);
 
-  // Загрузка SSH-ключей
   useEffect(() => {
-    const fetchSSHKeys = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('https://pam.cbmo.mosreg.ru/ssh-keys', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setSSHKeys(response.data);
-      } catch (error) {
-      }
-    };
-
-    fetchSSHKeys();
+    api.get('/ssh-keys').then(res => setSSHKeys(res.data)).catch(() => {});
   }, []);
-
-  const handleAdd = () => {
-    setErrorMessage('');
-    setShowAddModal(true);
-    setSSHTestResult(null);
-  };
 
   const handleSaveAdd = async () => {
     try {
-      // Подготавливаем данные для отправки
-      const dataToSend = {
-        ...newServer
-      };
-      
-      // Если используется ключ, добавляем passphrase если он указан
-      if (newServer.ssh_auth_type === 'key' && newServer.ssh_key_passphrase) {
-        dataToSend.ssh_key_passphrase = newServer.ssh_key_passphrase;
-      }
-      
-      const response = await axios.post(
-        'https://pam.cbmo.mosreg.ru/servers',
-        dataToSend,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
+      const response = await api.post('/servers', newServer);
       if (response.data.status !== "ok" && response.data.status !== undefined) {
         setErrorMessage(`Ошибка: ${response.data.status}`);
       } else {
         setServers([...servers, response.data]);
-        setNewServer({
-          name: '',
-          host: '',
-          user: '',
-          password: '',
-          port: 5432,
-          ssh_user: '',
-          ssh_password: '',
-          ssh_port: 22,
-          ssh_auth_type: 'password',
-          ssh_key_id: '',
-          ssh_key_passphrase: '',
-          stats_db: ''
-        });
+        setNewServer(INITIAL_SERVER);
         setShowAddModal(false);
         setSSHTestResult(null);
+        toast.success('Сервер добавлен');
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || error.message || 'Неизвестная ошибка';
-      setErrorMessage('Ошибка при добавлении сервера: ' + errorMsg);
+      setErrorMessage('Ошибка при добавлении: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -143,601 +99,430 @@ function ServerList() {
     setTestingSSH(true);
     setSSHTestResult(null);
     try {
-      const response = await axios.post(
-        `https://pam.cbmo.mosreg.ru/servers/${server.name}/test-ssh`,
-        {},
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
+      const response = await api.post(`/servers/${server.name}/test-ssh`);
       setSSHTestResult(response.data);
     } catch (error) {
-      setSSHTestResult({
-        success: false,
-        message: error.response?.data?.detail || error.message
-      });
+      setSSHTestResult({ success: false, message: error.response?.data?.detail || error.message });
     } finally {
       setTestingSSH(false);
     }
   };
 
-  const handleIntervalChange = (e) => {
-    const value = parseInt(e.target.value);
-    setRefreshInterval(value);
-    setTimeLeft(value / 1000);
-  };
-
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('asc');
     }
   };
 
-  const formatBytes = (bytes) => {
-    if (!bytes) return 'N/A';
-    const sizes = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
-  };
-
-  const formatUptime = (hours) => {
-    if (!hours) return 'N/A';
-    const totalSeconds = hours * 3600;
-    const days = Math.floor(totalSeconds / 86400);
-    const hoursLeft = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    return `${days} д. ${hoursLeft} ч. ${minutes} мин.`;
-  };
-
   const getServerStatus = (server) => {
-    if (!server.status || server.status === 'failed' || server.status.includes('error')) {
-      return {
-        class: 'error',
-        text: 'Connection Failed',
-        tooltip: 'Не удается подключиться к серверу. Проверьте сетевое соединение и настройки подключения.'
-      };
+    if (!server.status || server.status === 'failed' || server.status.includes?.('error')) {
+      return { variant: 'destructive', text: 'Недоступен', tooltip: 'Не удается подключиться к серверу' };
     }
-    if (server.status === 'ok' || server.status.includes('ok')) {
-      const totalConnections = (server.connections?.active || 0) + (server.connections?.idle || 0);
-      if (totalConnections > 50) {
-        return {
-          class: 'warning',
-          text: 'High Load',
-          tooltip: `Высокая нагрузка: ${totalConnections} активных соединений. Рекомендуется мониторинг производительности.`
-        };
-      }
-      return {
-        class: 'online',
-        text: 'Online',
-        tooltip: `Сервер работает нормально. Соединений: ${totalConnections}`
-      };
+    if (server.status === 'ok' || server.status.includes?.('ok')) {
+      const total = (server.connections?.active || 0) + (server.connections?.idle || 0);
+      if (total > 50) return { variant: 'warning', text: 'Нагрузка', tooltip: `Высокая нагрузка: ${total} соединений` };
+      return { variant: 'default', text: 'Активен', tooltip: `Работает нормально. Соединений: ${total}` };
     }
-    return {
-      class: 'offline',
-      text: 'Unknown',
-      tooltip: 'Статус сервера неизвестен. Возможны проблемы с мониторингом.'
-    };
+    return { variant: 'secondary', text: 'Неизвестно', tooltip: 'Статус неизвестен' };
   };
 
-  const getDiskUsageClass = (freeSpace, totalSpace) => {
-    if (!freeSpace || !totalSpace) return 'danger';
+  const getDiskInfo = (freeSpace, totalSpace) => {
+    if (!freeSpace || !totalSpace) return { percent: 0, color: 'bg-red-500' };
     const usedPercent = ((totalSpace - freeSpace) / totalSpace) * 100;
-    if (usedPercent < 70) return 'good';
-    if (usedPercent < 85) return 'warning';
-    return 'danger';
-  };
-
-  const getDiskUsagePercent = (freeSpace, totalSpace) => {
-    if (!freeSpace || !totalSpace) return 0;
-    return ((totalSpace - freeSpace) / totalSpace) * 100;
+    const color = usedPercent < 70 ? 'bg-green-500' : usedPercent < 85 ? 'bg-amber-500' : 'bg-red-500';
+    return { percent: usedPercent, color };
   };
 
   const getSortValue = (server, field) => {
     switch (field) {
-      case 'name':
-        return server.name || '';
-      case 'host':
-        return server.host || '';
-      case 'version':
-        return server.version || '';
-      case 'connections':
-        return (server.connections?.active || 0) + (server.connections?.idle || 0);
-      case 'free_space':
-        return server.free_space || 0;
-      case 'uptime':
-        return server.uptime_hours || 0;
-      case 'status':
-        return getServerStatus(server).text;
-      default:
-        return '';
+      case 'name': return server.name || '';
+      case 'host': return server.host || '';
+      case 'version': return server.version || '';
+      case 'connections': return (server.connections?.active || 0) + (server.connections?.idle || 0);
+      case 'free_space': return server.free_space || 0;
+      case 'uptime': return server.uptime_hours || 0;
+      case 'status': return getServerStatus(server).text;
+      default: return '';
     }
   };
 
-  const filteredServers = servers.filter(server => {
-    const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         server.host.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredServers = servers
+    .filter(server => {
+      const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           server.host.toLowerCase().includes(searchTerm.toLowerCase());
+      if (statusFilter === 'all') return matchesSearch;
+      if (statusFilter === 'online') return matchesSearch && getServerStatus(server).variant === 'default';
+      if (statusFilter === 'error') return matchesSearch && getServerStatus(server).variant === 'destructive';
+      return matchesSearch;
+    })
+    .sort((a, b) => {
+      const aVal = getSortValue(a, sortField);
+      const bVal = getSortValue(b, sortField);
+      const cmp = typeof aVal === 'string' ? aVal.localeCompare(bVal) : aVal - bVal;
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
 
-    if (statusFilter === 'all') return matchesSearch;
-    if (statusFilter === 'online') return matchesSearch && getServerStatus(server).class === 'online';
-    if (statusFilter === 'error') return matchesSearch && getServerStatus(server).class === 'error';
-
-    return matchesSearch;
-  }).sort((a, b) => {
-    const aValue = getSortValue(a, sortField);
-    const bValue = getSortValue(b, sortField);
-
-    if (typeof aValue === 'string') {
-      return sortDirection === 'asc'
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
-    } else {
-      return sortDirection === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
-    }
-  });
-
-  const progress = (timeLeft / (refreshInterval / 1000)) * 100;
-
-  const getSortClass = (field) => {
-    if (sortField !== field) return 'sortable';
-    return `sortable sorted-${sortDirection}`;
+  const SortHeader = ({ field, children }) => {
+    const active = sortField === field;
+    const Icon = active ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+    return (
+      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort(field)}>
+        <div className="flex items-center gap-1">
+          {children}
+          <Icon className={`h-3 w-3 ${active ? 'text-foreground' : 'text-muted-foreground'}`} />
+        </div>
+      </TableHead>
+    );
   };
 
-  // Показываем LoadingSpinner при первой загрузке
   if (loading) {
     return <LoadingSpinner text="Загрузка серверов..." subtext="Подключение к базам данных" />;
   }
 
-  // Компонент для SSH настроек в модальном окне
-  const SSHAuthSettings = ({ server, onChange, isEdit = false }) => {
-    // Находим информацию о выбранном ключе
-    const selectedKey = server.ssh_key_id ? sshKeys.find(k => k.id === server.ssh_key_id) : null;
-    
-    return (
-      <>
-        <Form.Group className="mb-3">
-          <Form.Label>SSH Аутентификация</Form.Label>
-          <div>
-            <Form.Check
-              inline
-              type="radio"
-              label="По паролю"
-              name={`sshAuth-${isEdit ? 'edit' : 'add'}`}
-              value="password"
-              checked={server.ssh_auth_type === 'password'}
-              onChange={(e) => onChange({ ...server, ssh_auth_type: e.target.value })}
-            />
-            <Form.Check
-              inline
-              type="radio"
-              label="По SSH-ключу"
-              name={`sshAuth-${isEdit ? 'edit' : 'add'}`}
-              value="key"
-              checked={server.ssh_auth_type === 'key'}
-              onChange={(e) => onChange({ ...server, ssh_auth_type: e.target.value })}
-            />
-          </div>
-        </Form.Group>
-
-        {server.ssh_auth_type === 'password' ? (
-          <Form.Group className="mb-3">
-            <Form.Label>Пароль SSH</Form.Label>
-            <Form.Control
-              type="password"
-              value={server.ssh_password || ''}
-              onChange={(e) => onChange({ ...server, ssh_password: e.target.value })}
-              placeholder={isEdit ? "Оставьте пустым, если не меняете" : "Введите пароль SSH"}
-            />
-          </Form.Group>
-        ) : (
-          <>
-            <Form.Group className="mb-3">
-              <Form.Label>SSH-ключ</Form.Label>
-              <Form.Select
-                value={server.ssh_key_id || ''}
-                onChange={(e) => onChange({ ...server, ssh_key_id: e.target.value })}
-              >
-                <option value="">Выберите ключ...</option>
-                {sshKeys.map(key => (
-                  <option key={key.id} value={key.id}>
-                    {key.name} ({key.key_type.toUpperCase()}) - {key.fingerprint.substring(0, 16)}...
-                  </option>
-                ))}
-              </Form.Select>
-              {selectedKey && (
-                <div className="mt-2">
-                  <small className="text-muted">
-                    Fingerprint: <code>{selectedKey.fingerprint}</code>
-                  </small>
-                </div>
-              )}
-              {sshKeys.length === 0 && (
-                <Form.Text className="text-muted">
-                  Нет доступных SSH-ключей. 
-                  <Link to="/ssh-keys"> Перейти к управлению ключами</Link>
-                </Form.Text>
-              )}
-            </Form.Group>
-            
-            {selectedKey && selectedKey.has_passphrase && (
-              <Form.Group className="mb-3">
-                <Form.Label>Пароль от SSH-ключа</Form.Label>
-                <Form.Control
-                  type="password"
-                  value={server.ssh_key_passphrase || ''}
-                  onChange={(e) => onChange({ ...server, ssh_key_passphrase: e.target.value })}
-                  placeholder="Введите пароль от ключа"
-                />
-                <Form.Text className="text-muted">
-                  Этот ключ защищен паролем
-                </Form.Text>
-              </Form.Group>
-            )}
-          </>
-        )}
-
-        {server.name && server.ssh_auth_type && (
-          <Form.Group className="mb-3">
-            <Button
-              variant="outline-success"
-              size="sm"
-              onClick={() => handleTestSSH(server)}
-              disabled={testingSSH}
-            >
-              {testingSSH ? <Spinner size="sm" /> : '🔧 Тест SSH подключения'}
-            </Button>
-            {sshTestResult && (
-              <Alert 
-                variant={sshTestResult.success ? 'success' : 'danger'} 
-                className="mt-2 mb-0"
-              >
-                {sshTestResult.success ? '✅' : '❌'} {sshTestResult.message}
-              </Alert>
-            )}
-          </Form.Group>
-        )}
-      </>
-    );
-  };
+  // Dashboard карточки
+  const onlineCount = servers.filter(s => getServerStatus(s).variant === 'default').length;
+  const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
+  const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
 
   return (
-    <div className="container mt-4">
-      {/* Панель фильтров */}
-      <Card className="mb-4">
-        <Card.Body className="py-3">
-          <Row className="align-items-center">
-            <Col md={4}>
-              <div className="d-flex align-items-center gap-2">
-                <label className="mb-0 font-weight-medium">Статус:</label>
-                <div className="select-wrapper">
-                  <Form.Select
-                    size="sm"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    style={{ width: 'auto' }}
-                  >
-                    <option value="all">Все серверы</option>
-                    <option value="online">Только активные</option>
-                    <option value="error">С ошибками</option>
-                  </Form.Select>
-                  <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5z"/>
-                  </svg>
-                </div>
-              </div>
-            </Col>
-            <Col md={4}>
-              <div className="d-flex align-items-center gap-2">
-                <label className="mb-0 font-weight-medium">Поиск:</label>
-                <Form.Control
-                  size="sm"
-                  type="text"
-                  placeholder="Имя сервера..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </Col>
-            <Col md={4}>
-              <div className="d-flex align-items-center justify-content-end gap-3">
-                <div className="d-flex align-items-center gap-2">
-                  <label className="mb-0 font-weight-medium">Обновление:</label>
-                  <div className="select-wrapper">
-                    <Form.Select
-                      size="sm"
-                      value={refreshInterval}
-                      onChange={handleIntervalChange}
-                      style={{ width: 'auto' }}
-                    >
-                      <option value={5000}>5 сек</option>
-                      <option value={10000}>10 сек</option>
-                      <option value={15000}>15 сек</option>
-                      <option value={30000}>30 сек</option>
-                      <option value={60000}>1 мин</option>
-                    </Form.Select>
-                    <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M7 10l5 5 5-5z"/>
-                    </svg>
-                  </div>
-                </div>
-                <div className="progress-circle-wrapper">
-                  <svg className="progress-circle" viewBox="0 0 36 36">
-                    <path className="progress-circle-bg"
-                      d="M18 2.0845
-                        a 15.9155 15.9155 0 0 1 0 31.831
-                        a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path className="progress-circle-fill"
-                      d="M18 2.0845
-                        a 15.9155 15.9155 0 0 1 0 31.831
-                        a 15.9155 15.9155 0 0 1 0 -31.831"
-                      style={{
-                        strokeDasharray: `${progress}, 100`
-                      }}
-                    />
-                  </svg>
-                  <span className="progress-text">{timeLeft}с</span>
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => window.location.reload()}
-                >
-                  Обновить
-                </Button>
-              </div>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+    <div className="space-y-6">
+      {/* Dashboard cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{servers.length}</div>
+            <p className="text-xs text-muted-foreground">Всего серверов</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-green-600">{onlineCount}</div>
+            <p className="text-xs text-muted-foreground">Активных</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-red-600">{errorCount}</div>
+            <p className="text-xs text-muted-foreground">С ошибками</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-amber-600">{warningCount}</div>
+            <p className="text-xs text-muted-foreground">Нагрузка</p>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Таблица серверов */}
+      {/* Filters */}
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Серверы PostgreSQL</h5>
-          <Button variant="success" size="sm" onClick={handleAdd}>
-            + Добавить сервер
-          </Button>
-        </Card.Header>
-        <Card.Body className="p-0">
-          {errorMessage && (
-            <Alert variant="danger" className="m-3 mb-0">
-              {errorMessage}
-            </Alert>
-          )}
-          <div className="table-responsive">
-            <Table className="mb-0" hover>
-              <thead>
-                <tr>
-                  <th className={getSortClass('name')} onClick={() => handleSort('name')}>
-                    Сервер
-                  </th>
-                  <th className={getSortClass('host')} onClick={() => handleSort('host')}>
-                    IP адрес
-                  </th>
-                  <th className={getSortClass('version')} onClick={() => handleSort('version')}>
-                    Версия PG
-                  </th>
-                  <th className={getSortClass('connections')} onClick={() => handleSort('connections')}>
-                    Соединения
-                  </th>
-                  <th className={getSortClass('free_space')} onClick={() => handleSort('free_space')}>
-                    Свободное место
-                  </th>
-                  <th className={getSortClass('uptime')} onClick={() => handleSort('uptime')}>
-                    Uptime
-                  </th>
-                  <th className={getSortClass('status')} onClick={() => handleSort('status')}>
-                    Статус
-                  </th>
-                  <th>SSH</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredServers.map(server => {
-                  const status = getServerStatus(server);
-                  const diskClass = getDiskUsageClass(server.free_space, server.total_space);
-                  const diskPercent = getDiskUsagePercent(server.free_space, server.total_space);
-                  const sshKeyInfo = server.ssh_key_info;
-
-                  return (
-                    <tr key={server.name}>
-                      <td>
-                        <Link to={`/server/${server.name}`} className="server-link">
-                          {server.name}
-                        </Link>
-                      </td>
-                      <td>
-                        <code className="server-ip">{server.host}</code>
-                      </td>
-                      <td className="text-sm">{server.version || 'N/A'}</td>
-                      <td className="text-sm">
-                        {server.connections ? (
-                          <>
-                            <span className="connections-active">{server.connections.active || 0} активных</span>
-                            {' / '}
-                            <span className="connections-idle">{server.connections.idle || 0} idle</span>
-                          </>
-                        ) : 'N/A'}
-                      </td>
-                      <td>
-                        <div className="disk-space-cell">
-                          <div className="disk-space-info">
-                            <div className="disk-space-text">
-                              <strong style={{ color: diskClass === 'danger' ? 'var(--danger)' : diskClass === 'warning' ? 'var(--warning)' : 'var(--success)' }}>
-                                {formatBytes(server.free_space)}
-                              </strong>
-                              {server.total_space && ` из ${formatBytes(server.total_space)} (${(100 - diskPercent).toFixed(1)}%)`}
-                            </div>
-                            {server.total_space && (
-                              <OverlayTrigger
-                                placement="top"
-                                overlay={
-                                  <Tooltip>
-                                    Использовано: {diskPercent.toFixed(1)}%
-                                    ({formatBytes(server.total_space - server.free_space)} из {formatBytes(server.total_space)})
-                                  </Tooltip>
-                                }
-                              >
-                                <div className="disk-progress">
-                                  <div
-                                    className={`disk-progress-bar ${diskClass}`}
-                                    style={{ width: `${diskPercent}%` }}
-                                  ></div>
-                                </div>
-                              </OverlayTrigger>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="uptime-info">{formatUptime(server.uptime_hours)}</td>
-                      <td>
-                        <OverlayTrigger
-                          placement="top"
-                          overlay={<Tooltip>{status.tooltip}</Tooltip>}
-                        >
-                          <span className={`status-badge status-${status.class === 'online' ? 'ok' : status.class}`}>
-                            {status.text === 'Online' ? 'Активен' : 
-                             status.text === 'High Load' ? 'Нагрузка' :
-                             status.text === 'Connection Failed' ? 'Недоступен' :
-                             'Неизвестно'}
-                          </span>
-                        </OverlayTrigger>
-                      </td>
-                      <td>
-                        <span className="text-sm">
-                          {server.ssh_auth_type === 'key' ? '🔑' : '🔒'} 
-                          {server.ssh_auth_type === 'key' && sshKeyInfo ? (
-                            <OverlayTrigger
-                              placement="top"
-                              overlay={
-                                <Tooltip>
-                                  Ключ: {sshKeyInfo.name}<br/>
-                                  Fingerprint: {sshKeyInfo.fingerprint}
-                                </Tooltip>
-                              }
-                            >
-                              <span> {sshKeyInfo.name}</span>
-                            </OverlayTrigger>
-                          ) : (
-                            ' пароль'
-                          )}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-outline-primary btn-sm"
-                          onClick={() => navigate(`/server/${server.name}/edit`)}
-                        >
-                          Управление
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все серверы</SelectItem>
+                  <SelectItem value="online">Активные</SelectItem>
+                  <SelectItem value="error">С ошибками</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 flex-1">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск по имени или IP..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <div className="flex items-center gap-3 ml-auto">
+              <Select value={String(refreshInterval)} onValueChange={(v) => { setRefreshInterval(Number(v)); setTimeLeft(Number(v) / 1000); }}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5000">5 сек</SelectItem>
+                  <SelectItem value="10000">10 сек</SelectItem>
+                  <SelectItem value="15000">15 сек</SelectItem>
+                  <SelectItem value="30000">30 сек</SelectItem>
+                  <SelectItem value="60000">1 мин</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground tabular-nums w-8">{timeLeft}с</span>
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </Card.Body>
+        </CardContent>
       </Card>
 
-      {/* Модальное окно добавления (остается только для добавления новых серверов) */}
-      <Modal show={showAddModal} onHide={() => { setShowAddModal(false); setSSHTestResult(null); }} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Добавить сервер</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
-          <Form className="modal-form">
-            <Form.Group className="mb-3">
-              <Form.Label>Название</Form.Label>
-              <Form.Control
-                type="text"
-                value={newServer.name}
-                onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Хост</Form.Label>
-              <Form.Control
-                type="text"
-                value={newServer.host}
-                onChange={(e) => setNewServer({ ...newServer, host: e.target.value })}
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>База для статистики</Form.Label>
-              <Form.Control
-                type="text"
-                value={newServer.stats_db || ''}
-                onChange={(e) => setNewServer({ ...newServer, stats_db: e.target.value })}
-                placeholder="stats_db (опционально)"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Пользователь PostgreSQL</Form.Label>
-              <Form.Control
-                type="text"
-                value={newServer.user}
-                onChange={(e) => setNewServer({ ...newServer, user: e.target.value })}
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Пароль PostgreSQL</Form.Label>
-              <Form.Control
-                type="password"
-                value={newServer.password}
-                onChange={(e) => setNewServer({ ...newServer, password: e.target.value })}
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Порт PostgreSQL</Form.Label>
-              <Form.Control
-                type="number"
-                value={newServer.port}
-                onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })}
-              />
-            </Form.Group>
-            
-            <hr />
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Пользователь SSH</Form.Label>
-              <Form.Control
-                type="text"
-                value={newServer.ssh_user}
-                onChange={(e) => setNewServer({ ...newServer, ssh_user: e.target.value })}
-              />
-            </Form.Group>
-
-            <SSHAuthSettings 
-              server={newServer} 
-              onChange={setNewServer}
-              isEdit={false}
-            />
-
-            <Form.Group className="mb-3">
-              <Form.Label>Порт SSH</Form.Label>
-              <Form.Control
-                type="number"
-                value={newServer.ssh_port}
-                onChange={(e) => setNewServer({ ...newServer, ssh_port: parseInt(e.target.value) })}
-              />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowAddModal(false); setSSHTestResult(null); }}>
-            Закрыть
-          </Button>
-          <Button variant="primary" onClick={handleSaveAdd}>
+      {/* Server table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Серверы PostgreSQL
+          </CardTitle>
+          <Button size="sm" onClick={() => { setErrorMessage(''); setShowAddModal(true); setSSHTestResult(null); }}>
+            <Plus className="h-4 w-4 mr-1" />
             Добавить
           </Button>
-        </Modal.Footer>
-      </Modal>
+        </CardHeader>
+        <CardContent className="p-0">
+          {errorMessage && (
+            <Alert variant="destructive" className="mx-6 mb-4">
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortHeader field="name">Сервер</SortHeader>
+                  <SortHeader field="host">IP адрес</SortHeader>
+                  <SortHeader field="version">Версия PG</SortHeader>
+                  <SortHeader field="connections">Соединения</SortHeader>
+                  <SortHeader field="free_space">Диск</SortHeader>
+                  <SortHeader field="uptime">Uptime</SortHeader>
+                  <SortHeader field="status">Статус</SortHeader>
+                  <TableHead>SSH</TableHead>
+                  <TableHead>Действия</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredServers.map(server => {
+                  const status = getServerStatus(server);
+                  const disk = getDiskInfo(server.free_space, server.total_space);
+                  const freePercent = disk.percent ? (100 - disk.percent).toFixed(1) : 0;
+
+                  return (
+                    <TableRow key={server.name}>
+                      <TableCell className="font-medium">
+                        <Link to={`/server/${server.name}`} className="text-primary hover:underline">
+                          {server.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{server.host}</code>
+                      </TableCell>
+                      <TableCell className="text-sm">{server.version || '—'}</TableCell>
+                      <TableCell className="text-sm">
+                        {server.connections ? (
+                          <span>
+                            <span className="text-green-600 font-medium">{server.connections.active || 0}</span>
+                            {' / '}
+                            <span className="text-muted-foreground">{server.connections.idle || 0}</span>
+                          </span>
+                        ) : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {server.total_space ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="space-y-1 min-w-[140px]">
+                                <div className="text-xs">
+                                  <span className={disk.percent > 85 ? 'text-red-600 font-medium' : disk.percent > 70 ? 'text-amber-600 font-medium' : 'text-green-600 font-medium'}>
+                                    {formatBytes(server.free_space)}
+                                  </span>
+                                  <span className="text-muted-foreground"> / {formatBytes(server.total_space)}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all ${disk.color}`} style={{ width: `${disk.percent}%` }} />
+                                </div>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Использовано: {disk.percent.toFixed(1)}% ({formatBytes(server.total_space - server.free_space)})
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatUptime(server.uptime_hours)}</TableCell>
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant={status.variant === 'warning' ? 'outline' : status.variant}
+                              className={status.variant === 'warning' ? 'border-amber-500 text-amber-600' : ''}>
+                              {status.text}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>{status.tooltip}</TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm">
+                              {server.ssh_auth_type === 'key' ? <KeyRound className="h-4 w-4 inline" /> : <Lock className="h-4 w-4 inline" />}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {server.ssh_auth_type === 'key' && server.ssh_key_info
+                              ? `Ключ: ${server.ssh_key_info.name}`
+                              : 'Пароль'}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/server/${server.name}/edit`)}>
+                          <Settings className="h-3 w-3 mr-1" />
+                          Управление
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredServers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      {searchTerm || statusFilter !== 'all' ? 'Серверы не найдены' : 'Нет добавленных серверов'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add server dialog */}
+      <Dialog open={showAddModal} onOpenChange={(open) => { if (!open) { setShowAddModal(false); setSSHTestResult(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Добавить сервер</DialogTitle>
+            <DialogDescription>Укажите параметры подключения к PostgreSQL и SSH</DialogDescription>
+          </DialogHeader>
+          {errorMessage && (
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Название</Label>
+                <Input value={newServer.name} onChange={(e) => setNewServer({ ...newServer, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Хост</Label>
+                <Input value={newServer.host} onChange={(e) => setNewServer({ ...newServer, host: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>База для статистики</Label>
+              <Input value={newServer.stats_db} onChange={(e) => setNewServer({ ...newServer, stats_db: e.target.value })} placeholder="stats_db (опционально)" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Пользователь PG</Label>
+                <Input value={newServer.user} onChange={(e) => setNewServer({ ...newServer, user: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Пароль PG</Label>
+                <Input type="password" value={newServer.password} onChange={(e) => setNewServer({ ...newServer, password: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Порт PG</Label>
+              <Input type="number" value={newServer.port} onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })} className="w-32" />
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Пользователь SSH</Label>
+                <Input value={newServer.ssh_user} onChange={(e) => setNewServer({ ...newServer, ssh_user: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Порт SSH</Label>
+                <Input type="number" value={newServer.ssh_port} onChange={(e) => setNewServer({ ...newServer, ssh_port: parseInt(e.target.value) })} className="w-32" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>SSH Аутентификация</Label>
+              <RadioGroup value={newServer.ssh_auth_type} onValueChange={(v) => setNewServer({ ...newServer, ssh_auth_type: v })} className="flex gap-4">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="password" id="ssh-password" />
+                  <Label htmlFor="ssh-password" className="font-normal">По паролю</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="key" id="ssh-key" />
+                  <Label htmlFor="ssh-key" className="font-normal">По SSH-ключу</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {newServer.ssh_auth_type === 'password' ? (
+              <div className="space-y-2">
+                <Label>Пароль SSH</Label>
+                <Input type="password" value={newServer.ssh_password} onChange={(e) => setNewServer({ ...newServer, ssh_password: e.target.value })} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>SSH-ключ</Label>
+                  <Select value={newServer.ssh_key_id || ''} onValueChange={(v) => setNewServer({ ...newServer, ssh_key_id: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите ключ..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sshKeys.map(key => (
+                        <SelectItem key={key.id} value={key.id}>
+                          {key.name} ({key.key_type.toUpperCase()})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {sshKeys.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Нет доступных ключей. <Link to="/ssh-keys" className="text-primary">Управление ключами</Link>
+                    </p>
+                  )}
+                </div>
+                {newServer.ssh_key_id && sshKeys.find(k => k.id === newServer.ssh_key_id)?.has_passphrase && (
+                  <div className="space-y-2">
+                    <Label>Пароль от ключа</Label>
+                    <Input type="password" value={newServer.ssh_key_passphrase} onChange={(e) => setNewServer({ ...newServer, ssh_key_passphrase: e.target.value })} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {newServer.name && (
+              <div className="space-y-2">
+                <Button variant="outline" size="sm" onClick={() => handleTestSSH(newServer)} disabled={testingSSH}>
+                  {testingSSH ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                  Тест SSH
+                </Button>
+                {sshTestResult && (
+                  <Alert variant={sshTestResult.success ? 'default' : 'destructive'} className="mt-2">
+                    <AlertDescription>{sshTestResult.success ? '✅ ' : '❌ '}{sshTestResult.message}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAddModal(false); setSSHTestResult(null); }}>
+              Отмена
+            </Button>
+            <Button onClick={handleSaveAdd}>
+              Добавить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,34 +1,46 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
-import { Card, Table, Form, Alert, Button, Pagination, Tabs, Tab, Badge, Spinner } from 'react-bootstrap';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import api from '@/lib/api';
+import { formatBytesGB, formatTimestamp } from '@/lib/format';
+import { DEFAULT_CRITERIA, LS_CRITERIA, LS_USER_ROLE, ITEMS_PER_PAGE } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
-import './ServerDetails.css';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationLink,
+  PaginationNext, PaginationPrevious,
+} from '@/components/ui/pagination';
+import { Separator } from '@/components/ui/separator';
+import {
+  ArrowUpDown, ArrowUp, ArrowDown, Loader2, Download, RefreshCw,
+  Database, Activity, Settings, AlertTriangle, CheckCircle, XCircle, MinusCircle,
+} from 'lucide-react';
+import { toast } from 'sonner';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
 
-// Функция для загрузки критериев из localStorage
 const loadCriteria = () => {
-  const saved = localStorage.getItem('dbAnalysisCriteria');
-  if (saved) {
-    return JSON.parse(saved);
-  }
-  // Значения по умолчанию
-  return {
-    deadDays: 30,
-    staticConnectionsDays: 30,
-    lowActivityThreshold: 2
-  };
+  try {
+    const saved = localStorage.getItem(LS_CRITERIA);
+    return saved ? JSON.parse(saved) : { ...DEFAULT_CRITERIA };
+  } catch { return { ...DEFAULT_CRITERIA }; }
 };
-
-// Функция для сохранения критериев
-const saveCriteria = (criteria) => {
-  localStorage.setItem('dbAnalysisCriteria', JSON.stringify(criteria));
-};
+const saveCriteria = (c) => localStorage.setItem(LS_CRITERIA, JSON.stringify(c));
 
 function ServerDetails() {
   const { name } = useParams();
@@ -36,23 +48,22 @@ function ServerDetails() {
   const [serverData, setServerData] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
-  const [hideDeleted] = useState(true); // Убираем setHideDeleted, так как она не используется
+  const [hideDeleted] = useState(true);
   const [showNoConnections, setShowNoConnections] = useState(false);
   const [showStaticConnections, setShowStaticConnections] = useState(false);
-  const [showUnchangedConnections, setShowUnchangedConnections] = useState(false); // Новый фильтр
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+  const [showUnchangedConnections, setShowUnchangedConnections] = useState(false);
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 86400000));
   const [endDate, setEndDate] = useState(new Date());
-  const [selectedDateRange, setSelectedDateRange] = useState(7); // По умолчанию 7 дней
+  const [selectedDateRange, setSelectedDateRange] = useState(7);
   const [sortColumn, setSortColumn] = useState('size');
   const [sortDirection, setSortDirection] = useState('desc');
   const [nameFilter, setNameFilter] = useState('');
-  const [nameFilterType, setNameFilterType] = useState('contains'); // 'starts', 'contains', 'not_contains', 'ends'
+  const [nameFilterType, setNameFilterType] = useState('contains');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
   const [activeTab, setActiveTab] = useState('overview');
   const [analysisFilter, setAnalysisFilter] = useState('all');
-  const [isLoading, setIsLoading] = useState(false); // Для индикации загрузки
-  const [criteria, setCriteria] = useState(loadCriteria()); // Загружаем критерии
+  const [isLoading, setIsLoading] = useState(false);
+  const [criteria, setCriteria] = useState(loadCriteria());
   const [criteriaChanged, setCriteriaChanged] = useState(false);
   const connectionsChartRef = useRef(null);
   const sizeChartRef = useRef(null);
@@ -60,399 +71,157 @@ function ServerDetails() {
   const sizeCanvasRef = useRef(null);
   const isMounted = useRef(true);
 
-  const serverCacheKey = `serverData_${name}`;
-  
-  // Получаем роль пользователя
-  const userRole = localStorage.getItem('userRole') || 'viewer';
+  const userRole = localStorage.getItem(LS_USER_ROLE) || 'viewer';
   const canEditCriteria = userRole === 'admin' || userRole === 'operator';
 
-  // Функция анализа баз данных
-  const analyzeDatabases = useCallback(() => {
-    if (!stats || !stats.databases) return null;
-
-    const now = new Date();
-    const analyzed = stats.databases.map(db => {
-      // Получаем историю подключений для БД
-      const dbTimeline = stats.connection_timeline?.filter(
-        entry => entry.datname === db.name
-      ) || [];
-
-      // Считаем дни с последней активности
-      const lastEntry = dbTimeline[dbTimeline.length - 1];
-      const lastActivity = lastEntry?.ts;
-      const daysSinceActivity = lastActivity 
-        ? Math.floor((now - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24))
-        : Infinity;
-
-      // Проверяем статичность подключений
-      let isStatic = false;
-      let hasUnchangedConnections = false;
-      let avgConnections = 0;
-      
-      if (dbTimeline.length > 10) {
-        const last10 = dbTimeline.slice(-10);
-        const connections = last10.map(e => e.connections || 0);
-        const uniqueValues = new Set(connections);
-        isStatic = uniqueValues.size === 1 && connections[0] > 0;
-        hasUnchangedConnections = uniqueValues.size === 1 && connections[0] > 0;
-        avgConnections = connections.reduce((a, b) => a + b, 0) / connections.length;
-      } else if (dbTimeline.length > 0) {
-        const connections = dbTimeline.map(e => e.connections || 0);
-        const uniqueValues = new Set(connections);
-        hasUnchangedConnections = uniqueValues.size === 1 && connections[0] > 0;
-        avgConnections = dbTimeline.reduce((sum, e) => sum + (e.connections || 0), 0) / dbTimeline.length;
-      }
-
-      // Определяем статус с использованием текущих критериев
-      let status = 'healthy';
-      let reason = '';
-      
-      if (daysSinceActivity >= criteria.deadDays) {
-        status = 'dead';
-        reason = `Нет активности ${daysSinceActivity} дней`;
-      } else if (isStatic && daysSinceActivity >= criteria.staticConnectionsDays) {
-        status = 'static';
-        reason = `Статичные подключения (${avgConnections.toFixed(0)}) более ${criteria.staticConnectionsDays} дней`;
-      } else if (avgConnections > 0 && avgConnections < criteria.lowActivityThreshold) {
-        status = 'warning';
-        reason = `Низкая активность (среднее: ${avgConnections.toFixed(1)} подключений)`;
-      }
-
-      // Размер БД
-      const sizeGB = dbTimeline.find(e => e.size_gb > 0)?.size_gb || 0;
-
-      return {
-        ...db,
-        status,
-        reason,
-        daysSinceActivity,
-        avgConnections,
-        sizeGB,
-        isStatic,
-        hasUnchangedConnections,
-        lastActivity
-      };
+  // --- Helpers ---
+  const getAggregatedTimeline = useCallback(() => {
+    if (!stats?.connection_timeline) return [];
+    const map = new Map();
+    stats.connection_timeline.forEach(e => {
+      if (!map.has(e.ts)) map.set(e.ts, { connections: 0, size_gb: 0 });
+      const a = map.get(e.ts);
+      a.connections += e.connections || 0;
+      a.size_gb += e.size_gb || 0;
     });
+    return Array.from(map.entries()).map(([ts, d]) => ({ ts, ...d }));
+  }, [stats]);
 
-    return {
-      all: analyzed,
-      dead: analyzed.filter(db => db.status === 'dead'),
-      static: analyzed.filter(db => db.status === 'static'),
-      warning: analyzed.filter(db => db.status === 'warning'),
-      healthy: analyzed.filter(db => db.status === 'healthy'),
-      unchanged: analyzed.filter(db => db.hasUnchangedConnections)
-    };
-  }, [stats, criteria]); // Добавляем criteria в зависимости
+  const getDatabaseConnections = useCallback((dbName) => {
+    if (!stats?.connection_timeline) return [];
+    return stats.connection_timeline.filter(e => e.datname === dbName).map(e => e.connections);
+  }, [stats]);
 
-  const dbAnalysis = analyzeDatabases();
+  const getDatabaseSize = useCallback((dbName) => {
+    if (!stats?.connection_timeline) return null;
+    const last = stats.connection_timeline.filter(e => e.datname === dbName && e.size_gb > 0).slice(-1)[0];
+    return last?.size_gb ?? null;
+  }, [stats]);
 
-  // Функция экспорта
-  const exportDeadDatabases = () => {
-    if (!dbAnalysis) return;
-    
-    // Определяем какие базы экспортировать в зависимости от текущих фильтров
-    let databasesToExport = [];
-    let fileName = 'databases_export';
-    
-    if (showNoConnections) {
-      // Экспортируем базы без подключений
-      databasesToExport = filteredDatabases.filter(db => {
-        const connections = getDatabaseConnections(db.name);
-        return connections.length === 0 || connections.every(conn => conn === 0);
-      });
-      fileName = 'no_connections_databases';
-    } else if (showStaticConnections) {
-      // Экспортируем неактивные базы
-      databasesToExport = dbAnalysis.dead;
-      fileName = 'inactive_databases';
-    } else {
-      // Экспортируем все отфильтрованные базы
-      databasesToExport = filteredDatabases;
-      fileName = 'all_databases';
-    }
-
-    if (databasesToExport.length === 0) {
-      alert('Нет данных для экспорта');
-      return;
-    }
-
-    const csv = [
-      ['База данных', 'Размер (ГБ)', 'Последние подключения', 'Дней без активности', 'Последняя активность', 'Дата создания', 'Статус'],
-      ...databasesToExport.map(db => {
-        const connections = getDatabaseConnections(db.name);
-        const lastConnections = connections.length > 0 ? connections[connections.length - 1] : 0;
-        const sizeGB = getDatabaseSize(db.name) || 0;
-        const analysis = dbAnalysis?.all.find(a => a.name === db.name);
-        
-        return [
-          db.name,
-          sizeGB.toFixed(2),
-          lastConnections,
-          analysis?.daysSinceActivity === Infinity ? 'Никогда' : (analysis?.daysSinceActivity || 'N/A'),
-          analysis?.lastActivity ? new Date(analysis.lastActivity).toLocaleDateString('ru-RU') : 'Никогда',
-          db.creation_time ? new Date(db.creation_time).toLocaleDateString('ru-RU') : 'Неизвестно',
-          db.exists ? 'Активна' : 'Удалена'
-        ];
-      })
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${fileName}_${name}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Токен отсутствует');
-
-      const serverResponse = await axios.get('https://pam.cbmo.mosreg.ru/servers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const server = serverResponse.data.find(s => s.name === name);
-      if (!server) throw new Error(`Сервер ${name} не найден`);
-      if (isMounted.current) {
-        setServerData(server);
-        localStorage.setItem(serverCacheKey, JSON.stringify(server));
-      }
-
-      const statsResponse = await axios.get(`https://pam.cbmo.mosreg.ru/server/${name}/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: {
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString()
-        }
-      });
-      if (isMounted.current) {
-        setStats(statsResponse.data);
-        setError(null);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
-      if (isMounted.current) {
-        setError(error.response?.data?.detail || error.message || 'Неизвестная ошибка');
-      }
-    } finally {
-      if (isMounted.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [name, startDate, endDate, serverCacheKey]);
-
-  useEffect(() => {
-    isMounted.current = true;
-    const timer = setTimeout(() => {
-      fetchData();
-    }, 500);
-
-    return () => {
-      isMounted.current = false;
-      clearTimeout(timer);
-    };
-  }, [fetchData]);
-
-  useEffect(() => {
-    if (!stats || !connectionsCanvasRef.current || !sizeCanvasRef.current) return;
-
-    if (connectionsChartRef.current) {
-      connectionsChartRef.current.destroy();
-      connectionsChartRef.current = null;
-    }
-    if (sizeChartRef.current) {
-      sizeChartRef.current.destroy();
-      sizeChartRef.current = null;
-    }
-
-    const aggregatedTimeline = getAggregatedTimeline();
-    
-    const connectionsChartData = {
-      datasets: [
-        {
-          label: 'Общие подключения',
-          data: aggregatedTimeline.map(data => ({
-            x: new Date(data.ts),
-            y: data.connections
-          })),
-          fill: false,
-          borderColor: 'rgba(75, 192, 192, 1)',
-          tension: 0.1
-        }
-      ]
-    };
-
-    const sizeChartData = {
-      datasets: [
-        {
-          label: 'Общий размер баз (ГБ)',
-          data: aggregatedTimeline
-            .filter(data => data.size_gb > 0)
-            .map(data => ({
-              x: new Date(data.ts),
-              y: data.size_gb
-            })),
-          fill: false,
-          borderColor: 'rgba(153, 102, 255, 1)',
-          tension: 0.1
-        }
-      ]
-    };
-
-    const connectionsChartOptions = {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' },
-        title: { display: true, text: `Подключения к серверу ${name} за период` }
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            unit: 'day',
-            tooltipFormat: 'dd.MM.yyyy HH:mm'
-          },
-          title: { display: true, text: 'Дата и время' }
-        },
-        y: {
-          type: 'linear',
-          title: { display: true, text: 'Количество подключений' }
-        }
-      },
-      animation: false
-    };
-
-    const sizeChartOptions = {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' },
-        title: { display: true, text: `Общий размер баз ${name} за период` }
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            unit: 'day',
-            tooltipFormat: 'dd.MM.yyyy HH:mm'
-          },
-          title: { display: true, text: 'Дата и время' }
-        },
-        y: {
-          type: 'linear',
-          title: { display: true, text: 'Размер (ГБ)' }
-        }
-      },
-      animation: false
-    };
-
-    connectionsChartRef.current = new ChartJS(connectionsCanvasRef.current.getContext('2d'), {
-      type: 'line',
-      data: connectionsChartData,
-      options: connectionsChartOptions
-    });
-
-    sizeChartRef.current = new ChartJS(sizeCanvasRef.current.getContext('2d'), {
-      type: 'line',
-      data: sizeChartData,
-      options: sizeChartOptions
-    });
-
-    return () => {
-      if (connectionsChartRef.current) {
-        connectionsChartRef.current.destroy();
-        connectionsChartRef.current = null;
-      }
-      if (sizeChartRef.current) {
-        sizeChartRef.current.destroy();
-        sizeChartRef.current = null;
-      }
-    };
-  }, [stats, activeTab, name]);
-
-  const formatBytes = (bytes) => bytes ? `${(bytes / 1073741824).toFixed(2)} ГБ` : 'N/A';
-
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    const date = new Date(timestamp);
-    return date.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: 'Europe/Moscow'
-    });
-  };
+  const hasUnchangedConnections = useCallback((dbName) => {
+    const conns = getDatabaseConnections(dbName);
+    if (conns.length < 2) return false;
+    return new Set(conns).size === 1 && conns[0] > 0;
+  }, [getDatabaseConnections]);
 
   const formatSize = (sizeGb) => {
-    if (sizeGb === null || sizeGb === undefined) return 'N/A';
-    
-    // Если размер меньше 1 ГБ, показываем в МБ
-    if (sizeGb < 1) {
-      const sizeMb = sizeGb * 1024;
-      return `${sizeMb.toFixed(0)} МБ`;
-    }
-    
-    // Иначе показываем в ГБ
+    if (sizeGb == null) return 'N/A';
+    if (sizeGb < 1) return `${(sizeGb * 1024).toFixed(0)} МБ`;
     return `${sizeGb.toFixed(2)} ГБ`;
   };
 
-  const formatCreationTime = (creationTime) => {
-    if (!creationTime) return 'N/A';
-    const date = new Date(creationTime);
-    return date.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Europe/Moscow'
-    });
+  const formatCreationTime = (t) => {
+    if (!t) return 'N/A';
+    return new Date(t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
   };
 
-  const getAggregatedTimeline = () => {
-    if (!stats || !stats.connection_timeline) return [];
-    const timelineMap = new Map();
-    stats.connection_timeline.forEach(entry => {
-      const ts = entry.ts;
-      if (!timelineMap.has(ts)) {
-        timelineMap.set(ts, { connections: 0, size_gb: 0 });
+  // --- Analysis ---
+  const analyzeDatabases = useCallback(() => {
+    if (!stats?.databases) return null;
+    const now = new Date();
+    const analyzed = stats.databases.map(db => {
+      const timeline = stats.connection_timeline?.filter(e => e.datname === db.name) || [];
+      const lastEntry = timeline[timeline.length - 1];
+      const lastActivity = lastEntry?.ts;
+      const daysSince = lastActivity ? Math.floor((now - new Date(lastActivity).getTime()) / 86400000) : Infinity;
+
+      let isStatic = false, hasUnchanged = false, avgConn = 0;
+      if (timeline.length > 10) {
+        const last10 = timeline.slice(-10).map(e => e.connections || 0);
+        const uniq = new Set(last10);
+        isStatic = uniq.size === 1 && last10[0] > 0;
+        hasUnchanged = isStatic;
+        avgConn = last10.reduce((a, b) => a + b, 0) / last10.length;
+      } else if (timeline.length > 0) {
+        const conns = timeline.map(e => e.connections || 0);
+        hasUnchanged = new Set(conns).size === 1 && conns[0] > 0;
+        avgConn = conns.reduce((a, b) => a + b, 0) / conns.length;
       }
-      const agg = timelineMap.get(ts);
-      agg.connections += entry.connections || 0;
-      agg.size_gb += entry.size_gb || 0;
+
+      let status = 'healthy', reason = '';
+      if (daysSince >= criteria.deadDays) { status = 'dead'; reason = `Нет активности ${daysSince} дней`; }
+      else if (isStatic && daysSince >= criteria.staticConnectionsDays) { status = 'static'; reason = `Статичные подключения (${avgConn.toFixed(0)}) более ${criteria.staticConnectionsDays} дней`; }
+      else if (avgConn > 0 && avgConn < criteria.lowActivityThreshold) { status = 'warning'; reason = `Низкая активность (среднее: ${avgConn.toFixed(1)})`;  }
+
+      return { ...db, status, reason, daysSinceActivity: daysSince, avgConnections: avgConn, sizeGB: timeline.find(e => e.size_gb > 0)?.size_gb || 0, isStatic, hasUnchangedConnections: hasUnchanged, lastActivity };
     });
-    return Array.from(timelineMap.entries()).map(([ts, data]) => ({
-      ts,
-      connections: data.connections,
-      size_gb: data.size_gb
-    }));
-  };
+    return {
+      all: analyzed,
+      dead: analyzed.filter(d => d.status === 'dead'),
+      static: analyzed.filter(d => d.status === 'static'),
+      warning: analyzed.filter(d => d.status === 'warning'),
+      healthy: analyzed.filter(d => d.status === 'healthy'),
+      unchanged: analyzed.filter(d => d.hasUnchangedConnections),
+    };
+  }, [stats, criteria]);
 
-  const getDatabaseConnections = (dbName) => {
-    if (!stats || !stats.connection_timeline) return [];
-    return stats.connection_timeline
-      .filter(entry => entry.datname === dbName)
-      .map(entry => entry.connections);
-  };
+  const dbAnalysis = analyzeDatabases();
 
-  const getDatabaseSize = (dbName) => {
-    if (!stats || !stats.connection_timeline) return null;
-    const lastSizeEntry = stats.connection_timeline
-      .filter(entry => entry.datname === dbName && entry.size_gb > 0)
-      .slice(-1)[0];
-    return lastSizeEntry ? lastSizeEntry.size_gb : null;
-  };
-
-  const handleSort = (column) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
+  // --- Fetch ---
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [serversRes, statsRes] = await Promise.all([
+        api.get('/servers'),
+        api.get(`/server/${name}/stats`, { params: { start_date: startDate.toISOString(), end_date: endDate.toISOString() } }),
+      ]);
+      const server = serversRes.data.find(s => s.name === name);
+      if (!server) throw new Error(`Сервер ${name} не найден`);
+      if (isMounted.current) {
+        setServerData(server);
+        setStats(statsRes.data);
+        setError(null);
+      }
+    } catch (err) {
+      if (isMounted.current) setError(err.response?.data?.detail || err.message);
+    } finally {
+      if (isMounted.current) setIsLoading(false);
     }
+  }, [name, startDate, endDate]);
+
+  useEffect(() => {
+    isMounted.current = true;
+    const timer = setTimeout(fetchData, 500);
+    return () => { isMounted.current = false; clearTimeout(timer); };
+  }, [fetchData]);
+
+  // --- Charts ---
+  useEffect(() => {
+    if (!stats || !connectionsCanvasRef.current || !sizeCanvasRef.current) return;
+    connectionsChartRef.current?.destroy();
+    sizeChartRef.current?.destroy();
+    connectionsChartRef.current = null;
+    sizeChartRef.current = null;
+
+    const timeline = getAggregatedTimeline();
+    const chartOpts = (title, yLabel) => ({
+      responsive: true,
+      plugins: { legend: { position: 'top' }, title: { display: true, text: title } },
+      scales: {
+        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd.MM.yyyy HH:mm' }, title: { display: true, text: 'Дата и время' } },
+        y: { type: 'linear', title: { display: true, text: yLabel } },
+      },
+      animation: false,
+    });
+
+    connectionsChartRef.current = new ChartJS(connectionsCanvasRef.current.getContext('2d'), {
+      type: 'line',
+      data: { datasets: [{ label: 'Общие подключения', data: timeline.map(d => ({ x: new Date(d.ts), y: d.connections })), fill: false, borderColor: 'rgba(75, 192, 192, 1)', tension: 0.1 }] },
+      options: chartOpts(`Подключения к серверу ${name}`, 'Количество подключений'),
+    });
+    sizeChartRef.current = new ChartJS(sizeCanvasRef.current.getContext('2d'), {
+      type: 'line',
+      data: { datasets: [{ label: 'Общий размер (ГБ)', data: timeline.filter(d => d.size_gb > 0).map(d => ({ x: new Date(d.ts), y: d.size_gb })), fill: false, borderColor: 'rgba(153, 102, 255, 1)', tension: 0.1 }] },
+      options: chartOpts(`Размер баз ${name}`, 'Размер (ГБ)'),
+    });
+
+    return () => { connectionsChartRef.current?.destroy(); sizeChartRef.current?.destroy(); };
+  }, [stats, activeTab, name, getAggregatedTimeline]);
+
+  // --- Sorting, filtering, pagination ---
+  const handleSort = (col) => {
+    setSortDirection(sortColumn === col && sortDirection === 'asc' ? 'desc' : 'asc');
+    setSortColumn(col);
     setCurrentPage(1);
   };
 
@@ -465,622 +234,487 @@ function ServerDetails() {
     setSelectedDateRange(days);
   };
 
-  // Функция фильтрации по имени с учетом типа фильтра
   const filterByName = (dbName) => {
-    const nameLower = dbName.toLowerCase();
-    const filterLower = nameFilter.toLowerCase();
-    
-    switch (nameFilterType) {
-      case 'starts':
-        return nameLower.startsWith(filterLower);
-      case 'contains':
-        return nameLower.includes(filterLower);
-      case 'not_contains':
-        return !nameLower.includes(filterLower);
-      case 'ends':
-        return nameLower.endsWith(filterLower);
-      default:
-        return nameLower.includes(filterLower);
-    }
+    const n = dbName.toLowerCase(), f = nameFilter.toLowerCase();
+    if (nameFilterType === 'starts') return n.startsWith(f);
+    if (nameFilterType === 'not_contains') return !n.includes(f);
+    if (nameFilterType === 'ends') return n.endsWith(f);
+    return n.includes(f);
   };
 
-  // Обработчики для критериев
+  // --- Criteria ---
   const handleCriteriaChange = (field, value) => {
-    const newValue = parseInt(value) || 0;
-    setCriteria(prev => ({
-      ...prev,
-      [field]: newValue
-    }));
+    setCriteria(prev => ({ ...prev, [field]: parseInt(value) || 0 }));
     setCriteriaChanged(true);
   };
+  const handleSaveCriteria = () => { saveCriteria(criteria); setCriteriaChanged(false); toast.success('Критерии сохранены'); };
+  const handleResetCriteria = () => { setCriteria({ ...DEFAULT_CRITERIA }); saveCriteria({ ...DEFAULT_CRITERIA }); setCriteriaChanged(false); toast.success('Критерии сброшены'); };
 
-  const handleSaveCriteria = () => {
-    saveCriteria(criteria);
-    setCriteriaChanged(false);
-    alert('Критерии сохранены');
+  // --- Export ---
+  const exportDatabases = () => {
+    if (!dbAnalysis) return;
+    let data = [], fileName = 'all_databases';
+    if (showNoConnections) {
+      data = filteredDatabases.filter(db => { const c = getDatabaseConnections(db.name); return c.length === 0 || c.every(v => v === 0); });
+      fileName = 'no_connections_databases';
+    } else if (showStaticConnections) {
+      data = dbAnalysis.dead;
+      fileName = 'inactive_databases';
+    } else {
+      data = filteredDatabases;
+    }
+    if (!data.length) { toast.error('Нет данных для экспорта'); return; }
+
+    const csv = [
+      ['База данных', 'Размер (ГБ)', 'Подключения', 'Дней без активности', 'Последняя активность', 'Дата создания', 'Статус'],
+      ...data.map(db => {
+        const conns = getDatabaseConnections(db.name);
+        const analysis = dbAnalysis?.all.find(a => a.name === db.name);
+        return [
+          db.name, (getDatabaseSize(db.name) || 0).toFixed(2),
+          conns.length > 0 ? conns[conns.length - 1] : 0,
+          analysis?.daysSinceActivity === Infinity ? 'Никогда' : (analysis?.daysSinceActivity || 'N/A'),
+          analysis?.lastActivity ? new Date(analysis.lastActivity).toLocaleDateString('ru-RU') : 'Никогда',
+          db.creation_time ? new Date(db.creation_time).toLocaleDateString('ru-RU') : 'Неизвестно',
+          db.exists ? 'Активна' : 'Удалена',
+        ];
+      })
+    ].map(r => r.join(',')).join('\n');
+
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${fileName}_${name}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
   };
 
-  const handleResetCriteria = () => {
-    const defaultCriteria = {
-      deadDays: 30,
-      staticConnectionsDays: 30,
-      lowActivityThreshold: 2
-    };
-    setCriteria(defaultCriteria);
-    saveCriteria(defaultCriteria);
-    setCriteriaChanged(false);
-    alert('Критерии сброшены на значения по умолчанию');
+  // --- Sort icon ---
+  const SortIcon = ({ col }) => {
+    if (sortColumn !== col) return <ArrowUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+    return sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 ml-1 inline" /> : <ArrowDown className="h-3 w-3 ml-1 inline" />;
   };
 
-  // Функция для проверки, имеет ли база неизменные подключения
-  const hasUnchangedConnections = (dbName) => {
-    const connections = getDatabaseConnections(dbName);
-    if (connections.length < 2) return false;
-    const uniqueValues = new Set(connections);
-    return uniqueValues.size === 1 && connections[0] > 0;
-  };
-
-  if (error) return <Alert variant="danger">Ошибка: {error}</Alert>;
-  if (!serverData || !stats) return (
-    <LoadingSpinner text="Загрузка данных сервера..." subtext="Получение статистики" />
-  );
+  // --- Render ---
+  if (error && !serverData) return <Alert variant="destructive"><AlertDescription>Ошибка: {error}</AlertDescription></Alert>;
+  if (!serverData || !stats) return <LoadingSpinner text="Загрузка данных сервера..." subtext="Получение статистики" />;
 
   const allDatabases = stats.databases;
   const filteredDatabases = allDatabases.filter(db => {
-    const connections = getDatabaseConnections(db.name);
-    let nameMatch = !nameFilter || filterByName(db.name);
-
-    return (
-      nameMatch &&
-      (!hideDeleted || db.exists) &&
-      (!showNoConnections || (connections.length === 0 || connections.every(conn => conn === 0))) &&
-      (!showStaticConnections || (connections.length > 0 && connections.every(conn => conn === connections[0] && conn > 0))) &&
-      (!showUnchangedConnections || hasUnchangedConnections(db.name))
-    );
+    const conns = getDatabaseConnections(db.name);
+    const nameMatch = !nameFilter || filterByName(db.name);
+    return nameMatch
+      && (!hideDeleted || db.exists)
+      && (!showNoConnections || (conns.length === 0 || conns.every(c => c === 0)))
+      && (!showStaticConnections || (conns.length > 0 && conns.every(c => c === conns[0] && c > 0)))
+      && (!showUnchangedConnections || hasUnchangedConnections(db.name));
   }).sort((a, b) => {
-    if (sortColumn === 'name') {
-      return sortDirection === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-    } else if (sortColumn === 'size') {
-      const sizeA = getDatabaseSize(a.name) || 0;
-      const sizeB = getDatabaseSize(b.name) || 0;
-      return sortDirection === 'asc' ? sizeA - sizeB : sizeB - sizeA;
-    } else if (sortColumn === 'status') {
-      return sortDirection === 'asc' ? (a.exists === b.exists ? 0 : a.exists ? -1 : 1) : (a.exists === b.exists ? 0 : a.exists ? 1 : -1);
-    } else if (sortColumn === 'creation_time') {
-      const timeA = a.creation_time ? new Date(a.creation_time).getTime() : 0;
-      const timeB = b.creation_time ? new Date(b.creation_time).getTime() : 0;
-      return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
-    }
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    if (sortColumn === 'name') return dir * a.name.localeCompare(b.name);
+    if (sortColumn === 'size') return dir * ((getDatabaseSize(a.name) || 0) - (getDatabaseSize(b.name) || 0));
+    if (sortColumn === 'status') return dir * ((a.exists ? 1 : 0) - (b.exists ? 1 : 0));
+    if (sortColumn === 'creation_time') return dir * ((a.creation_time ? new Date(a.creation_time).getTime() : 0) - (b.creation_time ? new Date(b.creation_time).getTime() : 0));
     return 0;
   });
 
-  // Вычисляем суммарный размер отфильтрованных баз
-  const totalFilteredSize = filteredDatabases.reduce((sum, db) => {
-    const size = getDatabaseSize(db.name) || 0;
-    return sum + size;
-  }, 0);
+  const totalFilteredSize = filteredDatabases.reduce((sum, db) => sum + (getDatabaseSize(db.name) || 0), 0);
+  const totalPages = Math.ceil(filteredDatabases.length / ITEMS_PER_PAGE);
+  const paginatedDatabases = filteredDatabases.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(filteredDatabases.length / itemsPerPage);
-  const paginatedDatabases = itemsPerPage === 'all' ? filteredDatabases : filteredDatabases.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const freePercent = serverData.free_space && serverData.total_space
+    ? (serverData.free_space / serverData.total_space * 100).toFixed(1) : 0;
 
-  const freeSpacePercent = serverData.free_space && serverData.total_space
-    ? (serverData.free_space / serverData.total_space * 100).toFixed(2)
-    : 0;
+  const getStatusBadge = (status) => {
+    const map = { dead: ['destructive', 'Неактивна'], static: ['outline', 'Статичная'], warning: ['secondary', 'Низкая активность'], healthy: ['default', 'Активна'] };
+    const [variant, label] = map[status] || ['secondary', status];
+    return <Badge variant={variant}>{label}</Badge>;
+  };
+
+  const getAnalysisData = () => {
+    if (!dbAnalysis) return [];
+    const m = { all: dbAnalysis.all, dead: dbAnalysis.dead, warning: dbAnalysis.warning, static: dbAnalysis.static, healthy: dbAnalysis.healthy };
+    return m[analysisFilter] || dbAnalysis.all;
+  };
+
+  const getTileColor = (status) => {
+    const m = { dead: 'bg-red-100 border-red-300 dark:bg-red-950 dark:border-red-800', static: 'bg-blue-100 border-blue-300 dark:bg-blue-950 dark:border-blue-800', warning: 'bg-amber-100 border-amber-300 dark:bg-amber-950 dark:border-amber-800', healthy: 'bg-green-100 border-green-300 dark:bg-green-950 dark:border-green-800' };
+    return m[status] || 'bg-muted border-border';
+  };
+
+  // Pagination helper
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
 
   return (
-    <div className="container mt-5">
-      {/* Заголовок страницы как в артефакте */}
-      <div className="page-header">
-        <h1 className="page-title">Сервер: {name}</h1>
-        <div className="breadcrumb">
-          <Link to="/">Главная</Link>
-          <span>/</span>
-          <Link to="/">Серверы</Link>
-          <span>/</span>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold">Сервер: {name}</h1>
+        <nav className="text-sm text-muted-foreground mt-1">
+          <Link to="/" className="hover:text-foreground">Главная</Link>
+          <span className="mx-1">/</span>
+          <Link to="/" className="hover:text-foreground">Серверы</Link>
+          <span className="mx-1">/</span>
           <span>{name}</span>
-        </div>
+        </nav>
       </div>
 
-      {/* Информация о сервере */}
-      <div className="server-info-card">
-        <div className="server-info-grid">
-          <div className="info-block">
-            <span className="info-label">IP адрес</span>
-            <span className="info-value">{serverData.host}</span>
-          </div>
-          <div className="info-block">
-            <span className="info-label">Версия</span>
-            <span className="info-value">{serverData.version || 'N/A'}</span>
-          </div>
-          <div className="info-block">
-            <span className="info-label">Подключения</span>
-            <span className="info-value">
-              {serverData.connections ? `${serverData.connections.active || 0} / ${(serverData.connections.active || 0) + (serverData.connections.idle || 0)} max` : 'N/A'}
-            </span>
-          </div>
-          <div className="info-block">
-            <span className="info-label">Свободно на диске</span>
-            <span className="info-value" style={{ color: freeSpacePercent < 10 ? 'var(--danger)' : 'inherit' }}>
-              {serverData.free_space && serverData.total_space ? 
-                `${formatBytes(serverData.free_space)} из ${formatBytes(serverData.total_space)} (${freeSpacePercent}%)` : 
-                'N/A'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Выбор периода с индикацией загрузки */}
-      <div className="filter-bar">
-        <div className="filter-group">
-          <label className="filter-label">Период:</label>
-          <button 
-            className={`btn btn-sm ${selectedDateRange === 1 ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setDateRange(1)}
-            disabled={isLoading}
-          >
-            24ч
-          </button>
-          <button 
-            className={`btn btn-sm ${selectedDateRange === 7 ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setDateRange(7)}
-            disabled={isLoading}
-          >
-            7д
-          </button>
-          <button 
-            className={`btn btn-sm ${selectedDateRange === 30 ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setDateRange(30)}
-            disabled={isLoading}
-          >
-            30д
-          </button>
-          <button 
-            className={`btn btn-sm ${selectedDateRange === 90 ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setDateRange(90)}
-            disabled={isLoading}
-          >
-            90д
-          </button>
-        </div>
-        <div className="filter-group" style={{ marginLeft: 'auto' }}>
-          <DatePicker
-            selected={startDate}
-            onChange={date => {
-              setStartDate(date);
-              setSelectedDateRange(null); // Сбрасываем выбранный период при ручном изменении
-            }}
-            selectsStart
-            startDate={startDate}
-            endDate={endDate}
-            className="form-control form-control-sm"
-            dateFormat="dd.MM.yyyy"
-            style={{ minWidth: 'auto' }}
-            disabled={isLoading}
-          />
-          <span>—</span>
-          <DatePicker
-            selected={endDate}
-            onChange={date => {
-              setEndDate(date);
-              setSelectedDateRange(null); // Сбрасываем выбранный период при ручном изменении
-            }}
-            selectsEnd
-            startDate={startDate}
-            endDate={endDate}
-            minDate={startDate}
-            className="form-control form-control-sm"
-            dateFormat="dd.MM.yyyy"
-            style={{ minWidth: 'auto' }}
-            disabled={isLoading}
-          />
-        </div>
-        {isLoading && (
-          <div className="loading-indicator">
-            <Spinner animation="border" size="sm" />
-            <span>Обновление данных...</span>
-          </div>
-        )}
-      </div>
-
-      {/* Графики */}
-      <div className="charts-container" style={{ opacity: isLoading ? 0.5 : 1 }}>
-        <div className="chart-card">
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>Подключения к серверу</h3>
-          <canvas ref={connectionsCanvasRef} id="connectionsChart" />
-        </div>
-        <div className="chart-card">
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>Размер баз данных</h3>
-          <canvas ref={sizeCanvasRef} id="sizeChart" />
-        </div>
-      </div>
-
-      {/* Фильтры баз данных */}
-      <div className="filter-bar">
-        <div className="filter-group">
-          <label className="filter-label">Поиск:</label>
-          <div className="search-with-type">
-            <div className="select-wrapper">
-              <select 
-                className="form-select form-select-sm"
-                value={nameFilterType}
-                onChange={(e) => setNameFilterType(e.target.value)}
-                style={{ width: '150px' }}
-              >
-                <option value="contains">Содержит</option>
-                <option value="starts">Начинается с</option>
-                <option value="ends">Заканчивается на</option>
-                <option value="not_contains">Не содержит</option>
-              </select>
-              <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M7 10l5 5 5-5z"/>
-              </svg>
+      {/* Server info cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">IP адрес</p>
+            <div className="text-lg font-semibold">{serverData.host}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Версия PostgreSQL</p>
+            <div className="text-lg font-semibold">{serverData.version || 'N/A'}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Подключения</p>
+            <div className="text-lg font-semibold">
+              {serverData.connections ? `${serverData.connections.active || 0} / ${(serverData.connections.active || 0) + (serverData.connections.idle || 0)}` : 'N/A'}
             </div>
-            <input 
-              type="text" 
-              className="form-control form-control-sm aligned-input" 
-              placeholder="Имя базы..." 
-              value={nameFilter} 
-              onChange={(e) => { 
-                setNameFilter(e.target.value); 
-                setCurrentPage(1); 
-              }} 
-              style={{ maxWidth: '200px' }} 
-            />
-          </div>
-        </div>
-        <div className="filter-group">
-          <label className="filter-label">Показать:</label>
-          <div className="select-wrapper">
-            <select 
-              className="form-select form-select-sm" 
-              value={`${showNoConnections ? 'no-conn' : ''}${showStaticConnections ? 'static' : ''}`} 
-              onChange={(e) => {
-                const val = e.target.value;
-                setShowNoConnections(val === 'no-conn');
-                setShowStaticConnections(val === 'static');
-                setShowUnchangedConnections(false);
-                setCurrentPage(1);
-              }} 
-              style={{ width: 'auto' }}
-            >
-              <option value="">Все базы</option>
-              <option value="no-conn">Только активные</option>
-              <option value="static">Неактивные {'>'} {criteria.deadDays} дней</option>
-            </select>
-            <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 10l5 5 5-5z"/>
-            </svg>
-          </div>
-        </div>
-        <button 
-          className={`btn btn-sm ${showNoConnections ? 'btn-primary' : 'btn-outline-primary'}`}
-          onClick={() => {
-            setShowNoConnections(!showNoConnections);
-            if (!showNoConnections) {
-              setShowStaticConnections(false);
-              setShowUnchangedConnections(false);
-            }
-            setCurrentPage(1);
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
-          Без подключений
-        </button>
-        <button 
-          className={`btn btn-sm ${showUnchangedConnections ? 'btn-primary' : 'btn-outline-primary'}`}
-          onClick={() => {
-            setShowUnchangedConnections(!showUnchangedConnections);
-            if (!showUnchangedConnections) {
-              setShowNoConnections(false);
-              setShowStaticConnections(false);
-            }
-            setCurrentPage(1);
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
-          Статичные подключения
-        </button>
-        <div style={{ marginLeft: 'auto' }}>
-          <button 
-            className="btn btn-outline-secondary btn-sm" 
-            onClick={exportDeadDatabases}
-          >
-            Экспорт списка
-          </button>
-        </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Свободно на диске</p>
+            <div className={`text-lg font-semibold ${parseFloat(freePercent) < 10 ? 'text-destructive' : ''}`}>
+              {serverData.free_space && serverData.total_space
+                ? `${formatBytesGB(serverData.free_space)} / ${formatBytesGB(serverData.total_space)} (${freePercent}%)`
+                : 'N/A'}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Информация о суммарном размере отфильтрованных баз */}
-      {filteredDatabases.length > 0 && (showNoConnections || showStaticConnections || showUnchangedConnections || nameFilter) && (
-        <div className="filtered-summary">
-          <div className="summary-content">
-            <span className="summary-label">Отфильтровано баз:</span>
-            <span className="summary-value">{filteredDatabases.length}</span>
-            <span className="summary-separator">|</span>
-            <span className="summary-label">Суммарный размер:</span>
-            <span className="summary-value summary-size">{totalFilteredSize.toFixed(2)} ГБ</span>
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+
+      {/* Date range picker */}
+      <Card>
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium">Период:</span>
+            {[{ d: 1, l: '24ч' }, { d: 7, l: '7д' }, { d: 30, l: '30д' }, { d: 90, l: '90д' }].map(({ d, l }) => (
+              <Button key={d} variant={selectedDateRange === d ? 'default' : 'outline'} size="sm" onClick={() => setDateRange(d)} disabled={isLoading}>
+                {l}
+              </Button>
+            ))}
+            <Separator orientation="vertical" className="h-6" />
+            <div className="flex items-center gap-2">
+              <DatePicker selected={startDate} onChange={d => { setStartDate(d); setSelectedDateRange(null); }} selectsStart startDate={startDate} endDate={endDate} className="h-8 w-28 rounded-md border border-input bg-background px-2 text-sm" dateFormat="dd.MM.yyyy" disabled={isLoading} />
+              <span className="text-muted-foreground">—</span>
+              <DatePicker selected={endDate} onChange={d => { setEndDate(d); setSelectedDateRange(null); }} selectsEnd startDate={startDate} endDate={endDate} minDate={startDate} className="h-8 w-28 rounded-md border border-input bg-background px-2 text-sm" dateFormat="dd.MM.yyyy" disabled={isLoading} />
+            </div>
+            {isLoading && (
+              <div className="flex items-center gap-2 ml-auto text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Обновление...
+              </div>
+            )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Charts */}
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${isLoading ? 'opacity-50' : ''}`}>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Подключения к серверу</CardTitle></CardHeader>
+          <CardContent><canvas ref={connectionsCanvasRef} /></CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Размер баз данных</CardTitle></CardHeader>
+          <CardContent><canvas ref={sizeCanvasRef} /></CardContent>
+        </Card>
+      </div>
+
+      {/* Database filters */}
+      <Card>
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Поиск:</span>
+              <Select value={nameFilterType} onValueChange={setNameFilterType}>
+                <SelectTrigger className="w-[140px] h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contains">Содержит</SelectItem>
+                  <SelectItem value="starts">Начинается с</SelectItem>
+                  <SelectItem value="ends">Заканчивается на</SelectItem>
+                  <SelectItem value="not_contains">Не содержит</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input className="w-44 h-8" placeholder="Имя базы..." value={nameFilter} onChange={e => { setNameFilter(e.target.value); setCurrentPage(1); }} />
+            </div>
+            <Separator orientation="vertical" className="h-6" />
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Показать:</span>
+              <Select value={`${showNoConnections ? 'no-conn' : ''}${showStaticConnections ? 'static' : ''}` || 'all'} onValueChange={v => { setShowNoConnections(v === 'no-conn'); setShowStaticConnections(v === 'static'); setShowUnchangedConnections(false); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[200px] h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все базы</SelectItem>
+                  <SelectItem value="no-conn">Только активные</SelectItem>
+                  <SelectItem value="static">Неактивные {'>'} {criteria.deadDays} дней</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant={showNoConnections ? 'default' : 'outline'} size="sm" onClick={() => { setShowNoConnections(!showNoConnections); if (!showNoConnections) { setShowStaticConnections(false); setShowUnchangedConnections(false); } setCurrentPage(1); }}>
+              Без подключений
+            </Button>
+            <Button variant={showUnchangedConnections ? 'default' : 'outline'} size="sm" onClick={() => { setShowUnchangedConnections(!showUnchangedConnections); if (!showUnchangedConnections) { setShowNoConnections(false); setShowStaticConnections(false); } setCurrentPage(1); }}>
+              Статичные
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportDatabases} className="ml-auto">
+              <Download className="h-4 w-4 mr-1" />Экспорт
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filtered summary */}
+      {filteredDatabases.length > 0 && (showNoConnections || showStaticConnections || showUnchangedConnections || nameFilter) && (
+        <div className="flex items-center gap-4 px-4 py-2 bg-muted/50 rounded-lg text-sm">
+          <span className="text-muted-foreground">Отфильтровано:</span>
+          <span className="font-semibold">{filteredDatabases.length}</span>
+          <Separator orientation="vertical" className="h-4" />
+          <span className="text-muted-foreground">Суммарный размер:</span>
+          <span className="font-semibold">{totalFilteredSize.toFixed(2)} ГБ</span>
         </div>
       )}
 
-      <Tabs activeKey={activeTab} onSelect={setActiveTab} className="mb-4">
-        <Tab eventKey="overview" title="Обзор">
-          {/* Таблица баз данных */}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-1"><Database className="h-4 w-4" />Обзор</TabsTrigger>
+          <TabsTrigger value="analysis" className="gap-1">
+            <Activity className="h-4 w-4" />Анализ
+            {dbAnalysis && dbAnalysis.dead.length > 0 && (
+              <Badge variant="destructive" className="ml-1 text-xs px-1.5">{dbAnalysis.dead.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-1"><Settings className="h-4 w-4" />Критерии</TabsTrigger>
+        </TabsList>
+
+        {/* Overview tab */}
+        <TabsContent value="overview">
           <Card>
-            <Card.Header>
-              <span className="card-title">Базы данных (всего: {allDatabases.length}, показано: {filteredDatabases.length})</span>
-            </Card.Header>
-            <div className="table-responsive">
-              <Table className="mb-0">
-                <thead>
-                  <tr>
-                    <th className="sortable" onClick={() => handleSort('name')}>База данных</th>
-                    <th className="sortable" onClick={() => handleSort('size')}>Размер</th>
-                    <th>Подключения</th>
-                    <th>Последняя активность</th>
-                    <th className="sortable" onClick={() => handleSort('creation_time')}>Создана</th>
-                    <th className="sortable" onClick={() => handleSort('status')}>Статус</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <CardHeader>
+              <CardTitle className="text-sm">
+                Базы данных (всего: {allDatabases.length}, показано: {filteredDatabases.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('name')}>База данных <SortIcon col="name" /></TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('size')}>Размер <SortIcon col="size" /></TableHead>
+                    <TableHead>Подключения</TableHead>
+                    <TableHead>Последняя активность</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('creation_time')}>Создана <SortIcon col="creation_time" /></TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>Статус <SortIcon col="status" /></TableHead>
+                    <TableHead className="text-right">Действия</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {paginatedDatabases.map(db => {
-                    const connections = getDatabaseConnections(db.name);
-                    const isInactive = connections.length === 0 || connections.every(conn => conn === 0);
+                    const conns = getDatabaseConnections(db.name);
+                    const isInactive = conns.length === 0 || conns.every(c => c === 0);
                     const isUnchanged = hasUnchangedConnections(db.name);
-                    const lastActivity = stats.connection_timeline
-                      ?.filter(entry => entry.datname === db.name)
-                      ?.slice(-1)[0]?.ts;
-                    
+                    const lastAct = stats.connection_timeline?.filter(e => e.datname === db.name).slice(-1)[0]?.ts;
+
                     return (
-                      <tr key={db.name} className={isInactive ? 'table-warning' : isUnchanged ? 'table-info' : ''}>
-                        <td>
-                          <Link to={`/server/${name}/db/${db.name}`} className="server-link">
+                      <TableRow key={db.name} className={isInactive ? 'bg-amber-50 dark:bg-amber-950/20' : isUnchanged ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
+                        <TableCell>
+                          <Link to={`/server/${name}/db/${db.name}`} className="text-primary hover:underline font-medium">
                             {db.name}
                           </Link>
-                        </td>
-                        <td><strong>{formatSize(getDatabaseSize(db.name))}</strong></td>
-                        <td>
-                          <span style={{ color: isInactive ? 'var(--danger)' : isUnchanged ? 'var(--warning)' : 'var(--success)' }}>
-                            {connections.length > 0 ? connections[connections.length - 1] : 0}
-                            {isUnchanged && ' (стат.)'}
+                        </TableCell>
+                        <TableCell className="font-semibold">{formatSize(getDatabaseSize(db.name))}</TableCell>
+                        <TableCell>
+                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-amber-600' : 'text-green-600'}>
+                            {conns.length > 0 ? conns[conns.length - 1] : 0}
+                            {isUnchanged && <span className="text-xs ml-1">(стат.)</span>}
                           </span>
-                        </td>
-                        <td style={{ color: isInactive ? 'var(--danger)' : 'inherit' }}>
-                          {lastActivity ? formatTimestamp(lastActivity) : 'Никогда'}
-                        </td>
-                        <td>{formatCreationTime(db.creation_time)}</td>
-                        <td>
-                          <span className={`status-badge status-${db.exists ? 'ok' : 'error'}`}>
+                        </TableCell>
+                        <TableCell className={`text-sm ${isInactive ? 'text-destructive' : ''}`}>
+                          {lastAct ? formatTimestamp(lastAct) : 'Никогда'}
+                        </TableCell>
+                        <TableCell className="text-sm">{formatCreationTime(db.creation_time)}</TableCell>
+                        <TableCell>
+                          <Badge variant={db.exists ? 'default' : 'destructive'}>
                             {db.exists ? 'Активна' : 'Удалена'}
-                          </span>
-                        </td>
-                        <td>
-                          <Button 
-                            variant="outline-primary" 
-                            size="sm"
-                            onClick={() => navigate(`/server/${name}/db/${db.name}`)}
-                          >
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/server/${name}/db/${db.name}`)}>
                             Анализ
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
+                </TableBody>
               </Table>
-            </div>
-            {totalPages > 1 && (
-              <Card.Body>
-                <Pagination className="justify-content-center mb-0">
-                  <Pagination.First onClick={() => setCurrentPage(1)} disabled={currentPage === 1} />
-                  <Pagination.Prev onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} />
-                  {[...Array(Math.min(totalPages, 5))].map((_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    return (
-                      <Pagination.Item
-                        key={pageNum}
-                        active={pageNum === currentPage}
-                        onClick={() => setCurrentPage(pageNum)}
-                      >
-                        {pageNum}
-                      </Pagination.Item>
-                    );
-                  })}
-                  <Pagination.Next onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} />
-                  <Pagination.Last onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} />
-                </Pagination>
-              </Card.Body>
-            )}
+            </CardContent>
           </Card>
-        </Tab>
 
-        <Tab 
-          eventKey="analysis" 
-          title={
-            <span>
-              Анализ активности
-              {dbAnalysis && dbAnalysis.dead.length > 0 && (
-                <Badge bg="danger" className="ms-2">
-                  {dbAnalysis.dead.length}
-                </Badge>
-              )}
-            </span>
-          }
-        >
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious href="#" onClick={e => { e.preventDefault(); if (currentPage > 1) setCurrentPage(currentPage - 1); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  {getPageNumbers().map(p => (
+                    <PaginationItem key={p}>
+                      <PaginationLink href="#" onClick={e => { e.preventDefault(); setCurrentPage(p); }} isActive={p === currentPage}>
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext href="#" onClick={e => { e.preventDefault(); if (currentPage < totalPages) setCurrentPage(currentPage + 1); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Analysis tab */}
+        <TabsContent value="analysis">
           {dbAnalysis && (
-            <>
-              {/* Метрики */}
-              <div className="analysis-metrics">
-                <div className="metric-card danger">
-                  <div className="metric-label">Неактивные &gt; {criteria.deadDays} дней</div>
-                  <div className="metric-value">{dbAnalysis.dead.length}</div>
-                  <div className="metric-sublabel">
-                    {dbAnalysis.dead.reduce((sum, db) => sum + db.sizeGB, 0).toFixed(1)} ГБ
-                  </div>
-                </div>
-                <div className="metric-card warning">
-                  <div className="metric-label">Низкая активность</div>
-                  <div className="metric-value">{dbAnalysis.warning.length}</div>
-                  <div className="metric-sublabel">&lt; {criteria.lowActivityThreshold} подключений</div>
-                </div>
-                <div className="metric-card info">
-                  <div className="metric-label">Статичные подключения</div>
-                  <div className="metric-value">{dbAnalysis.static.length}</div>
-                  <div className="metric-sublabel">Без изменений &gt; {criteria.staticConnectionsDays} дней</div>
-                </div>
-                <div className="metric-card success">
-                  <div className="metric-label">Активные базы</div>
-                  <div className="metric-value">{dbAnalysis.healthy.length}</div>
-                  <div className="metric-sublabel">Используются регулярно</div>
-                </div>
+            <div className="space-y-6">
+              {/* Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="border-red-200 dark:border-red-900">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-red-600">
+                      <XCircle className="h-4 w-4" />
+                      <span className="text-xs">Неактивные {'>'} {criteria.deadDays}д</span>
+                    </div>
+                    <div className="text-3xl font-bold text-red-600 mt-1">{dbAnalysis.dead.length}</div>
+                    <p className="text-xs text-muted-foreground">{dbAnalysis.dead.reduce((s, d) => s + d.sizeGB, 0).toFixed(1)} ГБ</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-amber-200 dark:border-amber-900">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-xs">Низкая активность</span>
+                    </div>
+                    <div className="text-3xl font-bold text-amber-600 mt-1">{dbAnalysis.warning.length}</div>
+                    <p className="text-xs text-muted-foreground">{'<'} {criteria.lowActivityThreshold} подключений</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-blue-200 dark:border-blue-900">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <MinusCircle className="h-4 w-4" />
+                      <span className="text-xs">Статичные</span>
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 mt-1">{dbAnalysis.static.length}</div>
+                    <p className="text-xs text-muted-foreground">Без изменений {'>'} {criteria.staticConnectionsDays}д</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-green-200 dark:border-green-900">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="text-xs">Активные</span>
+                    </div>
+                    <div className="text-3xl font-bold text-green-600 mt-1">{dbAnalysis.healthy.length}</div>
+                    <p className="text-xs text-muted-foreground">Используются регулярно</p>
+                  </CardContent>
+                </Card>
               </div>
 
-              {/* Визуализация баз */}
-              <Card className="mb-4">
-                <Card.Header>
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span>Карта активности баз данных</span>
-                    <div className="filter-toolbar">
-                      <div className="select-wrapper">
-                        <Form.Select 
-                          className="filter-select"
-                          value={analysisFilter} 
-                          onChange={(e) => setAnalysisFilter(e.target.value)}
-                        >
-                          <option value="all">Все базы ({dbAnalysis.all.length})</option>
-                          <option value="dead">Неактивные ({dbAnalysis.dead.length})</option>
-                          <option value="warning">Низкая активность ({dbAnalysis.warning.length})</option>
-                          <option value="static">Статичные ({dbAnalysis.static.length})</option>
-                          <option value="healthy">Активные ({dbAnalysis.healthy.length})</option>
-                        </Form.Select>
-                        <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M7 10l5 5 5-5z"/>
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </Card.Header>
-                <Card.Body>
-                  <div className="db-grid">
-                    {(analysisFilter === 'all' ? dbAnalysis.all :
-                      analysisFilter === 'dead' ? dbAnalysis.dead :
-                      analysisFilter === 'warning' ? dbAnalysis.warning :
-                      analysisFilter === 'static' ? dbAnalysis.static :
-                      dbAnalysis.healthy
-                    ).map(db => (
-                      <div 
+              {/* Activity map */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                  <CardTitle className="text-sm">Карта активности баз данных</CardTitle>
+                  <Select value={analysisFilter} onValueChange={setAnalysisFilter}>
+                    <SelectTrigger className="w-[200px] h-8"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все базы ({dbAnalysis.all.length})</SelectItem>
+                      <SelectItem value="dead">Неактивные ({dbAnalysis.dead.length})</SelectItem>
+                      <SelectItem value="warning">Низкая активность ({dbAnalysis.warning.length})</SelectItem>
+                      <SelectItem value="static">Статичные ({dbAnalysis.static.length})</SelectItem>
+                      <SelectItem value="healthy">Активные ({dbAnalysis.healthy.length})</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                    {getAnalysisData().map(db => (
+                      <div
                         key={db.name}
-                        className={`db-tile ${db.status}`}
+                        className={`p-2 rounded-md border cursor-pointer hover:shadow-md transition-shadow ${getTileColor(db.status)}`}
                         title={db.reason}
                         onClick={() => navigate(`/server/${name}/db/${db.name}`)}
-                        style={{ cursor: 'pointer' }}
                       >
-                        <div className="db-name">{db.name}</div>
-                        <div className="db-info">{db.sizeGB.toFixed(1)} ГБ</div>
-                        <div className="db-info">
-                          {db.daysSinceActivity === Infinity ? 'Никогда' : `${db.daysSinceActivity}д назад`}
+                        <div className="text-xs font-medium truncate">{db.name}</div>
+                        <div className="text-[10px] text-muted-foreground">{db.sizeGB.toFixed(1)} ГБ</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {db.daysSinceActivity === Infinity ? 'Никогда' : `${db.daysSinceActivity}д`}
                         </div>
                       </div>
                     ))}
                   </div>
-                </Card.Body>
+                </CardContent>
               </Card>
-            </>
+            </div>
           )}
-        </Tab>
+        </TabsContent>
 
-        <Tab eventKey="settings" title="Настройки критериев">
+        {/* Settings tab */}
+        <TabsContent value="settings">
           <Card>
-            <Card.Header>Критерии определения неактивных баз</Card.Header>
-            <Card.Body>
-              <Form className="criteria-form">
-                <Form.Group className="mb-3">
-                  <Form.Label>Считать базу неактивной если нет подключений (дней):</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    value={criteria.deadDays}
-                    onChange={(e) => handleCriteriaChange('deadDays', e.target.value)}
-                    min="1"
-                    max="365"
-                    disabled={!canEditCriteria}
-                  />
-                  <Form.Text className="text-muted">
-                    Базы без подключений более указанного количества дней считаются неактивными
-                  </Form.Text>
-                </Form.Group>
+            <CardHeader>
+              <CardTitle>Критерии определения неактивных баз</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Считать базу неактивной если нет подключений (дней)</Label>
+                <Input type="number" className="max-w-xs" value={criteria.deadDays} onChange={e => handleCriteriaChange('deadDays', e.target.value)} min="1" max="365" disabled={!canEditCriteria} />
+                <p className="text-xs text-muted-foreground">Базы без подключений более указанного количества дней считаются неактивными</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Считать подключения статичными если нет изменений (дней)</Label>
+                <Input type="number" className="max-w-xs" value={criteria.staticConnectionsDays} onChange={e => handleCriteriaChange('staticConnectionsDays', e.target.value)} min="1" max="90" disabled={!canEditCriteria} />
+                <p className="text-xs text-muted-foreground">База с постоянным числом подключений без изменений</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Порог низкой активности (подключений)</Label>
+                <Input type="number" className="max-w-xs" value={criteria.lowActivityThreshold} onChange={e => handleCriteriaChange('lowActivityThreshold', e.target.value)} min="1" max="20" disabled={!canEditCriteria} />
+                <p className="text-xs text-muted-foreground">Среднее количество подключений для предупреждения о низкой активности</p>
+              </div>
 
-                <Form.Group className="mb-3">
-                  <Form.Label>Считать подключения статичными если нет изменений (дней):</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    value={criteria.staticConnectionsDays}
-                    onChange={(e) => handleCriteriaChange('staticConnectionsDays', e.target.value)}
-                    min="1"
-                    max="90"
-                    disabled={!canEditCriteria}
-                  />
-                  <Form.Text className="text-muted">
-                    База с постоянным числом подключений без изменений
-                  </Form.Text>
-                </Form.Group>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>Порог низкой активности (подключений):</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    value={criteria.lowActivityThreshold}
-                    onChange={(e) => handleCriteriaChange('lowActivityThreshold', e.target.value)}
-                    min="1"
-                    max="20"
-                    disabled={!canEditCriteria}
-                  />
-                  <Form.Text className="text-muted">
-                    Среднее количество подключений для предупреждения о низкой активности
-                  </Form.Text>
-                </Form.Group>
-
-                {canEditCriteria ? (
-                  <div className="d-flex gap-2">
-                    <Button 
-                      variant="primary" 
-                      onClick={handleSaveCriteria}
-                      disabled={!criteriaChanged}
-                    >
-                      Сохранить изменения
-                    </Button>
-                    <Button 
-                      variant="outline-secondary" 
-                      onClick={handleResetCriteria}
-                    >
-                      Сбросить по умолчанию
-                    </Button>
-                  </div>
-                ) : (
-                  <Alert variant="info">
-                    Только администраторы и операторы могут изменять критерии анализа
-                  </Alert>
-                )}
-              </Form>
-            </Card.Body>
+              {canEditCriteria ? (
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveCriteria} disabled={!criteriaChanged}>Сохранить</Button>
+                  <Button variant="outline" onClick={handleResetCriteria}>Сбросить по умолчанию</Button>
+                </div>
+              ) : (
+                <Alert>
+                  <AlertDescription>Только администраторы и операторы могут изменять критерии анализа</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
           </Card>
-        </Tab>
+        </TabsContent>
       </Tabs>
     </div>
   );

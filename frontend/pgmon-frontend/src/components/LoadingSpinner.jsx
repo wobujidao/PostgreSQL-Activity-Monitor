@@ -1,26 +1,14 @@
-import React from 'react';
-import './LoadingSpinner.css';
+import { Loader2 } from 'lucide-react';
 
 function LoadingSpinner({ text = "Загрузка...", subtext = "Пожалуйста, подождите" }) {
   return (
-    <div className="loading-container">
-      <div className="spinner-wrapper">
-        <div className="modern-spinner"></div>
-        <div className="spinner-inner">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-          </svg>
-        </div>
-        <div className="spinner-dots">
-          <div className="spinner-dot"></div>
-          <div className="spinner-dot"></div>
-          <div className="spinner-dot"></div>
-          <div className="spinner-dot"></div>
-        </div>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+      <div className="relative">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
-      <div>
-        <div className="loading-text">{text}</div>
-        <div className="loading-subtext">{subtext}</div>
+      <div className="text-center">
+        <p className="text-lg font-medium text-foreground">{text}</p>
+        <p className="text-sm text-muted-foreground">{subtext}</p>
       </div>
     </div>
   );

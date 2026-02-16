@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import './Login.css';
+import { useState } from 'react';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Shield, AlertCircle } from 'lucide-react';
 
 function Login({ onLogin, error: parentError }) {
   const [username, setUsername] = useState('');
@@ -10,12 +15,10 @@ function Login({ onLogin, error: parentError }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLocalError('');
-    
     if (!username.trim() || !password) {
       setLocalError('Пожалуйста, заполните все поля');
       return;
     }
-
     setLoading(true);
     await onLogin(username, password);
     setLoading(false);
@@ -24,78 +27,67 @@ function Login({ onLogin, error: parentError }) {
   const error = parentError || localError;
 
   return (
-    <div className="login-container">
-      {/* Login Box */}
-      <div className="login-box">
-        {/* Logo Section */}
-        <div className="login-logo">
-          <div className="login-logo-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-            </svg>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <Card className="w-full max-w-md border-0 shadow-2xl bg-white/95 backdrop-blur-sm">
+        <CardHeader className="text-center pb-2 pt-8">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg">
+            <Shield className="h-8 w-8 text-white" />
           </div>
-          <h1 className="login-title">PostgreSQL Monitor</h1>
-          <p className="login-subtitle">Система мониторинга активности баз</p>
-        </div>
+          <h1 className="text-2xl font-bold text-slate-900">PostgreSQL Monitor</h1>
+          <p className="text-sm text-muted-foreground">Система мониторинга активности баз</p>
+        </CardHeader>
 
-        {/* Error Alert */}
-        {error && (
-          <div className="login-error">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
-            {error}
-          </div>
-        )}
+        <CardContent className="px-8">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {/* Login Form */}
-        <form className="login-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="username">Логин</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              id="username" 
-              placeholder="Введите ваш логин"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              autoComplete="username"
-              autoFocus
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Логин</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Введите ваш логин"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoFocus
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Пароль</label>
-            <input 
-              type="password" 
-              className="form-control" 
-              id="password" 
-              placeholder="Введите ваш пароль"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Пароль</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Введите ваш пароль"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
 
-          <button type="submit" className="btn-login" disabled={loading}>
-            {loading ? (
-              <>
-                <div className="login-spinner"></div>
-                <span>Вход...</span>
-              </>
-            ) : (
-              <span>Войти в систему</span>
-            )}
-          </button>
-        </form>
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Вход...
+                </>
+              ) : (
+                'Войти в систему'
+              )}
+            </Button>
+          </form>
+        </CardContent>
 
-        {/* Footer */}
-        <div className="login-footer">
-          PostgreSQL Activity Monitor v2.0
-        </div>
-      </div>
+        <CardFooter className="justify-center pb-6">
+          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.0</p>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
