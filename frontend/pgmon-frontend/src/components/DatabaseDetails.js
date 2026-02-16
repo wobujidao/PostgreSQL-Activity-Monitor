@@ -37,11 +37,9 @@ function DatabaseDetails() {
         return;
       }
 
-      console.log('Fetching stats for:', name, db_name);
       const statsResponse = await axios.get(`https://pam.cbmo.mosreg.ru/server/${name}/db/${db_name}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('Stats response:', statsResponse.data);
 
       const historyResponse = await axios.get(`https://pam.cbmo.mosreg.ru/server/${name}/db/${db_name}/stats`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -50,14 +48,10 @@ function DatabaseDetails() {
           end_date: endDate.toISOString()
         }
       });
-      console.log('History response:', historyResponse.data);
-
       setDbStats(statsResponse.data);
       setDbHistory(historyResponse.data);
       setError(null);
-      console.log('States updated:', { dbStats: statsResponse.data, dbHistory: historyResponse.data });
     } catch (err) {
-      console.error('Fetch error:', err);
       const errorMessage = err.response?.status === 401 ? 'Недействительный токен, пожалуйста, войдите заново' : (err.response?.data?.detail || err.message);
       setError('Ошибка загрузки статистики базы: ' + errorMessage);
       if (err.response?.status === 401) {
@@ -79,11 +73,8 @@ function DatabaseDetails() {
 
   useEffect(() => {
     if (!dbHistory || !dbHistory.timeline || !connectionsCanvasRef.current || !sizeCanvasRef.current || !commitsCanvasRef.current) {
-      console.log('Skipping chart render: incomplete data or canvas refs', { dbHistory, connectionsCanvasRef: !!connectionsCanvasRef.current });
       return;
     }
-
-    console.log('Rendering charts with timeline:', dbHistory.timeline);
 
     if (connectionsChartRef.current) {
       connectionsChartRef.current.destroy();
@@ -250,8 +241,6 @@ function DatabaseDetails() {
       timeZone: 'Europe/Moscow'
     });
   };
-
-  console.log('Rendering with states:', { dbStats, dbHistory, error, loading });
 
   return (
     <div className="container mt-5">

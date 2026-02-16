@@ -11,17 +11,12 @@ LOG_FILE="/var/log/pg_stats.log"
 MAX_LOG_SIZE=5242880  # 5 МБ
 LOCK_FILE="/tmp/pg_stats_collection.lock"
 
-# Проверка на повторный запуск
-if [ -f "$LOCK_FILE" ]; then
-    PID=$(cat "$LOCK_FILE")
-    if ps -p $PID > /dev/null 2>&1; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Скрипт уже запущен (PID: $PID)" >> "$LOG_FILE"
-        exit 0
-    else
-        rm -f "$LOCK_FILE"
-    fi
+# Атомарная блокировка через flock (защита от race condition)
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Скрипт уже запущен" >> "$LOG_FILE"
+    exit 0
 fi
-echo $$ > "$LOCK_FILE"
 trap "rm -f $LOCK_FILE" EXIT
 
 # Текущее время
@@ -156,9 +151,11 @@ if [ -n "$NEW_DBS" ]; then
       echo "$(date '+%Y-%m-%d %H:%M:%S') - Дата создания для $datname: $CREATION_TIME" >> "$LOG_FILE"
     fi
     
+    # Экранируем имя БД для защиты от SQL injection
+    safe_datname="${datname//\'/\'\'}"
     psql -h "$PGHOST" -d "$STAT_DB" -U "$PGUSER" -c "
       INSERT INTO db_creation (datname, creation_time, oid)
-      VALUES ('$datname', '$CREATION_TIME', $oid)
+      VALUES ('$safe_datname', '$CREATION_TIME', $oid)
       ON CONFLICT (datname) DO UPDATE
       SET oid = $oid, creation_time = '$CREATION_TIME'
       WHERE db_creation.oid != $oid;

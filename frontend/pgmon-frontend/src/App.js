@@ -35,7 +35,6 @@ function AppContent() {
       const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
       return JSON.parse(jsonPayload);
     } catch (e) {
-      console.error('Ошибка декодирования токена:', e);
       return null;
     }
   };
@@ -62,9 +61,7 @@ function AppContent() {
       setRefreshPassword('');
       setTimeLeft(300);
       setBackendStatus('available');
-      console.log('Токен успешно продлён:', newToken);
     } catch (error) {
-      console.error('Ошибка продления токена:', error);
       setError('Ошибка продления сессии: ' + (error.response?.data?.detail || 'Неизвестная ошибка'));
       setShowRefreshLoginModal(true);
     } finally {
@@ -118,7 +115,7 @@ function AppContent() {
           setUserRole(response.data.role);
           localStorage.setItem('userRole', response.data.role);
         } catch (error) {
-          console.error('Ошибка получения информации о пользователе:', error);
+          // Ошибка получения информации о пользователе
         }
       }
     };
@@ -175,7 +172,8 @@ function AppContent() {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
     };
-  }, [timeLeft, showSessionModal, showRefreshLoginModal, WARNING_TIME_MS]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, showSessionModal, showRefreshLoginModal]);
 
   const login = async (username, password) => {
     try {
@@ -357,7 +355,7 @@ function AppContent() {
               placeholder="Пароль"
               value={refreshPassword}
               onChange={(e) => setRefreshPassword(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleRefreshLogin()}
+              onKeyDown={(e) => e.key === 'Enter' && handleRefreshLogin()}
             />
             {error && <div className="alert alert-danger py-2">{error}</div>}
           </div>

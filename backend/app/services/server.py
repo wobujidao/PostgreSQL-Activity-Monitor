@@ -10,7 +10,6 @@ from app.utils import ensure_encrypted, ensure_decrypted, is_encrypted, fix_doub
 from app.database import db_pool
 from app.services.cache import cache_manager
 from app.services.ssh import get_ssh_disk_usage, is_host_reachable
-import signal
 import time
 
 logger = logging.getLogger(__name__)
@@ -69,12 +68,6 @@ def save_servers(servers: list[Server]):
     except Exception as e:
         logger.error(f"Ошибка сохранения серверов: {e}")
         raise
-
-class TimeoutError(Exception):
-    pass
-
-def timeout_handler(signum, frame):
-    raise TimeoutError("Превышено время ожидания подключения")
 
 def connect_to_server(server: Server) -> dict[str, Any]:
     """Получение информации о сервере с кэшированием и таймаутами"""
@@ -140,42 +133,27 @@ def connect_to_server(server: Server) -> dict[str, Any]:
     else:
         start_time = time.time()
         try:
-            # Устанавливаем обработчик таймаута (только для Unix)
-            if hasattr(signal, 'SIGALRM'):
-                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(5)  # 5 секунд на все операции
-            
-            try:
-                with db_pool.get_connection(server) as conn:
-                    # Устанавливаем таймаут для операций
-                    with conn.cursor() as cur:
-                        cur.execute("SET statement_timeout = 5000;")  # 5 секунд
-                        
-                        cur.execute("SHOW server_version;")
-                        result["version"] = cur.fetchone()[0]
-                        
-                        cur.execute("SELECT state, COUNT(*) FROM pg_stat_activity GROUP BY state;")
-                        result["connections"] = dict(cur.fetchall())
-                        
-                        cur.execute("SELECT pg_postmaster_start_time();")
-                        start_time_pg = cur.fetchone()[0]
-                        now_utc = datetime.now(timezone.utc)
-                        result["uptime_hours"] = round((now_utc - start_time_pg).total_seconds() / 3600, 2)
-                        
-                        cur.execute("SHOW data_directory;")
-                        result["data_dir"] = cur.fetchone()[0]
-                
-                result["status"] = "ok"
-                logger.info(f"Сервер {server.name} доступен (время: {time.time() - start_time:.2f}с)")
-                
-            finally:
-                if hasattr(signal, 'SIGALRM'):
-                    signal.alarm(0)  # Отключаем таймаут
-                    signal.signal(signal.SIGALRM, old_handler)  # Восстанавливаем старый обработчик
-                    
-        except TimeoutError:
-            result["status"] = "PostgreSQL: connection timeout (5s)"
-            logger.error(f"Таймаут подключения к {server.name} (5 секунд)")
+            with db_pool.get_connection(server) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SET statement_timeout = 5000;")  # 5 секунд
+
+                    cur.execute("SHOW server_version;")
+                    result["version"] = cur.fetchone()[0]
+
+                    cur.execute("SELECT state, COUNT(*) FROM pg_stat_activity GROUP BY state;")
+                    result["connections"] = dict(cur.fetchall())
+
+                    cur.execute("SELECT pg_postmaster_start_time();")
+                    start_time_pg = cur.fetchone()[0]
+                    now_utc = datetime.now(timezone.utc)
+                    result["uptime_hours"] = round((now_utc - start_time_pg).total_seconds() / 3600, 2)
+
+                    cur.execute("SHOW data_directory;")
+                    result["data_dir"] = cur.fetchone()[0]
+
+            result["status"] = "ok"
+            logger.info(f"Сервер {server.name} доступен (время: {time.time() - start_time:.2f}с)")
+
         except socket.timeout:
             result["status"] = "PostgreSQL: socket timeout"
             logger.error(f"PostgreSQL socket таймаут для {server.name}")

@@ -75,8 +75,9 @@ def get_ssh_client(server: Server) -> paramiko.SSHClient:
                 passphrase
             )
             
-            # Создаем временный файл для ключа
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+            # Создаем временный файл для ключа с ограниченными правами
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.key') as tmp_file:
+                os.chmod(tmp_file.name, 0o600)
                 tmp_file.write(private_key_content)
                 tmp_file_path = tmp_file.name
             
@@ -128,41 +129,48 @@ def get_ssh_disk_usage(server: Server, data_dir: str) -> tuple[int | None, int |
         logger.warning(f"SSH недоступен для {server.name}")
         return None, None, "unreachable"
     
+    ssh = None
     try:
         logger.debug(f"SSH подключение к {server.name}")
         ssh = get_ssh_client(server)
-        
-        # Извлекаем точку монтирования
+
+        # Извлекаем точку монтирования и валидируем (защита от command injection)
         mount_point = data_dir.split('/DB')[0] if '/DB' in data_dir else data_dir
+        if not mount_point or not mount_point.startswith('/') or '..' in mount_point:
+            logger.warning(f"Невалидный mount_point для {server.name}: {mount_point}")
+            return None, None, "invalid mount point"
+        # Удаляем опасные символы
+        import re
+        if not re.match(r'^[a-zA-Z0-9/_.-]+$', mount_point):
+            logger.warning(f"Подозрительный mount_point для {server.name}: {mount_point}")
+            return None, None, "invalid mount point characters"
+
         cmd = f"df -B1 {mount_point}"
         stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
         df_output = stdout.read().decode().strip().splitlines()
         error_output = stderr.read().decode().strip()
-        
+
         if error_output:
             logger.warning(f"Ошибка df для {server.name}: {error_output}")
-            ssh.close()
             return None, None, f"df error: {error_output}"
-        
+
         if len(df_output) > 1:
             columns = df_output[1].split()
             if len(columns) >= 4:
                 total_space = int(columns[1])
                 free_space = int(columns[3])
-                
+
                 # Сохраняем в кэш
                 cache_manager.set_ssh_cache(cache_key, {
                     "free_space": free_space,
                     "total_space": total_space
                 })
-                
-                ssh.close()
+
                 logger.debug(f"SSH данные получены для {server.name}")
                 return free_space, total_space, "ok"
-        
-        ssh.close()
+
         return None, None, "invalid df output"
-        
+
     except socket.timeout:
         logger.error(f"SSH таймаут для {server.name}")
         return None, None, "timeout"
@@ -172,3 +180,6 @@ def get_ssh_disk_usage(server: Server, data_dir: str) -> tuple[int | None, int |
     except Exception as e:
         logger.error(f"SSH ошибка для {server.name}: {e}")
         return None, None, str(e)
+    finally:
+        if ssh:
+            ssh.close()

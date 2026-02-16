@@ -46,10 +46,12 @@ async def list_ssh_keys(current_user: User = Depends(get_current_user)):
         
         # Для оператора скрываем публичные ключи
         if current_user.role == "operator":
+            result = []
             for key in keys:
                 key_dict = key.model_dump()
                 key_dict['public_key'] = "[Скрыто для оператора]"
-                keys[keys.index(key)] = SSHKeyResponse(**key_dict)
+                result.append(SSHKeyResponse(**key_dict))
+            return result
         return [SSHKeyResponse(**key.model_dump()) for key in keys]
     except Exception as e:
         logger.error(f"Ошибка получения списка ключей: {e}")
@@ -173,9 +175,11 @@ async def import_ssh_key_file(
         content = await file.read()
         private_key = content.decode('utf-8')
         
-        # Используем имя файла если имя не указано
+        # Используем имя файла если имя не указано (с защитой от path traversal)
         if not name:
-            name = file.filename.replace('.pem', '').replace('.key', '')
+            import os
+            safe_filename = os.path.basename(file.filename or "imported_key")
+            name = safe_filename.replace('.pem', '').replace('.key', '')
         
         # Проверяем уникальность имени
         existing_keys = ssh_key_storage.list_keys()

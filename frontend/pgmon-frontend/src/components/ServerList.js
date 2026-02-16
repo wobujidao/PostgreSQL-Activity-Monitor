@@ -49,7 +49,6 @@ function ServerList() {
         setServers(response.data);
         setLoading(false);
       } catch (error) {
-        console.error('Ошибка загрузки серверов:', error);
         setErrorMessage('Ошибка загрузки серверов: ' + (error.message || 'Неизвестная ошибка'));
         setLoading(false);
       }
@@ -84,7 +83,6 @@ function ServerList() {
         });
         setSSHKeys(response.data);
       } catch (error) {
-        console.error('Ошибка загрузки SSH-ключей:', error);
       }
     };
 
@@ -134,10 +132,8 @@ function ServerList() {
         });
         setShowAddModal(false);
         setSSHTestResult(null);
-        console.log('Сервер успешно добавлен:', response.data);
       }
     } catch (error) {
-      console.error('Ошибка добавления сервера:', error);
       const errorMsg = error.response?.data?.detail || error.message || 'Неизвестная ошибка';
       setErrorMessage('Ошибка при добавлении сервера: ' + errorMsg);
     }

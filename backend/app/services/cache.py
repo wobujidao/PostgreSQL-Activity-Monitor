@@ -6,6 +6,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+MAX_CACHE_SIZE = 500  # Максимальное количество записей в каждом кэше
+
+
 class CacheManager:
     def __init__(self):
         self.ssh_cache = {}
@@ -14,14 +17,19 @@ class CacheManager:
         self.server_status_cache_lock = threading.Lock()
     
     def clear_cache(self, cache, lock, ttl):
-        """Universal cache cleanup function"""
+        """Universal cache cleanup function with size limit"""
         current_time = time.time()
         with lock:
-            expired = [key for key, value in cache.items() 
+            expired = [key for key, value in cache.items()
                       if current_time - value["timestamp"] > ttl]
             for key in expired:
-                logger.debug("Removing expired cache entry: {}".format(key))
+                logger.debug(f"Removing expired cache entry: {key}")
                 del cache[key]
+            # Ограничиваем размер кэша — удаляем самые старые записи
+            if len(cache) > MAX_CACHE_SIZE:
+                sorted_keys = sorted(cache, key=lambda k: cache[k]["timestamp"])
+                for key in sorted_keys[:len(cache) - MAX_CACHE_SIZE]:
+                    del cache[key]
     
     def get_ssh_cache(self, key):
         """Get data from SSH cache"""
