@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="PostgreSQL Activity Monitor API",
     description="API для мониторинга активности PostgreSQL серверов",
-    version="2.0",
+    version="2.1",
     lifespan=lifespan
 )
 

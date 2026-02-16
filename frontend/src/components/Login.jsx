@@ -85,7 +85,7 @@ function Login({ onLogin, error: parentError }) {
         </CardContent>
 
         <CardFooter className="justify-center pb-6">
-          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.0</p>
+          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.1</p>
         </CardFooter>
       </Card>
     </div>
