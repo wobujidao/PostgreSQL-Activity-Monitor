@@ -19,8 +19,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      const hadToken = localStorage.getItem(LS_TOKEN);
       localStorage.removeItem(LS_TOKEN);
-      window.location.href = '/';
+      // Перезагрузка только если был токен (сессия истекла), иначе — цикл
+      if (hadToken) {
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   }

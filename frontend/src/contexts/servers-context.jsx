@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import { SERVERS_REFRESH_INTERVAL } from '@/lib/constants';
+import { SERVERS_REFRESH_INTERVAL, LS_TOKEN } from '@/lib/constants';
 
 export const ServersContext = createContext(null);
 
@@ -12,6 +12,11 @@ export function ServersProvider({ children }) {
   const [paused, setPaused] = useState(false);
 
   const fetchServers = useCallback(async () => {
+    const token = localStorage.getItem(LS_TOKEN);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await api.get('/servers');
       setServers(response.data);
@@ -23,6 +28,11 @@ export function ServersProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    const token = localStorage.getItem(LS_TOKEN);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetchServers();
     const interval = setInterval(() => {
       if (!paused) {
