@@ -6,7 +6,6 @@ import 'chartjs-adapter-date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import debounce from 'lodash/debounce';
 import LoadingSpinner from './LoadingSpinner';
 import './ServerDetails.css';
 
@@ -243,17 +242,17 @@ function ServerDetails() {
     }
   }, [name, startDate, endDate, serverCacheKey]);
 
-  const debouncedFetchData = useCallback(debounce(fetchData, 500), [fetchData]);
-
   useEffect(() => {
     isMounted.current = true;
-    debouncedFetchData();
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 500);
 
     return () => {
       isMounted.current = false;
-      debouncedFetchData.cancel();
+      clearTimeout(timer);
     };
-  }, [debouncedFetchData]);
+  }, [fetchData]);
 
   useEffect(() => {
     if (!stats || !connectionsCanvasRef.current || !sizeCanvasRef.current) return;
@@ -749,7 +748,7 @@ function ServerDetails() {
             >
               <option value="">Все базы</option>
               <option value="no-conn">Только активные</option>
-              <option value="static">Неактивные > {criteria.deadDays} дней</option>
+              <option value="static">Неактивные {'>'} {criteria.deadDays} дней</option>
             </select>
             <svg className="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 10l5 5 5-5z"/>
