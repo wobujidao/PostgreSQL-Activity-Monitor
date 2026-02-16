@@ -10,6 +10,36 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["stats"])
 
+
+def get_aggregation_params(start_dt, end_dt):
+    """Определяет параметры агрегации SQL в зависимости от диапазона дат."""
+    delta_days = (end_dt - start_dt).total_seconds() / 86400
+
+    if delta_days <= 2:
+        return {
+            "trunc": "ts",
+            "group": "ts",
+            "level": "raw",
+        }
+    elif delta_days <= 14:
+        return {
+            "trunc": "date_trunc('hour', ts)",
+            "group": "date_trunc('hour', ts)",
+            "level": "hour",
+        }
+    elif delta_days <= 90:
+        return {
+            "trunc": "to_timestamp(floor(extract(epoch from ts) / 14400) * 14400)",
+            "group": "floor(extract(epoch from ts) / 14400)",
+            "level": "4hour",
+        }
+    else:
+        return {
+            "trunc": "date_trunc('day', ts)",
+            "group": "date_trunc('day', ts)",
+            "level": "day",
+        }
+
 @router.get("/server_stats/{server_name}")
 async def get_server_stats(server_name: str, current_user: dict = Depends(get_current_user)):
     """Получить текущую активность на сервере"""
@@ -83,15 +113,16 @@ async def get_server_stats_details(
                 stats_dbs = [{"name": row[0], "creation_time": row[1].isoformat() if row[1] else None} 
                             for row in cur.fetchall()]
                 
-                # Timeline
-                cur.execute("""
-                    SELECT date_trunc('hour', ts) as ts, datname, 
-                           AVG(numbackends) as avg_connections, 
-                           AVG(db_size::float / (1048576 * 1024)) as avg_size_gb
+                # Timeline с адаптивной агрегацией
+                agg = get_aggregation_params(start_date_dt, end_date_dt)
+                cur.execute(f"""
+                    SELECT {agg['trunc']} as ts, datname,
+                           AVG(numbackends) as avg_connections,
+                           MAX(db_size::float / (1048576 * 1024)) as max_size_gb
                     FROM pg_statistics
                     WHERE ts BETWEEN %s AND %s
-                    GROUP BY date_trunc('hour', ts), datname
-                    ORDER BY date_trunc('hour', ts);
+                    GROUP BY {agg['group']}, datname
+                    ORDER BY 1;
                 """, (start_date_dt, end_date_dt))
                 timeline = [
                     {
@@ -103,6 +134,7 @@ async def get_server_stats_details(
                     for row in cur.fetchall()
                 ]
                 result["connection_timeline"] = timeline
+                result["aggregation"] = agg["level"]
         
         # Проверяем существующие БД
         with db_pool.get_connection(server) as conn:
@@ -229,16 +261,17 @@ async def get_database_stats_details(
                 creation_time = cur.fetchone()
                 result["creation_time"] = creation_time[0].isoformat() if creation_time else None
                 
-                # Timeline для графиков
-                cur.execute("""
-                    SELECT date_trunc('hour', ts) as ts, 
+                # Timeline с адаптивной агрегацией
+                agg = get_aggregation_params(start_date_dt, end_date_dt)
+                cur.execute(f"""
+                    SELECT {agg['trunc']} as ts,
                            AVG(numbackends) as avg_connections,
-                           AVG(db_size::float / 1048576) as avg_size_mb, 
+                           MAX(db_size::float / 1048576) as max_size_mb,
                            SUM(xact_commit) as total_commits
                     FROM pg_statistics
                     WHERE datname = %s AND ts BETWEEN %s AND %s
-                    GROUP BY date_trunc('hour', ts)
-                    ORDER BY date_trunc('hour', ts);
+                    GROUP BY {agg['group']}
+                    ORDER BY 1;
                 """, (db_name, start_date_dt, end_date_dt))
                 timeline = [
                     {
@@ -250,6 +283,7 @@ async def get_database_stats_details(
                     for row in cur.fetchall()
                 ]
                 result["timeline"] = timeline
+                result["aggregation"] = agg["level"]
         
         return result
         

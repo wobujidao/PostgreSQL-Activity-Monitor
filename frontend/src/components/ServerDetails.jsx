@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Filler, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import { chartOptions, makeDataset, CHART_COLORS, gradientPlugin } from '@/lib/chart-config';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -33,7 +34,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Filler, Title, ChartTooltip, Legend);
 
 const loadCriteria = () => {
   try {
@@ -195,29 +196,23 @@ function ServerDetails() {
     sizeChartRef.current = null;
 
     const timeline = getAggregatedTimeline();
-    const chartOpts = (title, yLabel) => ({
-      responsive: true,
-      plugins: { legend: { position: 'top' }, title: { display: true, text: title } },
-      scales: {
-        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd.MM.yyyy HH:mm' }, title: { display: true, text: 'Дата и время' } },
-        y: { type: 'linear', title: { display: true, text: yLabel } },
-      },
-      animation: false,
-    });
+    const rangeDays = Math.max(1, Math.round((endDate - startDate) / 86400000));
 
     connectionsChartRef.current = new ChartJS(connectionsCanvasRef.current.getContext('2d'), {
       type: 'line',
-      data: { datasets: [{ label: 'Общие подключения', data: timeline.map(d => ({ x: new Date(d.ts), y: d.connections })), fill: false, borderColor: 'rgba(75, 192, 192, 1)', tension: 0.1 }] },
-      options: chartOpts(`Подключения к серверу ${name}`, 'Количество подключений'),
+      data: { datasets: [makeDataset('Подключения', timeline.map(d => ({ x: new Date(d.ts), y: d.connections })), CHART_COLORS.connections)] },
+      options: chartOptions('Количество', { days: rangeDays }),
+      plugins: [gradientPlugin],
     });
     sizeChartRef.current = new ChartJS(sizeCanvasRef.current.getContext('2d'), {
       type: 'line',
-      data: { datasets: [{ label: 'Общий размер (ГБ)', data: timeline.filter(d => d.size_gb > 0).map(d => ({ x: new Date(d.ts), y: d.size_gb })), fill: false, borderColor: 'rgba(153, 102, 255, 1)', tension: 0.1 }] },
-      options: chartOpts(`Размер баз ${name}`, 'Размер (ГБ)'),
+      data: { datasets: [makeDataset('Размер (ГБ)', timeline.filter(d => d.size_gb > 0).map(d => ({ x: new Date(d.ts), y: d.size_gb })), CHART_COLORS.sizeGb)] },
+      options: chartOptions('ГБ', { days: rangeDays }),
+      plugins: [gradientPlugin],
     });
 
     return () => { connectionsChartRef.current?.destroy(); sizeChartRef.current?.destroy(); };
-  }, [stats, activeTab, name, getAggregatedTimeline]);
+  }, [stats, activeTab, name, getAggregatedTimeline, startDate, endDate]);
 
   // --- Sorting, filtering, pagination ---
   const handleSort = (col) => {
@@ -400,7 +395,7 @@ function ServerDetails() {
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium">Период:</span>
-            {[{ d: 1, l: '24ч' }, { d: 7, l: '7д' }, { d: 30, l: '30д' }, { d: 90, l: '90д' }].map(({ d, l }) => (
+            {[{ d: 1, l: '24ч' }, { d: 7, l: '7д' }, { d: 30, l: '30д' }, { d: 90, l: '90д' }, { d: 365, l: '1г' }].map(({ d, l }) => (
               <Button key={d} variant={selectedDateRange === d ? 'default' : 'outline'} size="sm" onClick={() => setDateRange(d)} disabled={isLoading}>
                 {l}
               </Button>

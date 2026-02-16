@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Filler, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import { chartOptions, makeDataset, CHART_COLORS, gradientPlugin, DATE_RANGES } from '@/lib/chart-config';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import PageHeader from './PageHeader';
@@ -19,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, RefreshCw, Database, Activity, HardDrive, GitCommit } from 'lucide-react';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Title, ChartTooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, TimeScale, Filler, Title, ChartTooltip, Legend);
 
 function DatabaseDetails() {
   const { name, db_name } = useParams();
@@ -75,40 +76,27 @@ function DatabaseDetails() {
     sizeChartRef.current?.destroy();
     commitsChartRef.current?.destroy();
 
-    const chartOpts = (title, yLabel) => ({
-      responsive: true,
-      plugins: { legend: { position: 'top' }, title: { display: true, text: title } },
-      scales: {
-        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd.MM.yyyy HH:mm' }, title: { display: true, text: 'Дата и время' } },
-        y: { type: 'linear', title: { display: true, text: yLabel } },
-      },
-      animation: false,
-    });
-
-    const makeDataset = (label, key, color) => ({
-      label,
-      data: dbHistory.timeline.map(d => ({ x: new Date(d.ts), y: d[key] })),
-      fill: false,
-      borderColor: color,
-      tension: 0.1,
-    });
+    const rangeDays = Math.max(1, Math.round((endDate - startDate) / 86400000));
 
     connectionsChartRef.current = new ChartJS(connectionsCanvasRef.current.getContext('2d'), {
       type: 'line',
-      data: { datasets: [makeDataset('Подключения', 'connections', 'rgba(75, 192, 192, 1)')] },
-      options: chartOpts(`Подключения к базе ${db_name}`, 'Количество подключений'),
+      data: { datasets: [makeDataset('Подключения', dbHistory.timeline.map(d => ({ x: new Date(d.ts), y: d.connections })), CHART_COLORS.connections)] },
+      options: chartOptions('Количество', { days: rangeDays }),
+      plugins: [gradientPlugin],
     });
 
     sizeChartRef.current = new ChartJS(sizeCanvasRef.current.getContext('2d'), {
       type: 'line',
-      data: { datasets: [makeDataset('Размер (МБ)', 'size_mb', 'rgba(153, 102, 255, 1)')] },
-      options: chartOpts(`Размер базы ${db_name}`, 'Размер (МБ)'),
+      data: { datasets: [makeDataset('Размер (МБ)', dbHistory.timeline.map(d => ({ x: new Date(d.ts), y: d.size_mb })), CHART_COLORS.size)] },
+      options: chartOptions('МБ', { days: rangeDays }),
+      plugins: [gradientPlugin],
     });
 
     commitsChartRef.current = new ChartJS(commitsCanvasRef.current.getContext('2d'), {
       type: 'line',
-      data: { datasets: [makeDataset('Коммиты', 'commits', 'rgba(255, 99, 132, 1)')] },
-      options: chartOpts(`Коммиты в базе ${db_name}`, 'Количество коммитов'),
+      data: { datasets: [makeDataset('Коммиты', dbHistory.timeline.map(d => ({ x: new Date(d.ts), y: d.commits })), CHART_COLORS.commits)] },
+      options: chartOptions('Транзакций', { days: rangeDays }),
+      plugins: [gradientPlugin],
     });
 
     return () => {
@@ -116,7 +104,7 @@ function DatabaseDetails() {
       sizeChartRef.current?.destroy();
       commitsChartRef.current?.destroy();
     };
-  }, [dbHistory, db_name]);
+  }, [dbHistory, db_name, startDate, endDate]);
 
   const setDateRange = (days, label) => {
     const end = new Date();
@@ -185,16 +173,14 @@ function DatabaseDetails() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium">Период:</span>
             <Select value={dateRangeLabel} onValueChange={(v) => {
-              const map = { '7 дней': [7, '7 дней'], '2 недели': [14, '2 недели'], 'Месяц': [30, 'Месяц'], '3 месяца': [90, '3 месяца'] };
-              const [days, label] = map[v] || [7, '7 дней'];
-              setDateRange(days, label);
+              const days = DATE_RANGES[v];
+              if (days) setDateRange(days, v);
             }}>
               <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="7 дней">7 дней</SelectItem>
-                <SelectItem value="2 недели">2 недели</SelectItem>
-                <SelectItem value="Месяц">Месяц</SelectItem>
-                <SelectItem value="3 месяца">3 месяца</SelectItem>
+                {Object.keys(DATE_RANGES).map(label => (
+                  <SelectItem key={label} value={label}>{label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <div className="flex items-center gap-3 ml-auto">
