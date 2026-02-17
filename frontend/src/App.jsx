@@ -67,6 +67,16 @@ function AppContent() {
   }, []);
 
   if (!token) {
+    if (backendStatus === 'checking') {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
+            <p className="text-sm text-white/60">Подключение к серверу...</p>
+          </div>
+        </div>
+      );
+    }
     return <Login onLogin={login} error={error} backendStatus={backendStatus} />;
   }
 

@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem(LS_TOKEN));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem(LS_USERNAME) || '');
   const [userRole, setUserRole] = useState(localStorage.getItem(LS_USER_ROLE) || '');
-  const [backendStatus, setBackendStatus] = useState('unknown');
+  const [backendStatus, setBackendStatus] = useState('checking');
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showRefreshLoginModal, setShowRefreshLoginModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState(SESSION_WARNING_SEC);
@@ -101,7 +101,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const check = async () => {
       try {
-        await api.get('/api/health');
+        await api.get('/api/health', { timeout: 3000 });
         setBackendStatus('available');
       } catch {
         setBackendStatus('unavailable');
