@@ -36,8 +36,8 @@ function isDarkMode() {
 
 export function chartOptions(yLabel, { days = 7 } = {}) {
   const dark = isDarkMode();
-  const gridColor = dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
-  const textColor = dark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.5)';
+  const gridColor = dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+  const textColor = dark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.55)';
   const timeUnit = getTimeUnit(days);
 
   return {
