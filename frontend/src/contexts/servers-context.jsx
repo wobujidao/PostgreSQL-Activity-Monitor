@@ -1,10 +1,12 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import { SERVERS_REFRESH_INTERVAL, LS_TOKEN } from '@/lib/constants';
+import { SERVERS_REFRESH_INTERVAL } from '@/lib/constants';
+import { useAuth } from '@/hooks/use-auth';
 
 export const ServersContext = createContext(null);
 
 export function ServersProvider({ children }) {
+  const { token } = useAuth();
   const [servers, setServers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(SERVERS_REFRESH_INTERVAL);
@@ -12,8 +14,8 @@ export function ServersProvider({ children }) {
   const [paused, setPaused] = useState(false);
 
   const fetchServers = useCallback(async () => {
-    const token = localStorage.getItem(LS_TOKEN);
     if (!token) {
+      setServers([]);
       setLoading(false);
       return;
     }
@@ -25,14 +27,15 @@ export function ServersProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
-    const token = localStorage.getItem(LS_TOKEN);
     if (!token) {
+      setServers([]);
       setLoading(false);
       return;
     }
+    setLoading(true);
     fetchServers();
     const interval = setInterval(() => {
       if (!paused) {
@@ -44,7 +47,7 @@ export function ServersProvider({ children }) {
       if (!paused) setTimeLeft(prev => (prev > 0 ? prev - 1 : refreshInterval / 1000));
     }, 1000);
     return () => { clearInterval(interval); clearInterval(timer); };
-  }, [refreshInterval, paused, fetchServers]);
+  }, [token, refreshInterval, paused, fetchServers]);
 
   return (
     <ServersContext.Provider value={{
