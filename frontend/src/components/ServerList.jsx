@@ -7,7 +7,6 @@ import { useServers } from '@/hooks/use-servers';
 import { isValidServerName, isValidHostname, isValidPort } from '@/lib/validation';
 import ServerListSkeleton from './skeletons/ServerListSkeleton';
 import EmptyState from './EmptyState';
-import Sparkline from './Sparkline';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -162,88 +161,16 @@ function ServerList() {
     );
   };
 
-  // Sparkline: сохраняем историю значений в localStorage
-  const [sparkData, setSparkData] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pam_spark') || '{}'); } catch { return {}; }
-  });
-
-  useEffect(() => {
-    if (!servers.length) return;
-    const onlineCount = servers.filter(s => getServerStatus(s).variant === 'success').length;
-    const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
-    const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
-
-    setSparkData(prev => {
-      const next = {
-        total: [...(prev.total || []), servers.length].slice(-12),
-        online: [...(prev.online || []), onlineCount].slice(-12),
-        errors: [...(prev.errors || []), errorCount].slice(-12),
-        warnings: [...(prev.warnings || []), warningCount].slice(-12),
-      };
-      try { localStorage.setItem('pam_spark', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }, [servers]);
-
   if (loading) {
     return <ServerListSkeleton />;
   }
 
-  // Dashboard карточки
   const onlineCount = servers.filter(s => getServerStatus(s).variant === 'success').length;
   const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
   const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
 
   return (
     <div className="space-y-6">
-      {/* Dashboard cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-2xl font-bold">{servers.length}</div>
-                <p className="text-xs text-muted-foreground">Всего серверов</p>
-              </div>
-              <Sparkline data={sparkData.total} color="var(--color-foreground)" className="opacity-40" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-2xl font-bold text-green-600">{onlineCount}</div>
-                <p className="text-xs text-muted-foreground">Активных</p>
-              </div>
-              <Sparkline data={sparkData.online} color="#16a34a" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-2xl font-bold text-red-600">{errorCount}</div>
-                <p className="text-xs text-muted-foreground">С ошибками</p>
-              </div>
-              <Sparkline data={sparkData.errors} color="#dc2626" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-2xl font-bold text-amber-600">{warningCount}</div>
-                <p className="text-xs text-muted-foreground">Нагрузка</p>
-              </div>
-              <Sparkline data={sparkData.warnings} color="#d97706" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -424,6 +351,15 @@ function ServerList() {
               </TableBody>
             </Table>
           </div>
+          {filteredServers.length > 0 && (
+            <div className="flex items-center gap-3 px-6 py-3 border-t text-sm text-muted-foreground">
+              <span>Итого: {filteredServers.length} из {servers.length}</span>
+              <Separator orientation="vertical" className="h-4" />
+              <Badge variant="success" className="text-xs">{onlineCount} активных</Badge>
+              {errorCount > 0 && <Badge variant="destructive" className="text-xs">{errorCount} с ошибками</Badge>}
+              {warningCount > 0 && <Badge variant="warning" className="text-xs">{warningCount} нагрузка</Badge>}
+            </div>
+          )}
         </CardContent>
       </Card>
 
