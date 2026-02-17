@@ -8,7 +8,7 @@ export const TOKEN_CHECK_INTERVAL = 1000; // 1 сек — обновление �
 
 // Data refresh
 export const BACKEND_CHECK_INTERVAL = 5000; // 5 сек
-export const SERVERS_REFRESH_INTERVAL = 60000; // 1 минута
+export const SERVERS_REFRESH_INTERVAL = 10000; // 10 секунд
 export const DB_STATS_REFRESH_INTERVAL = 60000; // 1 минута
 export const FETCH_DEBOUNCE_MS = 500;
 

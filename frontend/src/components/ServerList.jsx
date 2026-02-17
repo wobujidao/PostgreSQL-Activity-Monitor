@@ -108,7 +108,7 @@ function ServerList() {
     if (server.status === 'ok' || server.status.includes?.('ok')) {
       const total = (server.connections?.active || 0) + (server.connections?.idle || 0);
       if (total > 50) return { variant: 'warning', text: 'Нагрузка', tooltip: `Высокая нагрузка: ${total} соединений` };
-      return { variant: 'default', text: 'Активен', tooltip: `Работает нормально. Соединений: ${total}` };
+      return { variant: 'success', text: 'Активен', tooltip: `Работает нормально. Соединений: ${total}` };
     }
     return { variant: 'secondary', text: 'Неизвестно', tooltip: 'Статус неизвестен' };
   };
@@ -138,7 +138,7 @@ function ServerList() {
       const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            server.host.toLowerCase().includes(searchTerm.toLowerCase());
       if (statusFilter === 'all') return matchesSearch;
-      if (statusFilter === 'online') return matchesSearch && getServerStatus(server).variant === 'default';
+      if (statusFilter === 'online') return matchesSearch && getServerStatus(server).variant === 'success';
       if (statusFilter === 'error') return matchesSearch && getServerStatus(server).variant === 'destructive';
       return matchesSearch;
     })
@@ -169,7 +169,7 @@ function ServerList() {
 
   useEffect(() => {
     if (!servers.length) return;
-    const onlineCount = servers.filter(s => getServerStatus(s).variant === 'default').length;
+    const onlineCount = servers.filter(s => getServerStatus(s).variant === 'success').length;
     const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
     const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
 
@@ -190,7 +190,7 @@ function ServerList() {
   }
 
   // Dashboard карточки
-  const onlineCount = servers.filter(s => getServerStatus(s).variant === 'default').length;
+  const onlineCount = servers.filter(s => getServerStatus(s).variant === 'success').length;
   const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
   const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
 
@@ -380,8 +380,8 @@ function ServerList() {
                       <TableCell>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge variant={status.variant === 'warning' ? 'outline' : status.variant}
-                              className={status.variant === 'warning' ? 'border-amber-500 text-amber-600' : ''}>
+                            <Badge variant={status.variant === 'warning' || status.variant === 'success' ? 'outline' : status.variant}
+                              className={status.variant === 'warning' ? 'border-amber-500 text-amber-600' : status.variant === 'success' ? 'border-emerald-500 text-emerald-600' : ''}>
                               {status.text}
                             </Badge>
                           </TooltipTrigger>
