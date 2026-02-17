@@ -275,7 +275,7 @@ function ServerList() {
                       <TableCell className="text-sm">
                         {server.connections ? (
                           <span>
-                            <span className="text-green-600 font-medium">{server.connections.active || 0}</span>
+                            <span className="text-green-600 dark:text-green-400 font-medium">{server.connections.active || 0}</span>
                             {' / '}
                             <span className="text-muted-foreground">{server.connections.idle || 0}</span>
                           </span>
@@ -287,7 +287,7 @@ function ServerList() {
                             <TooltipTrigger asChild>
                               <div className="space-y-1 min-w-[140px]">
                                 <div className="text-xs">
-                                  <span className={disk.percent > 85 ? 'text-red-600 font-medium' : disk.percent > 70 ? 'text-amber-600 font-medium' : 'text-green-600 font-medium'}>
+                                  <span className={disk.percent > 85 ? 'text-red-600 dark:text-red-400 font-medium' : disk.percent > 70 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-green-600 dark:text-green-400 font-medium'}>
                                     {formatBytes(server.free_space)}
                                   </span>
                                   <span className="text-muted-foreground"> / {formatBytes(server.total_space)}</span>

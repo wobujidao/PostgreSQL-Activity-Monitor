@@ -190,9 +190,9 @@ function SSHKeyManagement() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{keys.length}</div><p className="text-xs text-muted-foreground">Всего ключей</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-blue-600">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-green-600">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-purple-600">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-green-600 dark:text-green-400">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -227,7 +227,7 @@ function SSHKeyManagement() {
               {keys.map(key => {
                 const dupes = keys.filter(k => k.fingerprint === key.fingerprint && k.id !== key.id);
                 return (
-                  <TableRow key={key.id} className={dupes.length > 0 ? 'bg-amber-50' : ''}>
+                  <TableRow key={key.id} className={dupes.length > 0 ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
                     <TableCell>
                       <div className="font-medium">{key.name}</div>
                       {key.description && <div className="text-xs text-muted-foreground">{key.description}</div>}

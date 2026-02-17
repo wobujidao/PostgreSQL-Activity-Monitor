@@ -531,7 +531,7 @@ function ServerDetails() {
                         </TableCell>
                         <TableCell className="font-semibold">{formatSize(getDatabaseSize(db.name))}</TableCell>
                         <TableCell>
-                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-amber-600' : 'text-green-600'}>
+                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}>
                             {conns.length > 0 ? conns[conns.length - 1] : 0}
                             {isUnchanged && <span className="text-xs ml-1">(стат.)</span>}
                           </span>
@@ -590,41 +590,41 @@ function ServerDetails() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card className="border-red-200 dark:border-red-900">
                   <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-red-600">
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                       <XCircle className="h-4 w-4" />
                       <span className="text-xs">Неактивные {'>'} {criteria.deadDays}д</span>
                     </div>
-                    <div className="text-3xl font-bold text-red-600 mt-1">{dbAnalysis.dead.length}</div>
+                    <div className="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">{dbAnalysis.dead.length}</div>
                     <p className="text-xs text-muted-foreground">{dbAnalysis.dead.reduce((s, d) => s + d.sizeGB, 0).toFixed(1)} ГБ</p>
                   </CardContent>
                 </Card>
                 <Card className="border-amber-200 dark:border-amber-900">
                   <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-amber-600">
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                       <AlertTriangle className="h-4 w-4" />
                       <span className="text-xs">Низкая активность</span>
                     </div>
-                    <div className="text-3xl font-bold text-amber-600 mt-1">{dbAnalysis.warning.length}</div>
+                    <div className="text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1">{dbAnalysis.warning.length}</div>
                     <p className="text-xs text-muted-foreground">{'<'} {criteria.lowActivityThreshold} подключений</p>
                   </CardContent>
                 </Card>
                 <Card className="border-blue-200 dark:border-blue-900">
                   <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-blue-600">
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                       <MinusCircle className="h-4 w-4" />
                       <span className="text-xs">Статичные</span>
                     </div>
-                    <div className="text-3xl font-bold text-blue-600 mt-1">{dbAnalysis.static.length}</div>
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-1">{dbAnalysis.static.length}</div>
                     <p className="text-xs text-muted-foreground">Без изменений {'>'} {criteria.staticConnectionsDays}д</p>
                   </CardContent>
                 </Card>
                 <Card className="border-green-200 dark:border-green-900">
                   <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-green-600">
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                       <CheckCircle className="h-4 w-4" />
                       <span className="text-xs">Активные</span>
                     </div>
-                    <div className="text-3xl font-bold text-green-600 mt-1">{dbAnalysis.healthy.length}</div>
+                    <div className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">{dbAnalysis.healthy.length}</div>
                     <p className="text-xs text-muted-foreground">Используются регулярно</p>
                   </CardContent>
                 </Card>
