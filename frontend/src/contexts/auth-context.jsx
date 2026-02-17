@@ -64,7 +64,14 @@ export function AuthProvider({ children }) {
       setError(null);
       setRefreshPassword(password);
     } catch (err) {
-      setError('Ошибка авторизации: ' + (err.response?.data?.detail || 'Неизвестная ошибка'));
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 401 || detail === 'Invalid credentials') {
+        setError('Неверный логин или пароль');
+      } else if (!err.response) {
+        setError('Сервер недоступен');
+      } else {
+        setError('Ошибка авторизации: ' + (detail || 'Неизвестная ошибка'));
+      }
     }
   }, []);
 
