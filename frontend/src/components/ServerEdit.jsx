@@ -287,7 +287,7 @@ function ServerEdit() {
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Статус</span>
-                <Badge variant={server.status === 'ok' ? 'default' : 'destructive'}>
+                <Badge variant={server.status === 'ok' ? 'success' : 'destructive'}>
                   {server.status === 'ok' ? 'Активен' : 'Недоступен'}
                 </Badge>
               </div>

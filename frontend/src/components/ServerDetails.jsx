@@ -541,7 +541,7 @@ function ServerDetails() {
                         </TableCell>
                         <TableCell className="text-sm">{formatCreationTime(db.creation_time)}</TableCell>
                         <TableCell>
-                          <Badge variant={db.exists ? 'default' : 'destructive'}>
+                          <Badge variant={db.exists ? 'success' : 'destructive'}>
                             {db.exists ? 'Активна' : 'Удалена'}
                           </Badge>
                         </TableCell>

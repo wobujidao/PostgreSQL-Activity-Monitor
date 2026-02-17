@@ -91,7 +91,8 @@ function AppContent() {
             <Shield className="h-5 w-5 text-cyan-400" />
             <span className="font-semibold hidden sm:inline">PostgreSQL Activity Monitor</span>
             <span className="font-semibold sm:hidden">PAM</span>
-            <Badge variant={backendStatus === 'available' ? 'success' : 'destructive'} className="ml-2 text-xs">
+            <Badge variant={backendStatus === 'available' ? 'success' : 'destructive'}
+              className={`ml-2 text-xs ${backendStatus === 'available' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40' : ''}`}>
               {backendStatus === 'available' ? 'Online' : 'Offline'}
             </Badge>
           </Link>

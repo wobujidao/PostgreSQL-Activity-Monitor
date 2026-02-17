@@ -25,7 +25,7 @@ export default function CommandPalette({ open, onOpenChange }) {
     if (!server.status || server.status === 'failed' || server.status?.includes?.('error')) {
       return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">offline</Badge>;
     }
-    return <Badge variant="default" className="text-[10px] px-1.5 py-0">online</Badge>;
+    return <Badge variant="success" className="text-[10px] px-1.5 py-0">online</Badge>;
   };
 
   return (
