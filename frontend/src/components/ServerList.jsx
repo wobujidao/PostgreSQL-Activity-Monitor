@@ -380,8 +380,7 @@ function ServerList() {
                       <TableCell>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge variant={status.variant === 'warning' || status.variant === 'success' ? 'outline' : status.variant}
-                              className={status.variant === 'warning' ? 'border-amber-500 text-amber-600' : status.variant === 'success' ? 'border-emerald-500 text-emerald-600' : ''}>
+                            <Badge variant={status.variant}>
                               {status.text}
                             </Badge>
                           </TooltipTrigger>
