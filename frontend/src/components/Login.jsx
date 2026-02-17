@@ -106,7 +106,7 @@ function Login({ onLogin, error: parentError, backendStatus }) {
           <div className="flex items-center gap-1.5 text-xs">
             <Circle className={`h-2 w-2 fill-current ${backendStatus === 'available' ? 'text-emerald-500' : backendStatus === 'unavailable' ? 'text-red-500' : 'text-yellow-500'}`} />
             <span className="text-muted-foreground">
-              Сервер: {backendStatus === 'available' ? 'доступен' : backendStatus === 'unavailable' ? 'недоступен' : 'проверка...'}
+              Бэкенд: {backendStatus === 'available' ? 'доступен' : backendStatus === 'unavailable' ? 'недоступен' : 'проверка...'}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.2</p>
