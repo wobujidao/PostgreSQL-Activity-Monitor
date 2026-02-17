@@ -67,7 +67,7 @@ function AppContent() {
   }, []);
 
   if (!token) {
-    return <Login onLogin={login} error={error} />;
+    return <Login onLogin={login} error={error} backendStatus={backendStatus} />;
   }
 
   const roleLabel = userRole === 'admin' ? 'Администратор' : userRole === 'operator' ? 'Оператор' : 'Просмотр';

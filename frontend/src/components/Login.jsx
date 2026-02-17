@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Shield, AlertCircle, Sun, Moon } from 'lucide-react';
+import { Loader2, Shield, AlertCircle, Sun, Moon, Circle } from 'lucide-react';
 
-function Login({ onLogin, error: parentError }) {
+function Login({ onLogin, error: parentError, backendStatus }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,6 +49,13 @@ function Login({ onLogin, error: parentError }) {
         </CardHeader>
 
         <CardContent className="px-8">
+          {backendStatus === 'unavailable' && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>Сервер мониторинга недоступен</AlertDescription>
+            </Alert>
+          )}
+
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
@@ -82,7 +89,7 @@ function Login({ onLogin, error: parentError }) {
               />
             </div>
 
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            <Button type="submit" className="w-full" size="lg" disabled={loading || backendStatus === 'unavailable'}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -95,7 +102,13 @@ function Login({ onLogin, error: parentError }) {
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center pb-6">
+        <CardFooter className="flex-col gap-2 pb-6">
+          <div className="flex items-center gap-1.5 text-xs">
+            <Circle className={`h-2 w-2 fill-current ${backendStatus === 'available' ? 'text-emerald-500' : backendStatus === 'unavailable' ? 'text-red-500' : 'text-yellow-500'}`} />
+            <span className="text-muted-foreground">
+              Сервер: {backendStatus === 'available' ? 'доступен' : backendStatus === 'unavailable' ? 'недоступен' : 'проверка...'}
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.2</p>
         </CardFooter>
       </Card>

@@ -97,12 +97,11 @@ export function AuthProvider({ children }) {
     }
   }, [refreshPassword]);
 
-  // Проверка backend status
+  // Проверка backend status (работает и до логина)
   useEffect(() => {
-    if (!token) return;
     const check = async () => {
       try {
-        await api.get('/servers');
+        await api.get('/api/health');
         setBackendStatus('available');
       } catch {
         setBackendStatus('unavailable');
@@ -111,7 +110,7 @@ export function AuthProvider({ children }) {
     check();
     const interval = setInterval(check, BACKEND_CHECK_INTERVAL);
     return () => clearInterval(interval);
-  }, [token]);
+  }, []);
 
   // Получение роли пользователя
   useEffect(() => {
