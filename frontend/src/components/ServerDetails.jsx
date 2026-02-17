@@ -320,7 +320,7 @@ function ServerDetails() {
     ? (serverData.free_space / serverData.total_space * 100).toFixed(1) : 0;
 
   const getStatusBadge = (status) => {
-    const map = { dead: ['destructive', 'Неактивна'], static: ['outline', 'Статичная'], warning: ['secondary', 'Низкая активность'], healthy: ['default', 'Активна'] };
+    const map = { dead: ['destructive', 'Неактивна'], static: ['outline', 'Статичная'], warning: ['warning', 'Низкая активность'], healthy: ['success', 'Активна'] };
     const [variant, label] = map[status] || ['secondary', status];
     return <Badge variant={variant}>{label}</Badge>;
   };

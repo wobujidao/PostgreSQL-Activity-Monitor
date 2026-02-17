@@ -99,7 +99,7 @@ function UserManagement() {
 
   const getRoleBadge = (role) => {
     if (role === 'admin') return <Badge variant="destructive">Администратор</Badge>;
-    if (role === 'operator') return <Badge variant="outline" className="border-amber-500 text-amber-600">Оператор</Badge>;
+    if (role === 'operator') return <Badge variant="warning">Оператор</Badge>;
     return <Badge variant="secondary">Просмотр</Badge>;
   };
 
@@ -154,7 +154,7 @@ function UserManagement() {
                   <TableCell className="text-sm">{formatTimestamp(user.created_at)}</TableCell>
                   <TableCell className="text-sm">{formatTimestamp(user.last_login)}</TableCell>
                   <TableCell>
-                    <Badge variant={user.is_active ? 'default' : 'destructive'}>
+                    <Badge variant={user.is_active ? 'success' : 'destructive'}>
                       {user.is_active ? 'Активен' : 'Заблокирован'}
                     </Badge>
                   </TableCell>
