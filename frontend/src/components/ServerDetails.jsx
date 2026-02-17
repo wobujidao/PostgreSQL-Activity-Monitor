@@ -106,6 +106,18 @@ function ServerDetails() {
     return new Set(conns).size === 1 && conns[0] > 0;
   }, [getDatabaseConnections]);
 
+  const getLastConnectionChange = useCallback((dbName) => {
+    if (!stats?.connection_timeline) return null;
+    const timeline = stats.connection_timeline.filter(e => e.datname === dbName);
+    if (timeline.length < 2) return timeline[0]?.ts || null;
+    for (let i = timeline.length - 1; i > 0; i--) {
+      if ((timeline[i].connections || 0) !== (timeline[i - 1].connections || 0)) {
+        return timeline[i].ts;
+      }
+    }
+    return null;
+  }, [stats]);
+
   const formatSize = (sizeGb) => {
     if (sizeGb == null) return 'N/A';
     if (sizeGb < 1) return `${(sizeGb * 1024).toFixed(0)} МБ`;
@@ -123,8 +135,13 @@ function ServerDetails() {
     const now = new Date();
     const analyzed = stats.databases.map(db => {
       const timeline = stats.connection_timeline?.filter(e => e.datname === db.name) || [];
-      const lastEntry = timeline[timeline.length - 1];
-      const lastActivity = lastEntry?.ts;
+      let lastActivity = null;
+      for (let i = timeline.length - 1; i > 0; i--) {
+        if ((timeline[i].connections || 0) !== (timeline[i - 1].connections || 0)) {
+          lastActivity = timeline[i].ts;
+          break;
+        }
+      }
       const daysSince = lastActivity ? Math.floor((now - new Date(lastActivity).getTime()) / 86400000) : Infinity;
 
       let isStatic = false, hasUnchanged = false, avgConn = 0;
@@ -520,7 +537,7 @@ function ServerDetails() {
                     const conns = getDatabaseConnections(db.name);
                     const isInactive = conns.length === 0 || conns.every(c => c === 0);
                     const isUnchanged = hasUnchangedConnections(db.name);
-                    const lastAct = stats.connection_timeline?.filter(e => e.datname === db.name).slice(-1)[0]?.ts;
+                    const lastAct = getLastConnectionChange(db.name);
 
                     return (
                       <TableRow key={db.name} className={isInactive ? 'bg-amber-50 dark:bg-amber-950/20' : isUnchanged ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
@@ -536,8 +553,8 @@ function ServerDetails() {
                             {isUnchanged && <span className="text-xs ml-1">(стат.)</span>}
                           </span>
                         </TableCell>
-                        <TableCell className={`text-sm ${isInactive ? 'text-destructive' : ''}`}>
-                          {lastAct ? formatTimestamp(lastAct) : 'Никогда'}
+                        <TableCell className={`text-sm ${!lastAct ? 'text-muted-foreground' : ''}`}>
+                          {lastAct ? formatTimestamp(lastAct) : 'Нет изменений'}
                         </TableCell>
                         <TableCell className="text-sm">{formatCreationTime(db.creation_time)}</TableCell>
                         <TableCell>

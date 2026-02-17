@@ -25,9 +25,9 @@ export const CHART_COLORS = {
 
 export function getTimeUnit(days) {
   if (days <= 2) return 'hour';
-  if (days <= 14) return 'hour';
-  if (days <= 90) return 'day';
-  return 'week';
+  if (days <= 30) return 'day';
+  if (days <= 180) return 'week';
+  return 'month';
 }
 
 function isDarkMode() {
@@ -97,6 +97,7 @@ export function chartOptions(yLabel, { days = 7 } = {}) {
         },
         ticks: {
           maxRotation: 0,
+          maxTicksLimit: 12,
           font: { size: 11 },
           color: textColor,
         },
