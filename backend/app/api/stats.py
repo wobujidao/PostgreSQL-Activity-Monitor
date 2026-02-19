@@ -23,34 +23,42 @@ def parse_date_param(value: str | None, default_offset_days: int | None = None) 
         raise HTTPException(status_code=400, detail=f"Невалидный формат даты: {value}")
 
 
+# Белый список SQL-выражений для агрегации (защита от SQL injection)
+_AGG_LEVELS = {
+    "raw": {
+        "trunc": "ts",
+        "group": "ts",
+    },
+    "hour": {
+        "trunc": "date_trunc('hour', ts)",
+        "group": "date_trunc('hour', ts)",
+    },
+    "4hour": {
+        "trunc": "to_timestamp(floor(extract(epoch from ts) / 14400) * 14400)",
+        "group": "floor(extract(epoch from ts) / 14400)",
+    },
+    "day": {
+        "trunc": "date_trunc('day', ts)",
+        "group": "date_trunc('day', ts)",
+    },
+}
+
+
 def get_aggregation_params(start_dt, end_dt):
     """Определяет параметры агрегации SQL в зависимости от диапазона дат."""
     delta_days = (end_dt - start_dt).total_seconds() / 86400
 
     if delta_days <= 2:
-        return {
-            "trunc": "ts",
-            "group": "ts",
-            "level": "raw",
-        }
+        level = "raw"
     elif delta_days <= 14:
-        return {
-            "trunc": "date_trunc('hour', ts)",
-            "group": "date_trunc('hour', ts)",
-            "level": "hour",
-        }
+        level = "hour"
     elif delta_days <= 90:
-        return {
-            "trunc": "to_timestamp(floor(extract(epoch from ts) / 14400) * 14400)",
-            "group": "floor(extract(epoch from ts) / 14400)",
-            "level": "4hour",
-        }
+        level = "4hour"
     else:
-        return {
-            "trunc": "date_trunc('day', ts)",
-            "group": "date_trunc('day', ts)",
-            "level": "day",
-        }
+        level = "day"
+
+    agg = _AGG_LEVELS[level]
+    return {"trunc": agg["trunc"], "group": agg["group"], "level": level}
 
 @router.get("/server_stats/{server_name}")
 async def get_server_stats(server_name: str, current_user: dict = Depends(get_current_user)):

@@ -104,6 +104,13 @@ export function AuthProvider({ children }) {
     }
   }, [refreshPassword]);
 
+  // Обработка события tokenExpired из api interceptor
+  useEffect(() => {
+    const handleTokenExpired = () => logout();
+    window.addEventListener('tokenExpired', handleTokenExpired);
+    return () => window.removeEventListener('tokenExpired', handleTokenExpired);
+  }, [logout]);
+
   // Проверка backend status (работает и до логина)
   useEffect(() => {
     const check = async () => {

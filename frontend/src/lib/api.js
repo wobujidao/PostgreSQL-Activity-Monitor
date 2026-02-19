@@ -20,10 +20,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const hadToken = localStorage.getItem(LS_TOKEN);
-      localStorage.removeItem(LS_TOKEN);
-      // Перезагрузка только если был токен (сессия истекла), иначе — цикл
       if (hadToken) {
-        window.location.href = '/';
+        localStorage.removeItem(LS_TOKEN);
+        // Уведомляем AuthContext через событие вместо жёсткой перезагрузки
+        window.dispatchEvent(new CustomEvent('tokenExpired'));
       }
     }
     return Promise.reject(error);

@@ -61,11 +61,11 @@ code {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--ring);
   --color-sidebar-muted: var(--sidebar-muted);
-  --color-status-active: var(--status-active);
-  --color-status-warning: var(--status-warning);
-  --color-status-danger: var(--status-danger);
-  --color-status-info: var(--status-info);
-  --color-status-neutral: var(--status-neutral);
+  --color-status-active: hsl(var(--status-active));
+  --color-status-warning: hsl(var(--status-warning));
+  --color-status-danger: hsl(var(--status-danger));
+  --color-status-info: hsl(var(--status-info));
+  --color-status-neutral: hsl(var(--status-neutral));
 }
 
 :root {
@@ -115,12 +115,12 @@ code {
   --chart-4: hsl(0 72% 51%);
   --chart-5: hsl(262 83% 58%);
 
-  /* Статусы */
-  --status-active: hsl(142 71% 45%);
-  --status-warning: hsl(38 92% 50%);
-  --status-danger: hsl(0 72% 51%);
-  --status-info: hsl(217 91% 60%);
-  --status-neutral: hsl(215 16% 47%);
+  /* Статусы (raw HSL — без обёртки hsl(), чтобы работали hsl(var(--status-X) / alpha) паттерны) */
+  --status-active: 142 71% 45%;
+  --status-warning: 38 92% 50%;
+  --status-danger: 0 72% 51%;
+  --status-info: 217 91% 60%;
+  --status-neutral: 215 16% 47%;
 
   /* Sidebar */
   --sidebar-background: hsl(215 28% 17%);
@@ -166,11 +166,11 @@ code {
   --chart-4: hsl(0 72% 55%);
   --chart-5: hsl(262 83% 63%);
 
-  --status-active: hsl(142 71% 50%);
-  --status-warning: hsl(38 92% 55%);
-  --status-danger: hsl(0 72% 55%);
-  --status-info: hsl(217 91% 65%);
-  --status-neutral: hsl(215 16% 55%);
+  --status-active: 142 71% 50%;
+  --status-warning: 38 92% 55%;
+  --status-danger: 0 72% 55%;
+  --status-info: 217 91% 65%;
+  --status-neutral: 215 16% 55%;
 
   --sidebar-background: hsl(220 25% 5%);
   --sidebar-foreground: hsl(215 20% 65%);

@@ -278,6 +278,14 @@ function ServerDetails() {
     }
     if (!data.length) { toast.error('Нет данных для экспорта'); return; }
 
+    const escapeCSV = (val) => {
+      const s = String(val ?? '');
+      if (s.match(/[,"\n\r]/)) return `"${s.replace(/"/g, '""')}"`;
+      // Защита от Formula Injection (Excel)
+      if (/^[=+\-@\t\r]/.test(s)) return `"'${s}"`;
+      return s;
+    };
+
     const csv = [
       ['База данных', 'Размер (ГБ)', 'Подключения', 'Дней без активности', 'Последняя активность', 'Дата создания', 'Статус'],
       ...data.map(db => {
@@ -292,7 +300,7 @@ function ServerDetails() {
           db.exists ? 'Активна' : 'Удалена',
         ];
       })
-    ].map(r => r.join(',')).join('\n');
+    ].map(r => r.map(escapeCSV).join(',')).join('\n');
 
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');

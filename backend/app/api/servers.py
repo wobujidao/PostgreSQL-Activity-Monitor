@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # app/api/servers.py
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Any
 import logging
@@ -17,7 +18,16 @@ router = APIRouter(prefix="/servers", tags=["servers"])
 async def get_servers(current_user: dict = Depends(get_current_user)):
     """Get list of all servers with their status"""
     servers = load_servers()
-    return [connect_to_server(server) for server in servers]
+    tasks = [asyncio.to_thread(connect_to_server, server) for server in servers]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    output = []
+    for server, result in zip(servers, results):
+        if isinstance(result, Exception):
+            logger.error(f"Ошибка подключения к {server.name}: {result}")
+            output.append({"name": server.name, "host": server.host, "port": server.port, "status": "error"})
+        else:
+            output.append(result)
+    return output
 
 @router.post("", response_model=dict)
 async def add_server(server: Server, current_user: dict = Depends(get_current_user)):

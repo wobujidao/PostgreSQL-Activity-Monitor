@@ -1,17 +1,21 @@
 # app/api/auth.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.auth import verify_password, create_access_token, load_users
 from app.config import TOKEN_EXPIRATION
 
 logger = logging.getLogger(__name__)
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["auth"])
 
 @router.post("/token")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("5/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """Авторизация и получение токена"""
     users = load_users()
     for user in users:

@@ -2,32 +2,17 @@
 import jwt
 import bcrypt
 from datetime import datetime, timedelta, timezone
-import json
 import logging
-from app.config import SECRET_KEY, ALGORITHM, TOKEN_EXPIRATION, USERS_FILE
+from app.config import SECRET_KEY, ALGORITHM, TOKEN_EXPIRATION
 
 logger = logging.getLogger(__name__)
 
-def load_users():
-    """Загрузка пользователей из файла"""
-    try:
-        with open(USERS_FILE, "r") as f:
-            users = json.load(f)
-        logger.debug(f"Загружено {len(users)} пользователей")
-        return users
-    except Exception as e:
-        logger.error(f"Ошибка загрузки пользователей: {e}")
-        raise
 
-def save_users(users):
-    """Сохранение пользователей в файл"""
-    try:
-        with open(USERS_FILE, "w") as f:
-            json.dump(users, f, indent=2)
-        logger.info(f"Сохранено {len(users)} пользователей")
-    except Exception as e:
-        logger.error(f"Ошибка сохранения пользователей: {e}")
-        raise
+def load_users():
+    """Загрузка пользователей (делегирует в user_manager с блокировкой файла)"""
+    from app.services import user_manager
+    return user_manager._load_users()
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Проверка пароля"""

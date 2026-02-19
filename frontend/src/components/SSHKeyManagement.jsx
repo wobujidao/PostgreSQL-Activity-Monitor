@@ -192,7 +192,7 @@ function SSHKeyManagement() {
         <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{keys.length}</div><p className="text-xs text-muted-foreground">Всего ключей</p></CardContent></Card>
         <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-info))] tabular-nums">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
         <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-active))] tabular-nums">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--chart-5))] tabular-nums">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-chart-5 tabular-nums">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}

@@ -1,9 +1,16 @@
 # app/config.py
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Загрузка .env (ищем в корне проекта)
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
 
 # Основные настройки
-SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-for-local-testing")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY не установлен! Задайте переменную окружения или укажите в .env")
 ALGORITHM = "HS256"
 TOKEN_EXPIRATION = 60  # минут
 
@@ -28,4 +35,6 @@ SSH_CACHE_TTL = 30  # секунд
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # CORS
-ALLOWED_ORIGINS = ["http://10.110.20.55:3000", "https://pam.cbmo.mosreg.ru"]
+ALLOWED_ORIGINS = [
+    "https://pam.cbmo.mosreg.ru",
+]
