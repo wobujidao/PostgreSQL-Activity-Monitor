@@ -13,6 +13,7 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY не установлен! Задайте переменную окружения или укажите в .env")
 ALGORITHM = "HS256"
 TOKEN_EXPIRATION = 60  # минут
+REFRESH_TOKEN_EXPIRATION_DAYS = 7  # дней
 
 # Пути к файлам
 CONFIG_DIR = Path("/etc/pg_activity_monitor")

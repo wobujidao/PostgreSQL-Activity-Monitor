@@ -13,10 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { AlertCircle, Lock, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { formatTimeLeft } from '@/lib/format';
 import { ServersProvider } from '@/contexts/servers-context';
 import AppSidebar from './components/AppSidebar';
@@ -33,12 +31,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 function AppContent() {
   const {
-    token, currentUser, userRole, backendStatus,
-    showSessionModal, showRefreshLoginModal,
+    token, userRole, backendStatus,
+    showSessionModal,
     timeLeft, isRefreshing, error,
-    refreshPassword, setRefreshPassword,
     login, logout, refreshToken,
-    setShowSessionModal, setShowRefreshLoginModal,
+    setShowSessionModal,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -121,44 +118,6 @@ function AppContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Password refresh dialog */}
-      <Dialog open={showRefreshLoginModal} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-primary" />
-              Продление сессии
-            </DialogTitle>
-            <DialogDescription>
-              Введите пароль для пользователя <strong>{currentUser}</strong>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <Input
-              type="password"
-              placeholder="Пароль"
-              value={refreshPassword}
-              onChange={(e) => setRefreshPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && refreshToken()}
-            />
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-          <DialogFooter className="flex gap-2 sm:justify-center">
-            <Button onClick={refreshToken} disabled={isRefreshing || !refreshPassword}>
-              {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Войти
-            </Button>
-            <Button variant="destructive" onClick={logout}>
-              Выйти
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SidebarProvider>
   );
 }

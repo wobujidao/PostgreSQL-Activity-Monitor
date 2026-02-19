@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 import uvicorn
 from slowapi import Limiter
@@ -15,6 +16,7 @@ from app.config import ALLOWED_ORIGINS, LOG_LEVEL
 from app.api import auth_router, servers_router, health_router, stats_router, users_router
 from app.database import db_pool
 from app.api.ssh_keys import router as ssh_keys_router
+from app.auth.blacklist import token_blacklist
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -27,6 +29,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Фоновая задача: очистка blacklist каждые 10 минут
+async def cleanup_blacklist():
+    while True:
+        await asyncio.sleep(600)  # 10 минут
+        token_blacklist.cleanup()
+
 # События жизненного цикла
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,8 +43,10 @@ async def lifespan(app: FastAPI):
     logger.info("PostgreSQL Activity Monitor API v2.2")
     logger.info(f"Уровень логирования: {LOG_LEVEL}")
     logger.info("=" * 60)
+    cleanup_task = asyncio.create_task(cleanup_blacklist())
     yield
     # Shutdown
+    cleanup_task.cancel()
     logger.info("Завершение работы PostgreSQL Activity Monitor API...")
     db_pool.close_all()
     logger.info("Все ресурсы освобождены. До свидания!")

@@ -31,13 +31,17 @@ export function AuthProvider({ children }) {
   const [userRole, setUserRole] = useState(localStorage.getItem(LS_USER_ROLE) || '');
   const [backendStatus, setBackendStatus] = useState('checking');
   const [showSessionModal, setShowSessionModal] = useState(false);
-  const [showRefreshLoginModal, setShowRefreshLoginModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState(SESSION_WARNING_SEC);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [refreshPassword, setRefreshPassword] = useState('');
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Серверный logout — blacklist токенов и удаление cookie
+    try {
+      await api.post('/logout');
+    } catch {
+      // Ошибка logout не критична
+    }
     setToken(null);
     setCurrentUser('');
     setUserRole('');
@@ -45,7 +49,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(LS_USERNAME);
     localStorage.removeItem(LS_USER_ROLE);
     setShowSessionModal(false);
-    setShowRefreshLoginModal(false);
     setBackendStatus('unavailable');
   }, []);
 
@@ -53,7 +56,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await api.post(
         '/token',
-        `username=${username}&password=${password}`,
+        `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       const newToken = response.data.access_token;
@@ -62,7 +65,6 @@ export function AuthProvider({ children }) {
       setToken(newToken);
       setCurrentUser(username);
       setError(null);
-      setRefreshPassword(password);
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (err.response?.status === 401 || detail === 'Invalid credentials') {
@@ -76,39 +78,40 @@ export function AuthProvider({ children }) {
   }, []);
 
   const refreshToken = useCallback(async () => {
-    const storedUsername = localStorage.getItem(LS_USERNAME);
-    if (!storedUsername || !refreshPassword) {
-      setShowSessionModal(false);
-      setShowRefreshLoginModal(true);
-      return;
-    }
     setIsRefreshing(true);
     try {
-      const response = await api.post(
-        '/token',
-        `username=${storedUsername}&password=${refreshPassword}`,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
+      const response = await api.post('/refresh');
       const newToken = response.data.access_token;
       localStorage.setItem(LS_TOKEN, newToken);
       setToken(newToken);
       setShowSessionModal(false);
-      setShowRefreshLoginModal(false);
       setTimeLeft(SESSION_WARNING_SEC);
       setBackendStatus('available');
-    } catch (err) {
-      setError('Ошибка продления сессии: ' + (err.response?.data?.detail || 'Неизвестная ошибка'));
-      setShowRefreshLoginModal(true);
+    } catch {
+      // Refresh не удался — нужен повторный логин
+      logout();
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshPassword]);
+  }, [logout]);
 
-  // Обработка события tokenExpired из api interceptor
+  // Обработка событий из api interceptor
   useEffect(() => {
     const handleTokenExpired = () => logout();
+    const handleTokenRefreshed = (e) => {
+      const newToken = e.detail?.token;
+      if (newToken) {
+        setToken(newToken);
+        setShowSessionModal(false);
+        setTimeLeft(SESSION_WARNING_SEC);
+      }
+    };
     window.addEventListener('tokenExpired', handleTokenExpired);
-    return () => window.removeEventListener('tokenExpired', handleTokenExpired);
+    window.addEventListener('tokenRefreshed', handleTokenRefreshed);
+    return () => {
+      window.removeEventListener('tokenExpired', handleTokenExpired);
+      window.removeEventListener('tokenRefreshed', handleTokenRefreshed);
+    };
   }, [logout]);
 
   // Проверка backend status (работает и до логина)
@@ -135,11 +138,9 @@ export function AuthProvider({ children }) {
     }).catch(() => {});
   }, [token]);
 
-  // Refs для актуальных значений в замыканиях
+  // Ref для актуального значения в замыканиях
   const showSessionModalRef = useRef(showSessionModal);
-  const showRefreshLoginModalRef = useRef(showRefreshLoginModal);
   useEffect(() => { showSessionModalRef.current = showSessionModal; }, [showSessionModal]);
-  useEffect(() => { showRefreshLoginModalRef.current = showRefreshLoginModal; }, [showRefreshLoginModal]);
 
   // Проверка истечения токена
   useEffect(() => {
@@ -180,7 +181,7 @@ export function AuthProvider({ children }) {
       const decoded = decodeToken(currentToken);
       if (!decoded?.exp) return;
       const remaining = decoded.exp * 1000 - now;
-      if (remaining < SESSION_WARNING_MS && !showSessionModalRef.current && !showRefreshLoginModalRef.current) {
+      if (remaining < SESSION_WARNING_MS && !showSessionModalRef.current) {
         setShowSessionModal(true);
         setTimeLeft(Math.floor(remaining / 1000));
       }
@@ -201,18 +202,14 @@ export function AuthProvider({ children }) {
     userRole,
     backendStatus,
     showSessionModal,
-    showRefreshLoginModal,
     timeLeft,
     isRefreshing,
     error,
-    refreshPassword,
-    setRefreshPassword,
     setError,
     login,
     logout,
     refreshToken,
     setShowSessionModal,
-    setShowRefreshLoginModal,
   };
 
   return (
