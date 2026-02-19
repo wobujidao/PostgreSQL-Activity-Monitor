@@ -31,6 +31,7 @@ graph TD
         CacheSvc["cache.py<br/>TTL кэш"]
         UserSvc["user_manager.py<br/>Пользователи"]
         KeySvc["ssh_key_manager.py<br/>SSH ключи"]
+        AuditSvc["audit_logger.py<br/>Аудит сессий"]
     end
 
     subgraph Storage["Хранение"]
@@ -81,28 +82,32 @@ backend/
 └── app/
     ├── config.py                 # Конфигурация: JWT, CORS, pools
     ├── api/
-    │   ├── auth.py               # POST /token
+    │   ├── auth.py               # POST /token, /refresh, /logout
     │   ├── servers.py            # CRUD /servers + test-ssh
     │   ├── stats.py              # Статистика серверов и БД
     │   ├── users.py              # CRUD /users (admin only)
     │   ├── ssh_keys.py           # CRUD /ssh-keys (admin/operator)
+    │   ├── audit.py              # GET /audit/sessions (admin)
     │   └── health.py             # /api/health, /api/pools/status
     ├── auth/
-    │   ├── dependencies.py       # get_current_user (OAuth2 + JWT)
-    │   └── utils.py              # create_access_token, verify_password
+    │   ├── blacklist.py          # In-memory token blacklist (thread-safe)
+    │   ├── dependencies.py       # get_current_user (OAuth2 + JWT + blacklist)
+    │   └── utils.py              # access/refresh токены, пароли
     ├── database/
     │   └── pool.py               # DatabasePool (ThreadedConnectionPool, keepalive)
     ├── models/                   # Pydantic v2
     │   ├── server.py             # Server
     │   ├── user.py               # User, UserCreate, UserUpdate, UserResponse
-    │   └── ssh_key.py            # SSHKey, SSHKeyCreate, SSHKeyImport
+    │   ├── ssh_key.py            # SSHKey, SSHKeyCreate, SSHKeyImport
+    │   └── audit.py              # AuditEvent
     ├── services/
     │   ├── server.py             # load_servers, save_servers, connect_to_server
     │   ├── ssh.py                # get_ssh_client, get_ssh_disk_usage
     │   ├── cache.py              # CacheManager (thread-safe, TTL)
     │   ├── user_manager.py       # UserManager (file-based, bcrypt, fcntl)
     │   ├── ssh_key_manager.py    # Генерация SSH ключей (RSA, Ed25519)
-    │   └── ssh_key_storage.py    # Хранение ключей (JSON + encrypted files)
+    │   ├── ssh_key_storage.py    # Хранение ключей (JSON + encrypted files)
+    │   └── audit_logger.py       # Аудит сессий (JSON + fcntl)
     └── utils/
         └── crypto.py             # Fernet: encrypt/decrypt/ensure_encrypted
 ```
@@ -149,6 +154,8 @@ sudo systemctl enable --now pgmon-backend
 | Группа | Метод | Endpoint | Доступ |
 |--------|-------|----------|--------|
 | Auth | POST | `/token` | — |
+| Auth | POST | `/refresh` | — (cookie) |
+| Auth | POST | `/logout` | авторизован |
 | Servers | GET / POST | `/servers` | все |
 | Servers | PUT / DELETE | `/servers/{name}` | все |
 | Servers | POST | `/servers/{name}/test-ssh` | все |
@@ -166,6 +173,8 @@ sudo systemctl enable --now pgmon-backend
 | SSH Keys | GET / PUT / DELETE | `/ssh-keys/{id}` | admin / operator |
 | SSH Keys | GET | `/ssh-keys/{id}/servers` | все |
 | SSH Keys | GET | `/ssh-keys/{id}/download-public` | admin |
+| Audit | GET | `/audit/sessions` | admin |
+| Audit | GET | `/audit/sessions/stats` | admin |
 | Health | GET | `/api/health` | — |
 | Health | GET | `/api/pools/status` | все |
 
@@ -176,7 +185,9 @@ sudo systemctl enable --now pgmon-backend
 | Параметр | Значение | Описание |
 |----------|----------|----------|
 | `SECRET_KEY` | из .env | Ключ для JWT |
-| `TOKEN_EXPIRATION` | 60 мин | Время жизни токена |
+| `TOKEN_EXPIRATION` | 60 мин | Время жизни access token |
+| `REFRESH_TOKEN_EXPIRATION_DAYS` | 7 дней | Время жизни refresh token |
+| `AUDIT_RETENTION_DAYS` | 90 дней | Хранение записей аудита |
 | `SERVER_STATUS_CACHE_TTL` | 5 сек | TTL кэша статуса серверов |
 | `SSH_CACHE_TTL` | 30 сек | TTL кэша SSH данных |
 | `POOL_CONFIGS.default` | min=1, max=5 | Пул по умолчанию |
@@ -192,6 +203,7 @@ sudo systemctl enable --now pgmon-backend
 | `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
 | `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
 | `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
+| `/etc/pg_activity_monitor/audit_log.json` | Журнал аудита сессий |
 | `.env` | SECRET_KEY, LOG_LEVEL |
 
 ## Лицензия

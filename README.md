@@ -28,7 +28,10 @@
 - **Управление серверами** — добавление, редактирование, удаление через UI
 - **Управление пользователями** — ролевая модель (admin / operator / viewer)
 - **Управление SSH-ключами** — генерация, импорт, привязка к серверам
-- **JWT авторизация** — безопасный доступ с автоматическим продлением сессии
+- **JWT авторизация** — access + refresh tokens, httpOnly cookies, token blacklist
+- **CSRF-защита** — SameSite=Strict cookies + проверка Origin header
+- **Аудит сессий** — журнал входов/выходов с IP, User-Agent, временем (admin)
+- **Rate limiting** — защита от brute force (slowapi)
 - **Тёмная тема** — полная поддержка light/dark режимов
 - **Command Palette** — быстрый поиск (`Ctrl+K`)
 - **Connection pooling** — переиспользование соединений к PostgreSQL
@@ -88,24 +91,33 @@ graph TB
 sequenceDiagram
     participant B as Браузер
     participant F as FastAPI
+    participant C as Cookie (httpOnly)
     participant S as localStorage
 
     B->>F: POST /token (login + password)
-    F-->>B: JWT токен (60 мин)
-    B->>S: Сохранение токена
+    F-->>B: access_token (JSON) + Set-Cookie: refresh_token
+    B->>S: access_token
+    F->>C: refresh_token (httpOnly, Secure, SameSite=Strict)
 
     loop Каждый запрос
         B->>F: API запрос + Authorization: Bearer
         F-->>B: Данные
     end
 
+    Note over B: Access token истёк (401)
+    B->>F: POST /refresh (cookie автоматически)
+    F->>F: Ротация: старый refresh → blacklist
+    F-->>B: Новый access_token + новый refresh cookie
+
     Note over B: За 5 мин до истечения
     B->>B: Модалка «Сессия истекает»
-    alt Пользователь продлил
-        B->>F: POST /token (refresh)
-        F-->>B: Новый JWT
-    else Время вышло
-        B->>B: Модалка с вводом пароля
+    alt Продолжить
+        B->>F: POST /refresh
+        F-->>B: Новый access_token
+    else Выйти
+        B->>F: POST /logout
+        F->>F: Оба токена → blacklist
+        F-->>B: Cookie удалена
     end
 ```
 
@@ -156,28 +168,32 @@ PostgreSQL-Activity-Monitor/
 │   └── app/
 │       ├── config.py               # Конфигурация (JWT, CORS, pools)
 │       ├── api/                    # REST endpoints
-│       │   ├── auth.py             # POST /token
+│       │   ├── auth.py             # POST /token, /refresh, /logout
 │       │   ├── servers.py          # CRUD /servers + test-ssh
 │       │   ├── stats.py            # Статистика серверов и БД
 │       │   ├── users.py            # CRUD /users (admin)
 │       │   ├── ssh_keys.py         # CRUD /ssh-keys
+│       │   ├── audit.py            # GET /audit/sessions (admin)
 │       │   └── health.py           # /api/health, /api/pools/status
 │       ├── auth/                   # JWT авторизация
+│       │   ├── blacklist.py        # In-memory token blacklist
 │       │   ├── dependencies.py     # get_current_user (OAuth2)
-│       │   └── utils.py            # Токены, пароли
+│       │   └── utils.py            # access/refresh токены, пароли
 │       ├── database/
 │       │   └── pool.py             # DatabasePool (ThreadedConnectionPool)
 │       ├── models/                 # Pydantic v2 модели
 │       │   ├── server.py           # Server
 │       │   ├── user.py             # User, UserCreate, UserUpdate
-│       │   └── ssh_key.py          # SSHKey, SSHKeyCreate, SSHKeyImport
+│       │   ├── ssh_key.py          # SSHKey, SSHKeyCreate, SSHKeyImport
+│       │   └── audit.py            # AuditEvent
 │       ├── services/               # Бизнес-логика
 │       │   ├── server.py           # Загрузка/сохранение серверов
 │       │   ├── ssh.py              # SSH подключения, disk usage
 │       │   ├── cache.py            # CacheManager (thread-safe, TTL)
 │       │   ├── user_manager.py     # UserManager (bcrypt, fcntl)
 │       │   ├── ssh_key_manager.py  # Генерация SSH ключей
-│       │   └── ssh_key_storage.py  # Хранение SSH ключей
+│       │   ├── ssh_key_storage.py  # Хранение SSH ключей
+│       │   └── audit_logger.py     # Аудит сессий (JSON + fcntl)
 │       └── utils/
 │           └── crypto.py           # Fernet шифрование/расшифровка
 │
@@ -202,6 +218,7 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── DatabaseDetails.jsx # Статистика БД + графики
 │       │   ├── UserManagement.jsx  # Управление пользователями
 │       │   ├── SSHKeyManagement.jsx# Управление SSH-ключами
+│       │   ├── SessionAudit.jsx   # Аудит сессий (admin)
 │       │   ├── PageHeader.jsx      # Заголовок + breadcrumbs
 │       │   ├── EmptyState.jsx      # Заглушка пустого состояния
 │       │   ├── LoadingSpinner.jsx  # Индикатор загрузки
@@ -209,14 +226,14 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── skeletons/          # Skeleton-загрузка страниц
 │       │   └── ui/                 # 27 shadcn/ui компонентов
 │       ├── contexts/
-│       │   ├── auth-context.jsx    # JWT lifecycle, auto-refresh
+│       │   ├── auth-context.jsx    # JWT lifecycle, cookie-based refresh
 │       │   └── servers-context.jsx # Глобальный список серверов
 │       ├── hooks/
 │       │   ├── use-auth.js         # useAuth()
 │       │   ├── use-servers.js      # useServers()
 │       │   └── use-mobile.js       # useMobile() (responsive)
 │       └── lib/
-│           ├── api.js              # Axios + JWT interceptors
+│           ├── api.js              # Axios + JWT interceptors + auto-refresh
 │           ├── chart-config.js     # Chart.js: цвета, опции, градиенты
 │           ├── constants.js        # Все константы приложения
 │           ├── format.js           # Форматирование: bytes, uptime, даты
@@ -365,20 +382,38 @@ server {
         proxy_set_header Host $host;
     }
 
-    # API
+    # Auth API
     location /token {
         proxy_pass http://127.0.0.1:8000/token;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Content-Type $http_content_type;
     }
 
+    location /refresh {
+        proxy_pass http://127.0.0.1:8000/refresh;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Origin $http_origin;
+    }
+
+    location /logout {
+        proxy_pass http://127.0.0.1:8000/logout;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    # Data API
     location /api/ {
         proxy_pass http://127.0.0.1:8000/api/;
         proxy_set_header Host $host;
         proxy_set_header Authorization $http_authorization;
     }
 
-    location ~ ^/(servers|users|ssh-keys|server_stats|server/) {
+    location ~ ^/(servers|users|ssh-keys|server_stats|audit|server/) {
         proxy_pass http://127.0.0.1:8000$request_uri;
         proxy_set_header Host $host;
         proxy_set_header Authorization $http_authorization;
@@ -405,7 +440,9 @@ sudo crontab -u postgres -e
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| POST | `/token` | Получение JWT токена |
+| POST | `/token` | Логин: access token + refresh cookie |
+| POST | `/refresh` | Обновление access token (по refresh cookie) |
+| POST | `/logout` | Выход: blacklist токенов + удаление cookie |
 
 ### Серверы
 
@@ -451,6 +488,13 @@ sudo crontab -u postgres -e
 | GET | `/ssh-keys/{id}/servers` | Серверы, использующие ключ |
 | GET | `/ssh-keys/{id}/download-public` | Скачать публичный ключ |
 
+### Аудит (admin)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/audit/sessions` | Журнал событий (с фильтрами и пагинацией) |
+| GET | `/audit/sessions/stats` | Статистика: входы сегодня, уникальные за неделю |
+
 ### Служебные
 
 | Метод | Endpoint | Описание |
@@ -470,6 +514,7 @@ sudo crontab -u postgres -e
 | `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
 | `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
 | `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
+| `/etc/pg_activity_monitor/audit_log.json` | Журнал аудита сессий |
 | `backend/.env` | SECRET_KEY, LOG_LEVEL |
 
 ### Параметры (`backend/app/config.py`)
@@ -477,7 +522,9 @@ sudo crontab -u postgres -e
 | Параметр | Значение | Описание |
 |----------|----------|----------|
 | `SECRET_KEY` | из .env | Ключ для JWT |
-| `TOKEN_EXPIRATION` | 60 мин | Время жизни токена |
+| `TOKEN_EXPIRATION` | 60 мин | Время жизни access token |
+| `REFRESH_TOKEN_EXPIRATION_DAYS` | 7 дней | Время жизни refresh token |
+| `AUDIT_RETENTION_DAYS` | 90 дней | Хранение записей аудита |
 | `SERVER_STATUS_CACHE_TTL` | 5 сек | TTL кэша статуса |
 | `SSH_CACHE_TTL` | 30 сек | TTL кэша SSH |
 | `POOL_CONFIGS` | default/stats_db/high_load | Размеры connection pools |
@@ -494,14 +541,17 @@ graph LR
     Admin -->|Полный доступ| Servers["Серверы"]
     Admin -->|Полный доступ| Users["Пользователи"]
     Admin -->|Полный доступ| Keys["SSH-ключи"]
+    Admin -->|Полный доступ| Audit["Аудит сессий"]
 
     Operator -->|Полный доступ| Servers
     Operator -.->|Нет доступа| Users
     Operator -->|Создание/импорт| Keys
+    Operator -.->|Нет доступа| Audit
 
     Viewer -->|Только чтение| Servers
     Viewer -.->|Нет доступа| Users
     Viewer -.->|Нет доступа| Keys
+    Viewer -.->|Нет доступа| Audit
 ```
 
 ## Использование

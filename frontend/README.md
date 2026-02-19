@@ -44,6 +44,7 @@ graph TD
     Content --> DD["DatabaseDetails<br/>(статистика БД)"]
     Content --> UM["UserManagement<br/>(admin)"]
     Content --> SK["SSHKeyManagement<br/>(admin/operator)"]
+    Content --> SA["SessionAudit<br/>(admin)"]
 
     Content --> CMD["CommandPalette<br/>(Ctrl+K)"]
 ```
@@ -89,6 +90,7 @@ frontend/
     │   ├── DatabaseDetails.jsx # 3 графика (подключения, размер, коммиты)
     │   ├── UserManagement.jsx  # CRUD пользователей (admin)
     │   ├── SSHKeyManagement.jsx# Генерация, импорт, управление SSH-ключами
+    │   ├── SessionAudit.jsx   # Журнал аудита сессий (admin)
     │   ├── PageHeader.jsx      # Заголовок + breadcrumbs
     │   ├── EmptyState.jsx      # Заглушка пустого состояния
     │   ├── LoadingSpinner.jsx  # Спиннер загрузки (Loader2)
@@ -113,7 +115,7 @@ frontend/
     │       └── tooltip.jsx
     │
     ├── contexts/
-    │   ├── auth-context.jsx    # AuthProvider — JWT lifecycle, auto-refresh
+    │   ├── auth-context.jsx    # AuthProvider — JWT lifecycle, cookie-based refresh
     │   └── servers-context.jsx # ServersProvider — глобальный список серверов
     │
     ├── hooks/
@@ -122,7 +124,7 @@ frontend/
     │   └── use-mobile.js       # useMobile() — responsive breakpoint
     │
     └── lib/
-        ├── api.js              # Axios instance + JWT interceptors
+        ├── api.js              # Axios instance + JWT interceptors + auto-refresh queue
         ├── chart-config.js     # Chart.js: цвета из CSS-переменных, опции, градиенты
         ├── constants.js        # Все константы (интервалы, пагинация, ключи LS)
         ├── format.js           # Форматирование: bytes, uptime, даты, таймер
@@ -140,6 +142,7 @@ frontend/
 | `/server/:name/db/:db_name` | `DatabaseDetails` | все | Графики подключений, размера, коммитов |
 | `/users` | `UserManagement` | admin | Управление пользователями |
 | `/ssh-keys` | `SSHKeyManagement` | admin, operator | Управление SSH-ключами |
+| `/audit` | `SessionAudit` | admin | Журнал аудита сессий |
 
 ## Быстрый старт
 
@@ -181,22 +184,22 @@ URL бэкенда определяется через `window.location.origin`.
 ```mermaid
 stateDiagram-v2
     [*] --> Login: Нет токена
-    Login --> Active: POST /token → JWT
+    Login --> Active: POST /token → access + refresh cookie
     Active --> Active: API запросы (Bearer)
     Active --> Warning: За 5 мин до истечения
-    Warning --> Active: Пользователь продлил
-    Warning --> Refresh: Время вышло
-    Refresh --> Active: Ввёл пароль
-    Refresh --> Login: Вышел
-    Active --> Login: 401 от бэкенда
+    Warning --> Active: POST /refresh (автоматически)
+    Active --> Refresh: 401 от бэкенда
+    Refresh --> Active: POST /refresh → новые токены
+    Refresh --> Login: Refresh тоже истёк
+    Active --> Login: POST /logout
 ```
 
 `AuthContext` управляет полным жизненным циклом JWT:
-1. Логин через `POST /token` → токен в `localStorage`
+1. Логин через `POST /token` → access token в `localStorage`, refresh token в httpOnly cookie
 2. Axios interceptor добавляет `Authorization: Bearer` header
 3. За 5 минут до истечения — модалка «Продлить сессию»
-4. При истечении — повторный ввод пароля
-5. При 401 — автоматический выход
+4. При 401 — автоматический `POST /refresh` (cookie-based, очередь запросов)
+5. При logout — `POST /logout` (blacklist обоих токенов, удаление cookie)
 
 ### UI-паттерны
 
