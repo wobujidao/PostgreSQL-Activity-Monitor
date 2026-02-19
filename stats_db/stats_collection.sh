@@ -110,6 +110,10 @@ psql -h "$PGHOST" -d "$STAT_DB" -U "$PGUSER" -c "
       SELECT datname FROM pg_database WHERE datname NOT IN ('template0', 'template1')
     );
 " >> "$LOG_FILE" 2>&1
+if [ $? -ne 0 ]; then
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - ОШИБКА: основной запрос сбора статистики завершился с ошибкой" >> "$LOG_FILE"
+  exit 1
+fi
 END_TIME=$(date +%s)
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Статистика собрана (выполнено за $((END_TIME - START_TIME)) сек)" >> "$LOG_FILE"
 

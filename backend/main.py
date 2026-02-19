@@ -62,7 +62,7 @@ app.include_router(ssh_keys_router, tags=["ssh-keys"])
 @app.get("/")
 async def root():
     return {
-        "message": "PostgreSQL Activity Monitor API v2.0",
+        "message": "PostgreSQL Activity Monitor API v2.2",
         "docs": "/docs",
         "redoc": "/redoc"
     }

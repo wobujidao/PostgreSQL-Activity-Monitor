@@ -1,5 +1,5 @@
 # app/utils/crypto.py
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from app.config import ENCRYPTION_KEY_FILE
 import logging
 
@@ -24,7 +24,11 @@ def decrypt_password(encrypted_password: str) -> str:
     """Расшифровать пароль"""
     if not encrypted_password:
         return encrypted_password
-    return fernet.decrypt(encrypted_password.encode()).decode()
+    try:
+        return fernet.decrypt(encrypted_password.encode()).decode()
+    except InvalidToken:
+        logger.error("Ошибка расшифровки: невалидный токен или повреждённые данные")
+        return ""
 
 def is_encrypted(value: str) -> bool:
     """Проверяет, зашифровано ли значение"""

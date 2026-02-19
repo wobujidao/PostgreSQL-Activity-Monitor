@@ -11,6 +11,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["stats"])
 
 
+def parse_date_param(value: str | None, default_offset_days: int | None = None) -> datetime:
+    """Парсит дату из ISO-формата или возвращает default."""
+    if not value:
+        if default_offset_days is not None:
+            return datetime.now(timezone.utc) - timedelta(days=default_offset_days)
+        return datetime.now(timezone.utc)
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail=f"Невалидный формат даты: {value}")
+
+
 def get_aggregation_params(start_dt, end_dt):
     """Определяет параметры агрегации SQL в зависимости от диапазона дат."""
     delta_days = (end_dt - start_dt).total_seconds() / 86400
@@ -85,12 +97,13 @@ async def get_server_stats_details(
         # Получаем статистику из stats_db
         with db_pool.get_connection(server, stats_db) as conn:
             with conn.cursor() as cur:
-                start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00")) if start_date else datetime.now(timezone.utc) - timedelta(days=7)
-                end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00")) if end_date else datetime.now(timezone.utc)
-                
+                start_date_dt = parse_date_param(start_date, default_offset_days=7)
+                end_date_dt = parse_date_param(end_date)
+
                 # Последнее обновление
                 cur.execute("SELECT MAX(ts) FROM pg_statistics;")
-                last_update = cur.fetchone()[0]
+                row = cur.fetchone()
+                last_update = row[0] if row else None
                 result["last_stat_update"] = last_update.isoformat() if last_update else None
                 
                 # Агрегированные данные
@@ -234,12 +247,13 @@ async def get_database_stats_details(
     try:
         with db_pool.get_connection(server, stats_db) as conn:
             with conn.cursor() as cur:
-                start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00")) if start_date else datetime.now(timezone.utc) - timedelta(days=7)
-                end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00")) if end_date else datetime.now(timezone.utc)
+                start_date_dt = parse_date_param(start_date, default_offset_days=7)
+                end_date_dt = parse_date_param(end_date)
                 
                 # Последнее обновление
                 cur.execute("SELECT MAX(ts) FROM pg_statistics WHERE datname = %s;", (db_name,))
-                last_update = cur.fetchone()[0]
+                row = cur.fetchone()
+                last_update = row[0] if row else None
                 result["last_stat_update"] = last_update.isoformat() if last_update else None
                 
                 # Агрегированные метрики
@@ -258,8 +272,8 @@ async def get_database_stats_details(
                 
                 # Время создания базы
                 cur.execute("SELECT creation_time FROM db_creation WHERE datname = %s;", (db_name,))
-                creation_time = cur.fetchone()
-                result["creation_time"] = creation_time[0].isoformat() if creation_time else None
+                row = cur.fetchone()
+                result["creation_time"] = row[0].isoformat() if row and row[0] else None
                 
                 # Timeline с адаптивной агрегацией
                 agg = get_aggregation_params(start_date_dt, end_date_dt)

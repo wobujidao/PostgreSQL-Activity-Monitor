@@ -50,7 +50,7 @@ function ServerDetails() {
   const [serverData, setServerData] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
-  const [hideDeleted] = useState(true);
+  const hideDeleted = true;
   const [showNoConnections, setShowNoConnections] = useState(false);
   const [showStaticConnections, setShowStaticConnections] = useState(false);
   const [showUnchangedConnections, setShowUnchangedConnections] = useState(false);

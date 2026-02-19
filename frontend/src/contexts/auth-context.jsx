@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import {
   SESSION_WARNING_SEC,
@@ -128,6 +128,12 @@ export function AuthProvider({ children }) {
     }).catch(() => {});
   }, [token]);
 
+  // Refs для актуальных значений в замыканиях
+  const showSessionModalRef = useRef(showSessionModal);
+  const showRefreshLoginModalRef = useRef(showRefreshLoginModal);
+  useEffect(() => { showSessionModalRef.current = showSessionModal; }, [showSessionModal]);
+  useEffect(() => { showRefreshLoginModalRef.current = showRefreshLoginModal; }, [showRefreshLoginModal]);
+
   // Проверка истечения токена
   useEffect(() => {
     if (!token) return;
@@ -149,18 +155,25 @@ export function AuthProvider({ children }) {
     checkExpiration();
     const interval = setInterval(() => {
       checkExpiration();
-      if (showSessionModal && timeLeft > 0) {
-        setTimeLeft(prev => prev - 1);
-      }
+      setTimeLeft(prev => {
+        if (showSessionModalRef.current && prev > 0) return prev - 1;
+        return prev;
+      });
     }, TOKEN_CHECK_INTERVAL);
 
+    // Throttled activity handler (не чаще раза в 2 сек)
+    let lastActivityCheck = 0;
     const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityCheck < 2000) return;
+      lastActivityCheck = now;
+
       const currentToken = localStorage.getItem(LS_TOKEN);
       if (!currentToken) return;
       const decoded = decodeToken(currentToken);
       if (!decoded?.exp) return;
-      const remaining = decoded.exp * 1000 - Date.now();
-      if (remaining < SESSION_WARNING_MS && !showSessionModal && !showRefreshLoginModal) {
+      const remaining = decoded.exp * 1000 - now;
+      if (remaining < SESSION_WARNING_MS && !showSessionModalRef.current && !showRefreshLoginModalRef.current) {
         setShowSessionModal(true);
         setTimeLeft(Math.floor(remaining / 1000));
       }
@@ -173,7 +186,7 @@ export function AuthProvider({ children }) {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
     };
-  }, [token, timeLeft, showSessionModal, showRefreshLoginModal, logout]);
+  }, [token, logout]);
 
   const value = {
     token,
