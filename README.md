@@ -514,7 +514,7 @@ sudo crontab -u postgres -e
 | `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
 | `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
 | `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
-| `/etc/pg_activity_monitor/audit_log.json` | Журнал аудита сессий |
+| `/etc/pg_activity_monitor/audit.db` | Журнал аудита сессий (SQLite) |
 | `backend/.env` | SECRET_KEY, LOG_LEVEL |
 
 ### Параметры (`backend/app/config.py`)

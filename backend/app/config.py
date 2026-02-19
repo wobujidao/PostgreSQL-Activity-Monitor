@@ -22,7 +22,8 @@ USERS_FILE = CONFIG_DIR / "users.json"
 ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
 
 # Аудит сессий
-AUDIT_LOG_FILE = CONFIG_DIR / "audit_log.json"
+AUDIT_DB_FILE = CONFIG_DIR / "audit.db"
+AUDIT_LOG_FILE = CONFIG_DIR / "audit_log.json"  # для миграции из старого формата
 AUDIT_RETENTION_DAYS = 90  # хранить записи N дней
 
 # Настройки пулов подключений
