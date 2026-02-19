@@ -1,147 +1,250 @@
 # PostgreSQL Activity Monitor
 
 <div align="center">
-  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
-  <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19"/>
-  <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/Python_3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13"/>
-  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS"/>
-  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/>
-</div>
 
-<div align="center">
-  <p>Система мониторинга PostgreSQL серверов с веб-интерфейсом, REST API и исторической статистикой</p>
-</div>
+<img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+<img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19"/>
+<img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI"/>
+<img src="https://img.shields.io/badge/Python_3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13"/>
+<img src="https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS"/>
+<img src="https://img.shields.io/badge/Vite_7-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/>
 
-<div align="center">
-  <img src="https://img.shields.io/github/license/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/github/stars/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="Stars"/>
+**Система мониторинга PostgreSQL серверов с веб-интерфейсом, REST API и исторической статистикой**
+
+<img src="https://img.shields.io/github/license/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="License"/>
+<img src="https://img.shields.io/github/stars/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="Stars"/>
+<img src="https://img.shields.io/badge/version-2.2.0-blue?style=flat-square" alt="Version"/>
+
 </div>
 
 ---
 
 ## Возможности
 
-- **Мониторинг серверов** - статус, версия, uptime, активные соединения
-- **Историческая статистика** - графики нагрузки, размеров БД, транзакций за любой период
-- **SSH мониторинг** - свободное место на дисках через SSH (пароль или ключ)
-- **Управление серверами** - добавление, редактирование, удаление через UI
-- **Управление пользователями** - ролевая модель (admin / operator / viewer)
-- **Управление SSH-ключами** - генерация, импорт, привязка к серверам
-- **JWT авторизация** - безопасный доступ с настраиваемым временем сессии
-- **Шифрование паролей** - Fernet шифрование для хранения credentials
-- **Connection pooling** - переиспользование соединений к PostgreSQL
-- **Кэширование** - двухуровневое (статус серверов 5с, SSH 30с)
+- **Мониторинг серверов** — статус, версия, uptime, активные соединения, дисковое пространство
+- **Историческая статистика** — графики нагрузки, размеров БД, транзакций за любой период
+- **Анализ баз данных** — автоматическое выявление неактивных, статичных и малоактивных БД
+- **SSH мониторинг** — свободное место на дисках через SSH (пароль или ключ)
+- **Управление серверами** — добавление, редактирование, удаление через UI
+- **Управление пользователями** — ролевая модель (admin / operator / viewer)
+- **Управление SSH-ключами** — генерация, импорт, привязка к серверам
+- **JWT авторизация** — безопасный доступ с автоматическим продлением сессии
+- **Тёмная тема** — полная поддержка light/dark режимов
+- **Command Palette** — быстрый поиск (`Ctrl+K`)
+- **Connection pooling** — переиспользование соединений к PostgreSQL
+- **Кэширование** — двухуровневое (статус серверов 5с, SSH 30с)
+- **Шифрование** — Fernet для хранения credentials, bcrypt для паролей
+
+## Архитектура
+
+```mermaid
+graph TB
+    subgraph Client["Браузер"]
+        SPA["React SPA<br/>Vite + shadcn/ui"]
+    end
+
+    subgraph Proxy["Nginx (HTTPS)"]
+        direction LR
+        NF[":443 → :3000<br/>Frontend"]
+        NB[":443 → :8000<br/>API"]
+    end
+
+    subgraph Backend["FastAPI Backend"]
+        Auth["JWT Auth"]
+        API["REST API"]
+        Cache["Cache Manager"]
+        Pool["Connection Pool"]
+        SSHClient["SSH Client"]
+    end
+
+    subgraph Data["Данные"]
+        PG[("PostgreSQL<br/>серверы")]
+        SSH["SSH<br/>серверы"]
+        Config["/etc/pg_activity_monitor/<br/>servers.json, users.json"]
+    end
+
+    subgraph Stats["Статистика"]
+        Cron["cron (10 мин)"]
+        StatsDB[("stats_db")]
+    end
+
+    SPA -->|HTTPS| Proxy
+    NF --> SPA
+    NB --> API
+    API --> Auth
+    API --> Cache
+    API --> Pool
+    API --> SSHClient
+    Pool -->|psycopg2| PG
+    SSHClient -->|paramiko| SSH
+    API --> Config
+    Cron -->|stats_collection.sh| StatsDB
+    Pool -->|SELECT| StatsDB
+```
+
+## Поток авторизации
+
+```mermaid
+sequenceDiagram
+    participant B as Браузер
+    participant F as FastAPI
+    participant S as localStorage
+
+    B->>F: POST /token (login + password)
+    F-->>B: JWT токен (60 мин)
+    B->>S: Сохранение токена
+
+    loop Каждый запрос
+        B->>F: API запрос + Authorization: Bearer
+        F-->>B: Данные
+    end
+
+    Note over B: За 5 мин до истечения
+    B->>B: Модалка «Сессия истекает»
+    alt Пользователь продлил
+        B->>F: POST /token (refresh)
+        F-->>B: Новый JWT
+    else Время вышло
+        B->>B: Модалка с вводом пароля
+    end
+```
 
 ## Технологический стек
 
 ### Backend
-- **Python 3.13** + virtualenv
-- **FastAPI 0.129** - REST API
-- **Pydantic 2.12** - валидация данных
-- **psycopg2** - драйвер PostgreSQL с connection pooling
-- **Paramiko** - SSH клиент
-- **PyJWT** + **bcrypt** - авторизация
-- **cryptography** - шифрование (Fernet)
+| Технология | Версия | Назначение |
+|-----------|--------|------------|
+| Python | 3.13 | Среда выполнения |
+| FastAPI | 0.129 | REST API фреймворк |
+| Pydantic | 2.12 | Валидация данных |
+| psycopg2 | 2.9 | PostgreSQL драйвер + connection pooling |
+| Paramiko | 3.5 | SSH клиент |
+| PyJWT + bcrypt | 2.11 / 4.3 | Авторизация |
+| cryptography | 44.0 | Fernet шифрование |
 
 ### Frontend
-- **React 19.2** + React Router 7.13
-- **Vite 7.3** - сборка и dev-сервер
-- **Tailwind CSS v4.1** + **shadcn/ui** - UI компоненты
-- **Chart.js 4.5** - графики
-- **axios 1.13** - HTTP клиент
-- **react-datepicker 9.1** - выбор диапазона дат
-- **sonner 2.0** - toast-уведомления
-- **lucide-react** - иконки
+| Технология | Версия | Назначение |
+|-----------|--------|------------|
+| React | 19.2 | UI фреймворк |
+| Vite | 7.3 | Сборка и dev-сервер |
+| Tailwind CSS | 4.1 | Utility-first CSS |
+| shadcn/ui | 27 компонентов | UI-библиотека (Radix + Tailwind) |
+| Chart.js | 4.5 | Графики временных рядов |
+| React Router | 7.13 | SPA маршрутизация |
+| axios | 1.13 | HTTP клиент с JWT interceptors |
+| lucide-react | 0.564 | SVG иконки |
 
 ### Инфраструктура
-- **PostgreSQL 9.6+** - целевые серверы
-- **Nginx** - reverse proxy + SSL
-- **systemd** - управление сервисами
-- **cron** - сбор статистики
+| Технология | Назначение |
+|-----------|------------|
+| PostgreSQL 9.6+ | Целевые серверы мониторинга |
+| Nginx | Reverse proxy + SSL termination |
+| systemd | Управление сервисами |
+| cron | Автоматический сбор статистики |
 
 ## Структура проекта
 
 ```
 PostgreSQL-Activity-Monitor/
-├── backend/                    # FastAPI REST API
-│   ├── main.py                 # Точка входа
-│   ├── requirements.txt        # Python зависимости
-│   ├── pgmon-backend.service   # systemd сервис
+├── backend/                        # FastAPI REST API
+│   ├── main.py                     # Точка входа
+│   ├── requirements.txt            # Python зависимости
+│   ├── pgmon-backend.service       # systemd сервис
+│   ├── README.md                   # Документация backend
+│   ├── USER_MANAGEMENT_API.md      # API управления пользователями
 │   └── app/
-│       ├── config.py           # Конфигурация
-│       ├── api/                # REST endpoints
-│       │   ├── auth.py         # POST /token
-│       │   ├── servers.py      # CRUD /servers
-│       │   ├── stats.py        # GET /server_stats, /server/*/stats
-│       │   ├── users.py        # CRUD /users
-│       │   ├── ssh_keys.py     # CRUD /ssh-keys
-│       │   └── health.py       # GET /api/health, /api/pools/status
-│       ├── auth/               # JWT авторизация
-│       │   ├── dependencies.py # get_current_user
-│       │   └── utils.py        # create_access_token, verify_password
+│       ├── config.py               # Конфигурация (JWT, CORS, pools)
+│       ├── api/                    # REST endpoints
+│       │   ├── auth.py             # POST /token
+│       │   ├── servers.py          # CRUD /servers + test-ssh
+│       │   ├── stats.py            # Статистика серверов и БД
+│       │   ├── users.py            # CRUD /users (admin)
+│       │   ├── ssh_keys.py         # CRUD /ssh-keys
+│       │   └── health.py           # /api/health, /api/pools/status
+│       ├── auth/                   # JWT авторизация
+│       │   ├── dependencies.py     # get_current_user (OAuth2)
+│       │   └── utils.py            # Токены, пароли
 │       ├── database/
-│       │   └── pool.py         # DatabasePool (ThreadedConnectionPool)
-│       ├── models/             # Pydantic v2 модели
-│       │   ├── server.py       # Server
-│       │   ├── user.py         # User, UserCreate, UserUpdate, UserResponse
-│       │   └── ssh_key.py      # SSHKey, SSHKeyCreate, SSHKeyImport
-│       ├── services/           # Бизнес-логика
-│       │   ├── server.py       # load_servers, save_servers, connect_to_server
-│       │   ├── ssh.py          # SSH подключения, disk usage
-│       │   ├── cache.py        # CacheManager (thread-safe)
-│       │   ├── user_manager.py # UserManager (CRUD + bcrypt)
-│       │   ├── ssh_key_manager.py    # Генерация/валидация SSH ключей
-│       │   └── ssh_key_storage.py    # Хранение SSH ключей (JSON + файлы)
+│       │   └── pool.py             # DatabasePool (ThreadedConnectionPool)
+│       ├── models/                 # Pydantic v2 модели
+│       │   ├── server.py           # Server
+│       │   ├── user.py             # User, UserCreate, UserUpdate
+│       │   └── ssh_key.py          # SSHKey, SSHKeyCreate, SSHKeyImport
+│       ├── services/               # Бизнес-логика
+│       │   ├── server.py           # Загрузка/сохранение серверов
+│       │   ├── ssh.py              # SSH подключения, disk usage
+│       │   ├── cache.py            # CacheManager (thread-safe, TTL)
+│       │   ├── user_manager.py     # UserManager (bcrypt, fcntl)
+│       │   ├── ssh_key_manager.py  # Генерация SSH ключей
+│       │   └── ssh_key_storage.py  # Хранение SSH ключей
 │       └── utils/
-│           └── crypto.py       # Fernet шифрование/расшифровка
-├── frontend/                   # React SPA (Vite + shadcn/ui)
-│   ├── index.html              # Точка входа Vite
-│   ├── vite.config.js          # Конфигурация Vite
-│   ├── package.json            # Node.js зависимости
+│           └── crypto.py           # Fernet шифрование/расшифровка
+│
+├── frontend/                       # React SPA
+│   ├── index.html                  # Точка входа
+│   ├── vite.config.js              # Конфигурация Vite
+│   ├── components.json             # Конфигурация shadcn/ui
+│   ├── package.json                # Node.js зависимости
+│   ├── README.md                   # Документация frontend
 │   └── src/
-│       ├── main.jsx            # Точка входа React
-│       ├── index.css           # Tailwind + CSS переменные shadcn
-│       ├── App.jsx             # Роутинг, хедер, модалы сессии
-│       ├── lib/
-│       │   ├── api.js          # Централизованный axios + JWT interceptor
-│       │   ├── constants.js    # Все константы приложения
-│       │   ├── format.js       # Утилиты форматирования
-│       │   └── utils.js        # cn() для Tailwind классов
+│       ├── main.jsx                # Точка входа React
+│       ├── App.jsx                 # Роутинг, sidebar layout, модалы сессии
+│       ├── index.css               # Tailwind + CSS-переменные (Steel Blue)
+│       ├── components/
+│       │   ├── AppSidebar.jsx      # Боковая навигация
+│       │   ├── CommandPalette.jsx  # Ctrl+K поиск
+│       │   ├── ErrorBoundary.jsx   # Обработка ошибок React
+│       │   ├── Login.jsx           # Авторизация
+│       │   ├── ServerList.jsx      # Список серверов (главная)
+│       │   ├── ServerDetails.jsx   # Детали сервера + анализ БД
+│       │   ├── ServerEdit.jsx      # Редактирование сервера
+│       │   ├── DatabaseDetails.jsx # Статистика БД + графики
+│       │   ├── UserManagement.jsx  # Управление пользователями
+│       │   ├── SSHKeyManagement.jsx# Управление SSH-ключами
+│       │   ├── PageHeader.jsx      # Заголовок + breadcrumbs
+│       │   ├── EmptyState.jsx      # Заглушка пустого состояния
+│       │   ├── LoadingSpinner.jsx  # Индикатор загрузки
+│       │   ├── ScrollToTop.jsx     # Кнопка «Наверх»
+│       │   ├── skeletons/          # Skeleton-загрузка страниц
+│       │   └── ui/                 # 27 shadcn/ui компонентов
 │       ├── contexts/
-│       │   └── auth-context.jsx  # AuthProvider (JWT lifecycle)
+│       │   ├── auth-context.jsx    # JWT lifecycle, auto-refresh
+│       │   └── servers-context.jsx # Глобальный список серверов
 │       ├── hooks/
-│       │   └── use-auth.js     # useAuth hook
-│       └── components/
-│           ├── Login.jsx             # Авторизация
-│           ├── ServerList.jsx        # Список серверов (главная)
-│           ├── ServerDetails.jsx     # Детали сервера + анализ БД
-│           ├── ServerEdit.jsx        # Редактирование сервера
-│           ├── DatabaseDetails.jsx   # Статистика БД + графики
-│           ├── UserManagement.jsx    # Управление пользователями
-│           ├── SSHKeyManagement.jsx  # Управление SSH ключами
-│           ├── ScrollToTop.jsx       # Кнопка "наверх"
-│           ├── LoadingSpinner.jsx    # Индикатор загрузки
-│           └── ui/                   # shadcn/ui компоненты
-├── stats_db/                   # Сбор исторической статистики
-│   ├── create_stats_db.sh      # Создание таблиц
-│   ├── stats_collection.sh     # Скрипт сбора (для cron)
-│   └── README.md
-├── .env                        # SECRET_KEY
+│       │   ├── use-auth.js         # useAuth()
+│       │   ├── use-servers.js      # useServers()
+│       │   └── use-mobile.js       # useMobile() (responsive)
+│       └── lib/
+│           ├── api.js              # Axios + JWT interceptors
+│           ├── chart-config.js     # Chart.js: цвета, опции, градиенты
+│           ├── constants.js        # Все константы приложения
+│           ├── format.js           # Форматирование: bytes, uptime, даты
+│           ├── validation.js       # Валидация: hostname, port
+│           └── utils.js            # cn() для Tailwind классов
+│
+├── stats_db/                       # Сбор исторической статистики
+│   ├── create_stats_db.sh          # Создание таблиц
+│   ├── stats_collection.sh         # Скрипт сбора (cron)
+│   └── README.md                   # Документация
+│
+├── docs/
+│   └── DESIGN_SYSTEM.md            # Дизайн-система проекта
+│
+├── .env                            # SECRET_KEY
 ├── .gitignore
-├── CLAUDE.md                   # Инструкции для Claude Code
-├── LICENSE                     # MIT
-└── README.md                   # Этот файл
+├── CLAUDE.md                       # Инструкции для Claude Code
+├── LICENSE                         # MIT
+└── README.md                       # Этот файл
 ```
 
 ## Установка
 
 ### Требования
 
-- Linux сервер (Debian/Ubuntu/Astra Linux)
+- Linux (Debian / Ubuntu / Astra Linux)
 - Python 3.10+ (рекомендуется 3.13)
+- Node.js 20+
 - PostgreSQL 9.6+ на целевых серверах
-- Node.js 18+ (для frontend)
 - Nginx (для HTTPS)
 
 ### 1. Клонирование
@@ -155,12 +258,8 @@ cd PostgreSQL-Activity-Monitor
 
 ```bash
 cd backend
-
-# Создаем virtualenv
 python3.13 -m venv venv
 source venv/bin/activate
-
-# Устанавливаем зависимости
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
@@ -168,23 +267,22 @@ pip install -r requirements.txt
 ### 3. Конфигурация
 
 ```bash
-# Создаем директорию конфигурации
+# Директория конфигурации
 sudo mkdir -p /etc/pg_activity_monitor
 sudo chown $USER:$USER /etc/pg_activity_monitor
 
-# Генерируем ключ шифрования
+# Ключ шифрования
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" \
   > /etc/pg_activity_monitor/encryption_key.key
 chmod 600 /etc/pg_activity_monitor/encryption_key.key
 
-# Создаем SECRET_KEY
+# SECRET_KEY для JWT
 echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" > .env
 ```
 
 ### 4. Создание администратора
 
 ```bash
-# Генерируем хэш пароля
 python3 -c "
 import bcrypt, json
 password = input('Пароль для admin: ').encode()
@@ -234,7 +332,7 @@ sudo cp backend/pgmon-backend.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pgmon-backend
 
-# Frontend (создайте сервис или используйте nginx + build)
+# Frontend
 sudo systemctl enable --now pgmon-frontend
 
 # Проверка
@@ -290,15 +388,15 @@ server {
 ### 9. Сбор статистики (опционально)
 
 ```bash
-# Создаем базу stats_db на целевом сервере
+# Создаём базу stats_db на целевом сервере
 bash stats_db/create_stats_db.sh
 
 # Добавляем в cron (каждые 10 минут)
-crontab -e
-# */10 * * * * /path/to/stats_db/stats_collection.sh >> /var/log/pg_stats.log 2>&1
+sudo crontab -u postgres -e
+# */10 * * * * /path/to/stats_db/stats_collection.sh
 ```
 
-## API Endpoints
+## API
 
 Все endpoints (кроме `/token` и `/api/health`) требуют JWT токен: `Authorization: Bearer <token>`
 
@@ -327,7 +425,7 @@ crontab -e
 | GET | `/server/{name}/db/{db}` | Краткая информация о БД |
 | GET | `/server/{name}/db/{db}/stats` | Детальная статистика БД за период |
 
-### Пользователи (требуется роль admin)
+### Пользователи (admin)
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
@@ -338,7 +436,7 @@ crontab -e
 | PUT | `/users/{login}` | Обновить пользователя |
 | DELETE | `/users/{login}` | Удалить пользователя |
 
-### SSH-ключи (требуется роль admin или operator)
+### SSH-ключи (admin / operator)
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
@@ -363,14 +461,14 @@ crontab -e
 
 ## Конфигурация
 
-### Файлы конфигурации
+### Файлы
 
 | Файл | Описание |
 |------|----------|
-| `/etc/pg_activity_monitor/servers.json` | Конфигурация серверов (пароли зашифрованы) |
-| `/etc/pg_activity_monitor/users.json` | Пользователи (пароли — bcrypt хэши) |
-| `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet для шифрования |
-| `/etc/pg_activity_monitor/ssh_keys/` | Хранилище SSH-ключей |
+| `/etc/pg_activity_monitor/servers.json` | Серверы (пароли зашифрованы Fernet) |
+| `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
+| `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
+| `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
 | `backend/.env` | SECRET_KEY, LOG_LEVEL |
 
 ### Параметры (`backend/app/config.py`)
@@ -386,11 +484,24 @@ crontab -e
 
 ### Роли пользователей
 
-| Роль | Серверы | Пользователи | SSH-ключи |
-|------|---------|---------------|-----------|
-| **admin** | Полный доступ | Полный доступ | Полный доступ |
-| **operator** | Полный доступ | Нет доступа | Создание/импорт |
-| **viewer** | Только чтение | Нет доступа | Нет доступа |
+```mermaid
+graph LR
+    Admin["admin"]
+    Operator["operator"]
+    Viewer["viewer"]
+
+    Admin -->|Полный доступ| Servers["Серверы"]
+    Admin -->|Полный доступ| Users["Пользователи"]
+    Admin -->|Полный доступ| Keys["SSH-ключи"]
+
+    Operator -->|Полный доступ| Servers
+    Operator -.->|Нет доступа| Users
+    Operator -->|Создание/импорт| Keys
+
+    Viewer -->|Только чтение| Servers
+    Viewer -.->|Нет доступа| Users
+    Viewer -.->|Нет доступа| Keys
+```
 
 ## Использование
 
@@ -411,7 +522,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/server_stats/my-ser
 curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/server/my-server/stats?start_date=2026-01-01&end_date=2026-02-01"
 
-# Состояние API
+# Состояние API (без авторизации)
 curl http://localhost:8000/api/health
 ```
 
@@ -420,8 +531,9 @@ curl http://localhost:8000/api/health
 ## Обслуживание
 
 ```bash
-# Логи backend
+# Логи
 sudo journalctl -u pgmon-backend -f
+sudo journalctl -u pgmon-frontend -f
 
 # Перезапуск
 sudo systemctl restart pgmon-backend
@@ -437,8 +549,8 @@ sudo systemctl restart pgmon-frontend
 
 ## Лицензия
 
-MIT License - см. файл [LICENSE](LICENSE).
+MIT License — см. файл [LICENSE](LICENSE).
 
 ## Автор
 
-**Владислав Демидов** - [@wobujidao](https://github.com/wobujidao)
+**Владислав Демидов** — [@wobujidao](https://github.com/wobujidao)

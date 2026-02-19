@@ -1,20 +1,58 @@
 # API управления пользователями
 
-## Роли пользователей
+<div align="center">
 
-- **admin** - полный доступ, может управлять пользователями
-- **operator** - может управлять серверами и выполнять операции
-- **viewer** - только просмотр информации
+<img src="https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi" alt="FastAPI"/>
+<img src="https://img.shields.io/badge/JWT-Auth-000000?style=flat-square&logo=jsonwebtokens&logoColor=white" alt="JWT"/>
+<img src="https://img.shields.io/badge/bcrypt-Passwords-4A4A4A?style=flat-square" alt="bcrypt"/>
+
+</div>
+
+## Ролевая модель
+
+```mermaid
+graph LR
+    subgraph Roles["Роли"]
+        A["admin"]
+        O["operator"]
+        V["viewer"]
+    end
+
+    subgraph Permissions["Права доступа"]
+        Servers["Серверы<br/>CRUD"]
+        ServersR["Серверы<br/>чтение"]
+        Users["Пользователи<br/>CRUD"]
+        Keys["SSH-ключи<br/>CRUD"]
+        KeysR["SSH-ключи<br/>создание/импорт"]
+    end
+
+    A --> Servers
+    A --> Users
+    A --> Keys
+
+    O --> Servers
+    O --> KeysR
+
+    V --> ServersR
+```
+
+| Роль | Серверы | Пользователи | SSH-ключи |
+|------|---------|--------------|-----------|
+| **admin** | Полный доступ | Полный доступ | Полный доступ |
+| **operator** | Полный доступ | Нет доступа | Создание / импорт |
+| **viewer** | Только чтение | Нет доступа | Нет доступа |
 
 ## Endpoints
 
-### Получить информацию о текущем пользователе
+### Текущий пользователь
+
 ```
 GET /users/me
 Authorization: Bearer {token}
 ```
 
 **Ответ:**
+
 ```json
 {
     "login": "admin",
@@ -26,13 +64,15 @@ Authorization: Bearer {token}
 }
 ```
 
-### Получить список всех пользователей (только admin)
+### Список пользователей (admin)
+
 ```
 GET /users
 Authorization: Bearer {token}
 ```
 
 **Ответ:**
+
 ```json
 [
     {
@@ -54,83 +94,56 @@ Authorization: Bearer {token}
 ]
 ```
 
-### Создать пользователя (только admin)
+### Создание пользователя (admin)
+
 ```
 POST /users
 Authorization: Bearer {token}
 Content-Type: application/json
+```
 
+```json
 {
   "login": "username",
   "password": "password",
-  "role": "viewer|operator|admin",
+  "role": "viewer",
   "email": "email@example.com"
 }
 ```
 
-**Ответ:**
-```json
-{
-    "login": "username",
-    "role": "viewer",
-    "email": "email@example.com",
-    "created_at": "2025-06-18T09:14:41.707282",
-    "last_login": null,
-    "is_active": true
-}
-```
+### Информация о пользователе (admin)
 
-### Получить информацию о пользователе (только admin)
 ```
 GET /users/{username}
 Authorization: Bearer {token}
 ```
 
-**Ответ:**
-```json
-{
-    "login": "username",
-    "role": "viewer",
-    "email": "email@example.com",
-    "created_at": "2025-06-18T09:14:41.707282",
-    "last_login": "2025-06-18T10:00:00.000000",
-    "is_active": true
-}
-```
+### Обновление пользователя (admin)
 
-### Обновить пользователя (только admin)
 ```
 PUT /users/{username}
 Authorization: Bearer {token}
 Content-Type: application/json
-
-{
-  "password": "new_password",
-  "role": "viewer|operator|admin",
-  "email": "new@example.com",
-  "is_active": true|false
-}
 ```
 
-**Ответ:**
 ```json
 {
-    "login": "username",
-    "role": "operator",
-    "email": "new@example.com",
-    "created_at": "2025-06-18T09:14:41.707282",
-    "last_login": "2025-06-18T10:00:00.000000",
-    "is_active": true
+  "password": "new_password",
+  "role": "operator",
+  "email": "new@example.com",
+  "is_active": true
 }
 ```
 
-### Удалить пользователя (только admin)
+Все поля опциональны — можно обновить только нужные.
+
+### Удаление пользователя (admin)
+
 ```
 DELETE /users/{username}
 Authorization: Bearer {token}
 ```
 
-**Ответ:**
 ```json
 {
     "message": "Пользователь username удален"
@@ -139,73 +152,67 @@ Authorization: Bearer {token}
 
 ## Коды ошибок
 
-- **401 Unauthorized** - отсутствует или невалидный токен
-- **403 Forbidden** - недостаточно прав (требуется роль admin)
-- **404 Not Found** - пользователь не найден
-- **400 Bad Request** - неверные данные или попытка удалить себя
+| Код | Описание |
+|-----|----------|
+| 400 | Неверные данные или попытка удалить себя |
+| 401 | Отсутствует или невалидный токен |
+| 403 | Недостаточно прав (требуется admin) |
+| 404 | Пользователь не найден |
 
-## Примеры использования
+## Примеры (curl)
 
-### Получение токена авторизации
 ```bash
+# Получение токена
 TOKEN=$(curl -s -X POST http://localhost:8000/token \
   -d "username=admin&password=admin" \
   -H "Content-Type: application/x-www-form-urlencoded" | \
   python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-```
 
-### Создание оператора
-```bash
+# Создание оператора
 curl -X POST http://localhost:8000/users \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"login": "operator1", "password": "secure_pass", "role": "operator"}'
-```
 
-### Изменение роли пользователя
-```bash
+# Изменение роли
 curl -X PUT http://localhost:8000/users/operator1 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"role": "admin"}'
-```
 
-### Деактивация пользователя
-```bash
+# Деактивация
 curl -X PUT http://localhost:8000/users/operator1 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"is_active": false}'
-```
 
-### Смена пароля пользователя
-```bash
+# Смена пароля
 curl -X PUT http://localhost:8000/users/operator1 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"password": "new_secure_password"}'
-```
 
-### Удаление пользователя
-```bash
+# Удаление
 curl -X DELETE http://localhost:8000/users/operator1 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-## Структура файла users.json
+## Хранение
 
-Пользователи хранятся в файле `/etc/pg_activity_monitor/users.json`:
+Пользователи хранятся в `/etc/pg_activity_monitor/users.json`:
 
 ```json
 [
     {
         "login": "admin",
-        "password": "$2b$12$...", // bcrypt hash
+        "password": "$2b$12$...",
         "role": "admin",
         "email": null,
-        "created_at": "2025-06-18T09:00:00.000000",
-        "last_login": "2025-06-18T10:00:00.000000",
+        "created_at": "2025-06-18T09:00:00",
+        "last_login": "2025-06-18T10:00:00",
         "is_active": true
     }
 ]
 ```
+
+Пароли хранятся как bcrypt хэши. Файл блокируется через `fcntl` при записи.

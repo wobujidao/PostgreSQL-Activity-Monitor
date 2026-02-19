@@ -1,21 +1,73 @@
-# PostgreSQL Activity Monitor - Backend API
+# PostgreSQL Activity Monitor — Backend API
 
-[![Python](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.129-green.svg)](https://fastapi.tiangolo.com/)
-[![Pydantic](https://img.shields.io/badge/Pydantic-2.12-purple.svg)](https://docs.pydantic.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<div align="center">
 
-REST API для мониторинга PostgreSQL серверов с connection pooling, кэшированием и управлением SSH-ключами.
+<img src="https://img.shields.io/badge/Python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13"/>
+<img src="https://img.shields.io/badge/FastAPI-0.129-005571?style=for-the-badge&logo=fastapi" alt="FastAPI"/>
+<img src="https://img.shields.io/badge/Pydantic-2.12-E92063?style=for-the-badge&logo=pydantic&logoColor=white" alt="Pydantic"/>
+<img src="https://img.shields.io/badge/PostgreSQL-psycopg2-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+
+**REST API для мониторинга PostgreSQL серверов**
+
+</div>
+
+---
+
+## Архитектура
+
+```mermaid
+graph TD
+    Client["Клиент (Browser / curl)"]
+
+    subgraph FastAPI["FastAPI Application"]
+        Auth["auth/<br/>JWT + OAuth2"]
+        Router["api/<br/>Роутеры"]
+        Models["models/<br/>Pydantic v2"]
+    end
+
+    subgraph Services["Сервисный слой"]
+        ServerSvc["server.py<br/>Загрузка/сохранение"]
+        SSHSvc["ssh.py<br/>SSH подключения"]
+        CacheSvc["cache.py<br/>TTL кэш"]
+        UserSvc["user_manager.py<br/>Пользователи"]
+        KeySvc["ssh_key_manager.py<br/>SSH ключи"]
+    end
+
+    subgraph Storage["Хранение"]
+        Pool["database/pool.py<br/>Connection Pool"]
+        Crypto["utils/crypto.py<br/>Fernet"]
+        PG[("PostgreSQL")]
+        SSH["SSH серверы"]
+        Config[("/etc/pg_activity_monitor/")]
+    end
+
+    Client -->|HTTP| Auth
+    Auth -->|JWT| Router
+    Router --> Models
+    Router --> Services
+
+    ServerSvc --> Config
+    ServerSvc --> Crypto
+    SSHSvc -->|paramiko| SSH
+    CacheSvc --> ServerSvc
+    UserSvc --> Config
+    KeySvc --> Config
+    Pool -->|psycopg2| PG
+```
 
 ## Стек
 
-- **Python 3.13** + virtualenv
-- **FastAPI 0.129** + uvicorn 0.40
-- **Pydantic 2.12** - валидация данных
-- **psycopg2-binary 2.9.11** - PostgreSQL + connection pooling
-- **paramiko 3.5** - SSH клиент
-- **PyJWT 2.11** + **bcrypt 4.3** - JWT авторизация
-- **cryptography 44.0** - Fernet шифрование
+| Технология | Версия | Назначение |
+|-----------|--------|------------|
+| Python | 3.13 | Среда выполнения |
+| FastAPI | 0.129 | REST API + автодокументация |
+| uvicorn | 0.40 | ASGI-сервер |
+| Pydantic | 2.12 | Валидация данных |
+| psycopg2-binary | 2.9.11 | PostgreSQL + connection pooling |
+| paramiko | 3.5 | SSH клиент |
+| PyJWT | 2.11 | JWT токены |
+| bcrypt | 4.3 | Хэширование паролей |
+| cryptography | 44.0 | Fernet шифрование |
 
 ## Структура
 
@@ -24,34 +76,34 @@ backend/
 ├── main.py                       # Точка входа FastAPI
 ├── requirements.txt              # Python зависимости
 ├── pgmon-backend.service         # systemd сервис
-├── venv/                         # virtualenv (не в git)
+├── .env                          # SECRET_KEY, LOG_LEVEL
 └── app/
-    ├── config.py                 # SECRET_KEY, JWT, POOL_CONFIGS, CORS
+    ├── config.py                 # Конфигурация: JWT, CORS, pools
     ├── api/
     │   ├── auth.py               # POST /token
     │   ├── servers.py            # CRUD /servers + test-ssh
-    │   ├── stats.py              # /server_stats, /server/*/stats, /server/*/db/*
+    │   ├── stats.py              # Статистика серверов и БД
     │   ├── users.py              # CRUD /users (admin only)
     │   ├── ssh_keys.py           # CRUD /ssh-keys (admin/operator)
     │   └── health.py             # /api/health, /api/pools/status
     ├── auth/
     │   ├── dependencies.py       # get_current_user (OAuth2 + JWT)
-    │   └── utils.py              # create_access_token, verify_password, hash_password
+    │   └── utils.py              # create_access_token, verify_password
     ├── database/
     │   └── pool.py               # DatabasePool (ThreadedConnectionPool, keepalive)
     ├── models/                   # Pydantic v2
     │   ├── server.py             # Server
-    │   ├── user.py               # User, UserCreate, UserUpdate, UserResponse, UserRole
-    │   └── ssh_key.py            # SSHKey, SSHKeyCreate, SSHKeyImport, SSHKeyResponse
+    │   ├── user.py               # User, UserCreate, UserUpdate, UserResponse
+    │   └── ssh_key.py            # SSHKey, SSHKeyCreate, SSHKeyImport
     ├── services/
     │   ├── server.py             # load_servers, save_servers, connect_to_server
-    │   ├── ssh.py                # get_ssh_client, get_ssh_disk_usage, is_host_reachable
+    │   ├── ssh.py                # get_ssh_client, get_ssh_disk_usage
     │   ├── cache.py              # CacheManager (thread-safe, TTL)
-    │   ├── user_manager.py       # UserManager (file-based, bcrypt, fcntl locking)
-    │   ├── ssh_key_manager.py    # Генерация/валидация SSH ключей (RSA, Ed25519)
-    │   └── ssh_key_storage.py    # Хранение ключей (JSON metadata + encrypted files)
+    │   ├── user_manager.py       # UserManager (file-based, bcrypt, fcntl)
+    │   ├── ssh_key_manager.py    # Генерация SSH ключей (RSA, Ed25519)
+    │   └── ssh_key_storage.py    # Хранение ключей (JSON + encrypted files)
     └── utils/
-        └── crypto.py             # Fernet: encrypt/decrypt/ensure_encrypted/ensure_decrypted
+        └── crypto.py             # Fernet: encrypt/decrypt/ensure_encrypted
 ```
 
 ## Установка
@@ -93,34 +145,36 @@ sudo systemctl enable --now pgmon-backend
 
 Документация: `http://localhost:8000/docs`
 
-| Группа | Метод | Endpoint | Роль |
-|--------|-------|----------|------|
-| Auth | POST | `/token` | - |
-| Servers | GET/POST | `/servers` | any |
-| Servers | PUT/DELETE | `/servers/{name}` | any |
-| Servers | POST | `/servers/{name}/test-ssh` | any |
-| Stats | GET | `/server_stats/{name}` | any |
-| Stats | GET | `/server/{name}/stats` | any |
-| Stats | GET | `/server/{name}/db/{db}` | any |
-| Stats | GET | `/server/{name}/db/{db}/stats` | any |
-| Users | GET/POST | `/users` | admin |
-| Users | GET | `/users/me` | any |
-| Users | GET/PUT/DELETE | `/users/{login}` | admin |
-| SSH Keys | GET | `/ssh-keys` | admin/operator |
-| SSH Keys | POST | `/ssh-keys/generate` | admin/operator |
-| SSH Keys | POST | `/ssh-keys/import` | admin/operator |
-| SSH Keys | POST | `/ssh-keys/import-file` | admin/operator |
-| SSH Keys | GET/PUT/DELETE | `/ssh-keys/{id}` | admin/operator |
-| SSH Keys | GET | `/ssh-keys/{id}/servers` | any |
+| Группа | Метод | Endpoint | Доступ |
+|--------|-------|----------|--------|
+| Auth | POST | `/token` | — |
+| Servers | GET / POST | `/servers` | все |
+| Servers | PUT / DELETE | `/servers/{name}` | все |
+| Servers | POST | `/servers/{name}/test-ssh` | все |
+| Stats | GET | `/server_stats/{name}` | все |
+| Stats | GET | `/server/{name}/stats` | все |
+| Stats | GET | `/server/{name}/db/{db}` | все |
+| Stats | GET | `/server/{name}/db/{db}/stats` | все |
+| Users | GET / POST | `/users` | admin |
+| Users | GET | `/users/me` | все |
+| Users | GET / PUT / DELETE | `/users/{login}` | admin |
+| SSH Keys | GET | `/ssh-keys` | admin / operator |
+| SSH Keys | POST | `/ssh-keys/generate` | admin / operator |
+| SSH Keys | POST | `/ssh-keys/import` | admin / operator |
+| SSH Keys | POST | `/ssh-keys/import-file` | admin / operator |
+| SSH Keys | GET / PUT / DELETE | `/ssh-keys/{id}` | admin / operator |
+| SSH Keys | GET | `/ssh-keys/{id}/servers` | все |
 | SSH Keys | GET | `/ssh-keys/{id}/download-public` | admin |
-| Health | GET | `/api/health` | - |
-| Health | GET | `/api/pools/status` | any |
+| Health | GET | `/api/health` | — |
+| Health | GET | `/api/pools/status` | все |
 
-## Конфигурация (`app/config.py`)
+## Конфигурация
+
+### Параметры (`app/config.py`)
 
 | Параметр | Значение | Описание |
 |----------|----------|----------|
-| `SECRET_KEY` | env | Ключ для JWT |
+| `SECRET_KEY` | из .env | Ключ для JWT |
 | `TOKEN_EXPIRATION` | 60 мин | Время жизни токена |
 | `SERVER_STATUS_CACHE_TTL` | 5 сек | TTL кэша статуса серверов |
 | `SSH_CACHE_TTL` | 30 сек | TTL кэша SSH данных |
@@ -129,16 +183,16 @@ sudo systemctl enable --now pgmon-backend
 | `POOL_CONFIGS.high_load` | min=5, max=20 | Пул для нагруженных серверов |
 | `ALLOWED_ORIGINS` | list | CORS origins |
 
-## Файлы конфигурации
+### Файлы конфигурации
 
 | Путь | Описание |
 |------|----------|
 | `/etc/pg_activity_monitor/servers.json` | Серверы (пароли зашифрованы Fernet) |
 | `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
 | `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
-| `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted private keys) |
+| `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
 | `.env` | SECRET_KEY, LOG_LEVEL |
 
 ## Лицензия
 
-MIT License - см. [LICENSE](../LICENSE)
+MIT — см. [LICENSE](../LICENSE)
