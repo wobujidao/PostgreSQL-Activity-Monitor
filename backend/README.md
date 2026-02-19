@@ -107,7 +107,7 @@ backend/
     │   ├── user_manager.py       # UserManager (file-based, bcrypt, fcntl)
     │   ├── ssh_key_manager.py    # Генерация SSH ключей (RSA, Ed25519)
     │   ├── ssh_key_storage.py    # Хранение ключей (JSON + encrypted files)
-    │   └── audit_logger.py       # Аудит сессий (JSON + fcntl)
+    │   └── audit_logger.py       # Аудит сессий (SQLite)
     └── utils/
         └── crypto.py             # Fernet: encrypt/decrypt/ensure_encrypted
 ```

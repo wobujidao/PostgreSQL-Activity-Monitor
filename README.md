@@ -193,7 +193,7 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── user_manager.py     # UserManager (bcrypt, fcntl)
 │       │   ├── ssh_key_manager.py  # Генерация SSH ключей
 │       │   ├── ssh_key_storage.py  # Хранение SSH ключей
-│       │   └── audit_logger.py     # Аудит сессий (JSON + fcntl)
+│       │   └── audit_logger.py     # Аудит сессий (SQLite)
 │       └── utils/
 │           └── crypto.py           # Fernet шифрование/расшифровка
 │
