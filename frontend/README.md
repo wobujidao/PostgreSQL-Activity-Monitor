@@ -172,7 +172,6 @@ npm run preview   # Предпросмотр сборки
 - Статусные цвета через утилитарные классы: `text-status-active`, `bg-status-danger/10`, `border-status-warning/30`
 - Графики: `--chart-1` ... `--chart-5`
 - Sidebar: `--sidebar-background`, `--sidebar-foreground`, `--sidebar-accent`
-- KPI-карточки на странице серверов (всего/активных/нагрузка/недоступных)
 - ARIA-labels на всех icon-only кнопках
 
 ### API
