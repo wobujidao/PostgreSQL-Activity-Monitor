@@ -29,7 +29,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Filter, Settings, CheckCircle, XCircle, AlertTriangle,
+  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Filter, Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -171,46 +171,6 @@ function ServerList() {
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Server className="h-4 w-4" />
-              <span className="text-xs">Всего</span>
-            </div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{servers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-status-active">
-              <CheckCircle className="h-4 w-4" />
-              <span className="text-xs">Активных</span>
-            </div>
-            <div className="text-2xl font-bold text-status-active tabular-nums mt-1">{onlineCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-status-warning">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-xs">Нагрузка</span>
-            </div>
-            <div className="text-2xl font-bold text-status-warning tabular-nums mt-1">{warningCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-status-danger">
-              <XCircle className="h-4 w-4" />
-              <span className="text-xs">Недоступных</span>
-            </div>
-            <div className="text-2xl font-bold text-status-danger tabular-nums mt-1">{errorCount}</div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="pt-4">
