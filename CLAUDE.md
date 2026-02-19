@@ -22,3 +22,6 @@ PostgreSQL Activity Monitor — веб-приложение для монито�
 - Frontend: React 19, Vite, Tailwind CSS v4, shadcn/ui, Chart.js, axios
 - БД: PostgreSQL
 - Деплой: systemd, Nginx, HTTPS
+
+## Дизайн-система
+Перед созданием/изменением UI обязательно прочитай `docs/DESIGN_SYSTEM.md`
