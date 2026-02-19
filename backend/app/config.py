@@ -21,6 +21,10 @@ SERVERS_FILE = CONFIG_DIR / "servers.json"
 USERS_FILE = CONFIG_DIR / "users.json"
 ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
 
+# Аудит сессий
+AUDIT_LOG_FILE = CONFIG_DIR / "audit_log.json"
+AUDIT_RETENTION_DAYS = 90  # хранить записи N дней
+
 # Настройки пулов подключений
 POOL_CONFIGS = {
     "default": {"minconn": 1, "maxconn": 5},

@@ -4,5 +4,6 @@ from .servers import router as servers_router
 from .health import router as health_router
 from .stats import router as stats_router
 from .users import router as users_router
+from .audit import router as audit_router
 
-__all__ = ["auth_router", "servers_router", "health_router", "stats_router", "users_router"]
+__all__ = ["auth_router", "servers_router", "health_router", "stats_router", "users_router", "audit_router"]

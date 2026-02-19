@@ -13,10 +13,11 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.config import ALLOWED_ORIGINS, LOG_LEVEL
-from app.api import auth_router, servers_router, health_router, stats_router, users_router
+from app.api import auth_router, servers_router, health_router, stats_router, users_router, audit_router
 from app.database import db_pool
 from app.api.ssh_keys import router as ssh_keys_router
 from app.auth.blacklist import token_blacklist
+from app.services.audit_logger import audit_logger
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -34,6 +35,7 @@ async def cleanup_blacklist():
     while True:
         await asyncio.sleep(600)  # 10 минут
         token_blacklist.cleanup()
+        audit_logger.cleanup()
 
 # События жизненного цикла
 @asynccontextmanager
@@ -85,6 +87,7 @@ app.include_router(health_router)
 app.include_router(stats_router)
 app.include_router(users_router, tags=["users"])
 app.include_router(ssh_keys_router, tags=["ssh-keys"])
+app.include_router(audit_router, tags=["audit"])
 # Корневой маршрут
 @app.get("/")
 async def root():

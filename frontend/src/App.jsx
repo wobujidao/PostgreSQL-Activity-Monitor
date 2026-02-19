@@ -26,6 +26,7 @@ import ServerEdit from './components/ServerEdit';
 import DatabaseDetails from './components/DatabaseDetails';
 import UserManagement from './components/UserManagement';
 import SSHKeyManagement from './components/SSHKeyManagement';
+import SessionAudit from './components/SessionAudit';
 import ScrollToTop from './components/ScrollToTop';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -82,6 +83,7 @@ function AppContent() {
             <Route path="/server/:name/db/:db_name" element={<DatabaseDetails />} />
             <Route path="/users" element={userRole === 'admin' ? <UserManagement /> : <Navigate to="/" />} />
             <Route path="/ssh-keys" element={(userRole === 'admin' || userRole === 'operator') ? <SSHKeyManagement /> : <Navigate to="/" />} />
+            <Route path="/audit" element={userRole === 'admin' ? <SessionAudit /> : <Navigate to="/" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
