@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ServerDetailsSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2">
         <Skeleton className="h-4 w-16" />
@@ -15,7 +15,7 @@ export default function ServerDetailsSkeleton() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i}>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-2">
                 <Skeleton className="h-4 w-4 rounded" />
                 <Skeleton className="h-3 w-20" />
@@ -28,7 +28,7 @@ export default function ServerDetailsSkeleton() {
 
       {/* Date range */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4">
           <div className="flex items-center gap-3">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-8 w-16 rounded-md" />
@@ -40,7 +40,7 @@ export default function ServerDetailsSkeleton() {
       </Card>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {[...Array(2)].map((_, i) => (
           <Card key={i}>
             <CardHeader>
@@ -58,7 +58,7 @@ export default function ServerDetailsSkeleton() {
         <CardHeader>
           <Skeleton className="h-5 w-32" />
         </CardHeader>
-        <CardContent className="p-0 px-6 pb-6">
+        <CardContent className="p-0 px-4 pb-4">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="flex gap-4 py-3 border-b last:border-0">
               <Skeleton className="h-4 w-[200px]" />

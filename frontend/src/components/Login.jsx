@@ -29,7 +29,7 @@ function Login({ onLogin, error: parentError, backendStatus }) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 relative">
+    <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--sidebar-background))] p-4 relative">
       <Button
         variant="ghost"
         size="icon"
@@ -89,7 +89,7 @@ function Login({ onLogin, error: parentError, backendStatus }) {
               />
             </div>
 
-            <Button type="submit" className="w-full" size="lg" disabled={loading || backendStatus === 'unavailable'}>
+            <Button type="submit" className="w-full" disabled={loading || backendStatus === 'unavailable'}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -104,7 +104,7 @@ function Login({ onLogin, error: parentError, backendStatus }) {
 
         <CardFooter className="flex-col gap-2 pb-6">
           <div className="flex items-center gap-1.5 text-xs">
-            <Circle className={`h-2 w-2 fill-current ${backendStatus === 'available' ? 'text-emerald-500' : backendStatus === 'unavailable' ? 'text-red-500' : 'text-yellow-500'}`} />
+            <Circle className={`h-2 w-2 fill-current ${backendStatus === 'available' ? 'text-[hsl(var(--status-active))]' : backendStatus === 'unavailable' ? 'text-[hsl(var(--status-danger))]' : 'text-[hsl(var(--status-warning))]'}`} />
             <span className="text-muted-foreground">
               Бэкенд: {backendStatus === 'available' ? 'доступен' : backendStatus === 'unavailable' ? 'недоступен' : 'проверка...'}
             </span>

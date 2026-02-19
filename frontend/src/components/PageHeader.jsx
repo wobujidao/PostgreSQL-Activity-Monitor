@@ -10,7 +10,7 @@ import { Home } from 'lucide-react';
  */
 export default function PageHeader({ title, breadcrumbs = [] }) {
   return (
-    <div className="space-y-2 mb-6">
+    <div className="space-y-2 mb-4">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -32,7 +32,7 @@ export default function PageHeader({ title, breadcrumbs = [] }) {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      {title && <h1 className="text-2xl font-bold tracking-tight">{title}</h1>}
+      {title && <h1 className="text-2xl font-bold">{title}</h1>}
     </div>
   );
 }

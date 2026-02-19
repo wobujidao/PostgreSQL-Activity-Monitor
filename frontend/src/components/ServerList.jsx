@@ -113,9 +113,9 @@ function ServerList() {
   };
 
   const getDiskInfo = (freeSpace, totalSpace) => {
-    if (!freeSpace || !totalSpace) return { percent: 0, color: 'bg-red-500' };
+    if (!freeSpace || !totalSpace) return { percent: 0, color: 'bg-[hsl(var(--status-danger))]' };
     const usedPercent = ((totalSpace - freeSpace) / totalSpace) * 100;
-    const color = usedPercent < 70 ? 'bg-green-500' : usedPercent < 85 ? 'bg-amber-500' : 'bg-red-500';
+    const color = usedPercent < 70 ? 'bg-[hsl(var(--status-active))]' : usedPercent < 85 ? 'bg-[hsl(var(--status-warning))]' : 'bg-[hsl(var(--status-danger))]';
     return { percent: usedPercent, color };
   };
 
@@ -170,10 +170,10 @@ function ServerList() {
   const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
@@ -211,7 +211,7 @@ function ServerList() {
                 </SelectContent>
               </Select>
               <div className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${timeLeft <= 3 ? 'bg-amber-500 animate-pulse' : 'bg-green-500 animate-pulse'}`} />
+                <span className={`h-2 w-2 rounded-full ${timeLeft <= 3 ? 'bg-[hsl(var(--status-warning))] animate-pulse' : 'bg-[hsl(var(--status-active))] animate-pulse'}`} />
                 <span className="text-xs text-muted-foreground tabular-nums">{timeLeft}с</span>
               </div>
               <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
@@ -275,7 +275,7 @@ function ServerList() {
                       <TableCell className="text-sm">
                         {server.connections ? (
                           <span>
-                            <span className="text-green-600 dark:text-green-400 font-medium">{server.connections.active || 0}</span>
+                            <span className="text-[hsl(var(--status-active))] font-medium">{server.connections.active || 0}</span>
                             {' / '}
                             <span className="text-muted-foreground">{server.connections.idle || 0}</span>
                           </span>
@@ -287,7 +287,7 @@ function ServerList() {
                             <TooltipTrigger asChild>
                               <div className="space-y-1 min-w-[140px]">
                                 <div className="text-xs">
-                                  <span className={disk.percent > 85 ? 'text-red-600 dark:text-red-400 font-medium' : disk.percent > 70 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-green-600 dark:text-green-400 font-medium'}>
+                                  <span className={disk.percent > 85 ? 'text-[hsl(var(--status-danger))] font-medium' : disk.percent > 70 ? 'text-[hsl(var(--status-warning))] font-medium' : 'text-[hsl(var(--status-active))] font-medium'}>
                                     {formatBytes(server.free_space)}
                                   </span>
                                   <span className="text-muted-foreground"> / {formatBytes(server.total_space)}</span>

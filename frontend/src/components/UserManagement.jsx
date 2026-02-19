@@ -106,17 +106,17 @@ function UserManagement() {
   if (loading) return <LoadingSpinner text="Загрузка пользователей..." />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Управление пользователями" breadcrumbs={[
         { label: 'Пользователи' },
       ]} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{users.length}</div><p className="text-xs text-muted-foreground">Всего</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-red-600 dark:text-red-400">{users.filter(u => u.role === 'admin').length}</div><p className="text-xs text-muted-foreground">Админов</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{users.filter(u => u.role === 'operator').length}</div><p className="text-xs text-muted-foreground">Операторов</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{users.filter(u => u.role === 'viewer').length}</div><p className="text-xs text-muted-foreground">Просмотр</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{users.length}</div><p className="text-xs text-muted-foreground">Всего</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-danger))] tabular-nums">{users.filter(u => u.role === 'admin').length}</div><p className="text-xs text-muted-foreground">Админов</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-warning))] tabular-nums">{users.filter(u => u.role === 'operator').length}</div><p className="text-xs text-muted-foreground">Операторов</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-info))] tabular-nums">{users.filter(u => u.role === 'viewer').length}</div><p className="text-xs text-muted-foreground">Просмотр</p></CardContent></Card>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}

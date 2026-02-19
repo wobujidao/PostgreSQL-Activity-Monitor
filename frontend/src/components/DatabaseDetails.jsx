@@ -116,7 +116,7 @@ function DatabaseDetails() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title={`База данных: ${db_name}`} breadcrumbs={[
         { label: 'Серверы', href: '/' },
         { label: name, href: `/server/${name}` },
@@ -126,7 +126,7 @@ function DatabaseDetails() {
       {/* Info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <HardDrive className="h-4 w-4" />
               <span className="text-xs">Размер базы</span>
@@ -137,7 +137,7 @@ function DatabaseDetails() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Activity className="h-4 w-4" />
               <span className="text-xs">Подключения</span>
@@ -146,7 +146,7 @@ function DatabaseDetails() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <GitCommit className="h-4 w-4" />
               <span className="text-xs">Транзакций</span>
@@ -155,7 +155,7 @@ function DatabaseDetails() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Database className="h-4 w-4" />
               <span className="text-xs">Создана</span>
@@ -186,7 +186,7 @@ function DatabaseDetails() {
             <div className="flex items-center gap-3 ml-auto">
               {lastUpdated && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-[hsl(var(--status-active))] animate-pulse" />
                   {lastUpdated.toLocaleTimeString('ru-RU')}
                 </span>
               )}
@@ -202,7 +202,7 @@ function DatabaseDetails() {
       {loading ? (
         <LoadingSpinner text="Загрузка статистики базы..." subtext="Анализ данных" />
       ) : dbStats && dbHistory ? (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Stats table */}
           <Card>
             <CardHeader>
@@ -250,7 +250,7 @@ function DatabaseDetails() {
 
           {/* Charts */}
           {dbHistory.timeline?.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader><CardTitle className="text-sm">Подключения</CardTitle></CardHeader>
                 <CardContent><canvas ref={connectionsCanvasRef} /></CardContent>

@@ -349,7 +349,7 @@ function ServerDetails() {
   };
 
   const getTileColor = (status) => {
-    const m = { dead: 'bg-red-100 border-red-300 dark:bg-red-950 dark:border-red-800', static: 'bg-blue-100 border-blue-300 dark:bg-blue-950 dark:border-blue-800', warning: 'bg-amber-100 border-amber-300 dark:bg-amber-950 dark:border-amber-800', healthy: 'bg-green-100 border-green-300 dark:bg-green-950 dark:border-green-800' };
+    const m = { dead: 'bg-[hsl(var(--status-danger)/0.1)] border-[hsl(var(--status-danger)/0.3)]', static: 'bg-[hsl(var(--status-info)/0.1)] border-[hsl(var(--status-info)/0.3)]', warning: 'bg-[hsl(var(--status-warning)/0.1)] border-[hsl(var(--status-warning)/0.3)]', healthy: 'bg-[hsl(var(--status-active)/0.1)] border-[hsl(var(--status-active)/0.3)]' };
     return m[status] || 'bg-muted border-border';
   };
 
@@ -365,7 +365,7 @@ function ServerDetails() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title={`Сервер: ${name}`} breadcrumbs={[
         { label: 'Серверы', href: '/' },
         { label: name },
@@ -374,19 +374,19 @@ function ServerDetails() {
       {/* Server info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">IP адрес</p>
             <div className="text-lg font-semibold">{serverData.host}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">Версия PostgreSQL</p>
             <div className="text-lg font-semibold">{serverData.version || 'N/A'}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">Подключения</p>
             <div className="text-lg font-semibold">
               {serverData.connections ? `${serverData.connections.active || 0} / ${(serverData.connections.active || 0) + (serverData.connections.idle || 0)}` : 'N/A'}
@@ -394,7 +394,7 @@ function ServerDetails() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">Свободно на диске</p>
             <div className={`text-lg font-semibold ${parseFloat(freePercent) < 10 ? 'text-destructive' : ''}`}>
               {serverData.free_space && serverData.total_space
@@ -434,7 +434,7 @@ function ServerDetails() {
       </Card>
 
       {/* Charts */}
-      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${isLoading ? 'opacity-50' : ''}`}>
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${isLoading ? 'opacity-50' : ''}`}>
         <Card>
           <CardHeader><CardTitle className="text-sm">Подключения к серверу</CardTitle></CardHeader>
           <CardContent><canvas ref={connectionsCanvasRef} /></CardContent>
@@ -540,7 +540,7 @@ function ServerDetails() {
                     const lastAct = getLastConnectionChange(db.name);
 
                     return (
-                      <TableRow key={db.name} className={isInactive ? 'bg-amber-50 dark:bg-amber-950/20' : isUnchanged ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
+                      <TableRow key={db.name} className={isInactive ? 'bg-[hsl(var(--status-warning)/0.05)]' : isUnchanged ? 'bg-[hsl(var(--status-info)/0.05)]' : ''}>
                         <TableCell>
                           <Link to={`/server/${name}/db/${db.name}`} className="text-primary hover:underline font-medium">
                             {db.name}
@@ -548,7 +548,7 @@ function ServerDetails() {
                         </TableCell>
                         <TableCell className="font-semibold">{formatSize(getDatabaseSize(db.name))}</TableCell>
                         <TableCell>
-                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}>
+                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-[hsl(var(--status-warning))]' : 'text-[hsl(var(--status-active))]'}>
                             {conns.length > 0 ? conns[conns.length - 1] : 0}
                             {isUnchanged && <span className="text-xs ml-1">(стат.)</span>}
                           </span>
@@ -602,46 +602,46 @@ function ServerDetails() {
         {/* Analysis tab */}
         <TabsContent value="analysis">
           {dbAnalysis && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="border-red-200 dark:border-red-900">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <Card className="border-[hsl(var(--status-danger)/0.3)]">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-[hsl(var(--status-danger))]">
                       <XCircle className="h-4 w-4" />
                       <span className="text-xs">Неактивные {'>'} {criteria.deadDays}д</span>
                     </div>
-                    <div className="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">{dbAnalysis.dead.length}</div>
+                    <div className="text-2xl font-bold text-[hsl(var(--status-danger))] mt-1 tabular-nums">{dbAnalysis.dead.length}</div>
                     <p className="text-xs text-muted-foreground">{dbAnalysis.dead.reduce((s, d) => s + d.sizeGB, 0).toFixed(1)} ГБ</p>
                   </CardContent>
                 </Card>
-                <Card className="border-amber-200 dark:border-amber-900">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <Card className="border-[hsl(var(--status-warning)/0.3)]">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-[hsl(var(--status-warning))]">
                       <AlertTriangle className="h-4 w-4" />
                       <span className="text-xs">Низкая активность</span>
                     </div>
-                    <div className="text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1">{dbAnalysis.warning.length}</div>
+                    <div className="text-2xl font-bold text-[hsl(var(--status-warning))] mt-1 tabular-nums">{dbAnalysis.warning.length}</div>
                     <p className="text-xs text-muted-foreground">{'<'} {criteria.lowActivityThreshold} подключений</p>
                   </CardContent>
                 </Card>
-                <Card className="border-blue-200 dark:border-blue-900">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                <Card className="border-[hsl(var(--status-info)/0.3)]">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-[hsl(var(--status-info))]">
                       <MinusCircle className="h-4 w-4" />
                       <span className="text-xs">Статичные</span>
                     </div>
-                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-1">{dbAnalysis.static.length}</div>
+                    <div className="text-2xl font-bold text-[hsl(var(--status-info))] mt-1 tabular-nums">{dbAnalysis.static.length}</div>
                     <p className="text-xs text-muted-foreground">Без изменений {'>'} {criteria.staticConnectionsDays}д</p>
                   </CardContent>
                 </Card>
-                <Card className="border-green-200 dark:border-green-900">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <Card className="border-[hsl(var(--status-active)/0.3)]">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-[hsl(var(--status-active))]">
                       <CheckCircle className="h-4 w-4" />
                       <span className="text-xs">Активные</span>
                     </div>
-                    <div className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">{dbAnalysis.healthy.length}</div>
+                    <div className="text-2xl font-bold text-[hsl(var(--status-active))] mt-1 tabular-nums">{dbAnalysis.healthy.length}</div>
                     <p className="text-xs text-muted-foreground">Используются регулярно</p>
                   </CardContent>
                 </Card>
@@ -667,7 +667,7 @@ function ServerDetails() {
                     {getAnalysisData().map(db => (
                       <div
                         key={db.name}
-                        className={`p-2 rounded-md border cursor-pointer hover:shadow-md transition-shadow ${getTileColor(db.status)}`}
+                        className={`p-2 rounded-md border cursor-pointer transition-colors hover:opacity-80 ${getTileColor(db.status)}`}
                         title={db.reason}
                         onClick={() => navigate(`/server/${name}/db/${db.name}`)}
                       >
@@ -691,7 +691,7 @@ function ServerDetails() {
             <CardHeader>
               <CardTitle>Критерии определения неактивных баз</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Считать базу неактивной если нет подключений (дней)</Label>
                 <Input type="number" className="max-w-xs" value={criteria.deadDays} onChange={e => handleCriteriaChange('deadDays', e.target.value)} min="1" max="365" disabled={!canEditCriteria} />

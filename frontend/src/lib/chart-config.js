@@ -1,27 +1,33 @@
 import { ru } from 'date-fns/locale/ru';
 
-export const CHART_COLORS = {
-  connections: {
-    border: 'rgb(59, 130, 246)',
-    bgStart: 'rgba(59, 130, 246, 0.25)',
-    bgEnd: 'rgba(59, 130, 246, 0.02)',
+function getCSSColor(varName) {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
+
+function makeChartColor(cssVar) {
+  const color = getCSSColor(cssVar);
+  return {
+    border: `hsl(${color})`,
+    bgStart: `hsl(${color} / 0.25)`,
+    bgEnd: `hsl(${color} / 0.02)`,
+  };
+}
+
+export function getChartColors() {
+  return {
+    connections: makeChartColor('--chart-1'),
+    size: makeChartColor('--chart-5'),
+    commits: makeChartColor('--chart-4'),
+    sizeGb: makeChartColor('--chart-5'),
+  };
+}
+
+// Backward compatibility — lazy getter
+export const CHART_COLORS = new Proxy({}, {
+  get(_, prop) {
+    return getChartColors()[prop];
   },
-  size: {
-    border: 'rgb(139, 92, 246)',
-    bgStart: 'rgba(139, 92, 246, 0.25)',
-    bgEnd: 'rgba(139, 92, 246, 0.02)',
-  },
-  commits: {
-    border: 'rgb(236, 72, 153)',
-    bgStart: 'rgba(236, 72, 153, 0.25)',
-    bgEnd: 'rgba(236, 72, 153, 0.02)',
-  },
-  sizeGb: {
-    border: 'rgb(168, 85, 247)',
-    bgStart: 'rgba(168, 85, 247, 0.25)',
-    bgEnd: 'rgba(168, 85, 247, 0.02)',
-  },
-};
+});
 
 export function getTimeUnit(days) {
   if (days <= 2) return 'hour';
@@ -36,8 +42,10 @@ function isDarkMode() {
 
 export function chartOptions(yLabel, { days = 7 } = {}) {
   const dark = isDarkMode();
-  const gridColor = dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
-  const textColor = dark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.55)';
+  const borderColor = getCSSColor('--border');
+  const mutedFg = getCSSColor('--muted-foreground');
+  const gridColor = `hsl(${borderColor} / ${dark ? '0.3' : '0.5'})`;
+  const textColor = `hsl(${mutedFg})`;
   const timeUnit = getTimeUnit(days);
 
   return {

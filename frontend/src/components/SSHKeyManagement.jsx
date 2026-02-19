@@ -182,17 +182,17 @@ function SSHKeyManagement() {
   if (loading) return <LoadingSpinner text="Загрузка SSH-ключей..." />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Управление SSH-ключами" breadcrumbs={[
         { label: 'SSH-ключи' },
       ]} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{keys.length}</div><p className="text-xs text-muted-foreground">Всего ключей</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-green-600 dark:text-green-400">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{keys.length}</div><p className="text-xs text-muted-foreground">Всего ключей</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-info))] tabular-nums">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-active))] tabular-nums">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--chart-5))] tabular-nums">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -227,11 +227,11 @@ function SSHKeyManagement() {
               {keys.map(key => {
                 const dupes = keys.filter(k => k.fingerprint === key.fingerprint && k.id !== key.id);
                 return (
-                  <TableRow key={key.id} className={dupes.length > 0 ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
+                  <TableRow key={key.id} className={dupes.length > 0 ? 'bg-[hsl(var(--status-warning)/0.05)]' : ''}>
                     <TableCell>
                       <div className="font-medium">{key.name}</div>
                       {key.description && <div className="text-xs text-muted-foreground">{key.description}</div>}
-                      {dupes.length > 0 && <div className="text-xs text-amber-600 mt-1">Дубликат: {dupes.map(k => k.name).join(', ')}</div>}
+                      {dupes.length > 0 && <div className="text-xs text-[hsl(var(--status-warning))] mt-1">Дубликат: {dupes.map(k => k.name).join(', ')}</div>}
                     </TableCell>
                     <TableCell>
                       <Badge variant={key.key_type === 'rsa' ? 'default' : 'secondary'}>{key.key_type.toUpperCase()}</Badge>

@@ -136,7 +136,7 @@ function ServerEdit() {
   const selectedKey = server.ssh_key_id ? sshKeys.find(k => k.id === server.ssh_key_id) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Редактирование сервера" breadcrumbs={[
         { label: 'Серверы', href: '/' },
         { label: serverName },
@@ -148,9 +148,9 @@ function ServerEdit() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Main settings */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Основные настройки</CardTitle>
@@ -279,7 +279,7 @@ function ServerEdit() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Информация</CardTitle>
@@ -320,7 +320,7 @@ function ServerEdit() {
               <Button className="w-full" onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Сохранить
-                {isDirty && <span className="ml-1.5 h-2 w-2 rounded-full bg-amber-400 inline-block" />}
+                {isDirty && <span className="ml-1.5 h-2 w-2 rounded-full bg-[hsl(var(--status-warning))] inline-block" />}
               </Button>
               <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />

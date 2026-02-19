@@ -2,7 +2,7 @@ import { Loader2 } from 'lucide-react';
 
 function LoadingSpinner({ text = "Загрузка...", subtext = "Пожалуйста, подождите" }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
       <div className="relative">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>

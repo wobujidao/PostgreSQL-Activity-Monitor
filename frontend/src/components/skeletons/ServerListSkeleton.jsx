@@ -3,12 +3,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ServerListSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Dashboard cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i}>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <Skeleton className="h-8 w-16 mb-2" />
               <Skeleton className="h-3 w-24" />
             </CardContent>
@@ -18,7 +18,7 @@ export default function ServerListSkeleton() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4">
           <div className="flex items-center gap-4">
             <Skeleton className="h-9 w-[160px]" />
             <Skeleton className="h-9 w-[300px]" />
