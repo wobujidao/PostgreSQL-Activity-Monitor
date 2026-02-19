@@ -1,15 +1,18 @@
 import { ru } from 'date-fns/locale/ru';
 
-function getCSSColor(varName) {
-  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+function getCSSColorParams(varName) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  // raw = "hsl(217 91% 60%)" — extract params inside hsl()
+  const match = raw.match(/hsl\(\s*(.+?)\s*\)/);
+  return match ? match[1] : raw;
 }
 
 function makeChartColor(cssVar) {
-  const color = getCSSColor(cssVar);
+  const params = getCSSColorParams(cssVar);
   return {
-    border: `hsl(${color})`,
-    bgStart: `hsl(${color} / 0.25)`,
-    bgEnd: `hsl(${color} / 0.02)`,
+    border: `hsl(${params})`,
+    bgStart: `hsl(${params} / 0.25)`,
+    bgEnd: `hsl(${params} / 0.02)`,
   };
 }
 
@@ -22,12 +25,13 @@ export function getChartColors() {
   };
 }
 
-// Backward compatibility — lazy getter
-export const CHART_COLORS = new Proxy({}, {
-  get(_, prop) {
-    return getChartColors()[prop];
-  },
-});
+// Backward compat — вызывается лениво в useEffect, не при импорте
+export const CHART_COLORS = {
+  get connections() { return getChartColors().connections; },
+  get size() { return getChartColors().size; },
+  get commits() { return getChartColors().commits; },
+  get sizeGb() { return getChartColors().sizeGb; },
+};
 
 export function getTimeUnit(days) {
   if (days <= 2) return 'hour';
@@ -42,10 +46,10 @@ function isDarkMode() {
 
 export function chartOptions(yLabel, { days = 7 } = {}) {
   const dark = isDarkMode();
-  const borderColor = getCSSColor('--border');
-  const mutedFg = getCSSColor('--muted-foreground');
-  const gridColor = `hsl(${borderColor} / ${dark ? '0.3' : '0.5'})`;
-  const textColor = `hsl(${mutedFg})`;
+  const borderParams = getCSSColorParams('--border');
+  const mutedFgParams = getCSSColorParams('--muted-foreground');
+  const gridColor = `hsl(${borderParams} / ${dark ? '0.3' : '0.5'})`;
+  const textColor = `hsl(${mutedFgParams})`;
   const timeUnit = getTimeUnit(days);
 
   return {

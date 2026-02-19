@@ -29,6 +29,7 @@ import DatabaseDetails from './components/DatabaseDetails';
 import UserManagement from './components/UserManagement';
 import SSHKeyManagement from './components/SSHKeyManagement';
 import ScrollToTop from './components/ScrollToTop';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function AppContent() {
   const {
@@ -76,7 +77,7 @@ function AppContent() {
         <header className="flex h-12 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
         </header>
-        <main className="flex-1 px-6 py-4">
+        <div className="flex-1 px-6 py-4">
           <Routes>
             <Route exact path="/" element={<ServerList />} />
             <Route path="/server/:name" element={<ServerDetails />} />
@@ -86,7 +87,7 @@ function AppContent() {
             <Route path="/ssh-keys" element={(userRole === 'admin' || userRole === 'operator') ? <SSHKeyManagement /> : <Navigate to="/" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </main>
+        </div>
       </SidebarInset>
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
@@ -164,15 +165,17 @@ function AppContent() {
 
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <ServersProvider>
-          <TooltipProvider>
-            <AppContent />
-            <Toaster richColors position="top-right" />
-          </TooltipProvider>
-        </ServersProvider>
-      </AuthProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AuthProvider>
+          <ServersProvider>
+            <TooltipProvider>
+              <AppContent />
+              <Toaster richColors position="top-right" />
+            </TooltipProvider>
+          </ServersProvider>
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }
