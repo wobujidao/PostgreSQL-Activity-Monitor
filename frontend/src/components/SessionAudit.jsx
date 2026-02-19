@@ -128,28 +128,28 @@ function SessionAudit() {
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-1">
-                <CalendarDays className="h-4 w-4 text-[hsl(var(--status-active))]" />
+                <CalendarDays className="h-4 w-4 text-status-active" />
                 <p className="text-xs text-muted-foreground">Входов сегодня</p>
               </div>
-              <div className="text-2xl font-bold text-[hsl(var(--status-active))] tabular-nums">{stats.logins_today}</div>
+              <div className="text-2xl font-bold text-status-active tabular-nums">{stats.logins_today}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-1">
-                <Users className="h-4 w-4 text-[hsl(var(--status-info))]" />
+                <Users className="h-4 w-4 text-status-info" />
                 <p className="text-xs text-muted-foreground">Пользователей за неделю</p>
               </div>
-              <div className="text-2xl font-bold text-[hsl(var(--status-info))] tabular-nums">{stats.unique_users_week}</div>
+              <div className="text-2xl font-bold text-status-info tabular-nums">{stats.unique_users_week}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="h-4 w-4 text-[hsl(var(--status-danger))]" />
+                <AlertTriangle className="h-4 w-4 text-status-danger" />
                 <p className="text-xs text-muted-foreground">Неудачных попыток</p>
               </div>
-              <div className="text-2xl font-bold text-[hsl(var(--status-danger))] tabular-nums">
+              <div className="text-2xl font-bold text-status-danger tabular-nums">
                 {stats.failed_today}
                 {stats.failed_total > 0 && (
                   <span className="text-sm font-normal text-muted-foreground ml-1">/ {stats.failed_total}</span>

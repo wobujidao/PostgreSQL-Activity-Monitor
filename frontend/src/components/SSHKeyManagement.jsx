@@ -190,8 +190,8 @@ function SSHKeyManagement() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{keys.length}</div><p className="text-xs text-muted-foreground">Всего ключей</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-info))] tabular-nums">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-active))] tabular-nums">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-info tabular-nums">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-active tabular-nums">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
         <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-chart-5 tabular-nums">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
       </div>
 
@@ -227,11 +227,11 @@ function SSHKeyManagement() {
               {keys.map(key => {
                 const dupes = keys.filter(k => k.fingerprint === key.fingerprint && k.id !== key.id);
                 return (
-                  <TableRow key={key.id} className={dupes.length > 0 ? 'bg-[hsl(var(--status-warning)/0.05)]' : ''}>
+                  <TableRow key={key.id} className={dupes.length > 0 ? 'bg-status-warning/5' : ''}>
                     <TableCell>
                       <div className="font-medium">{key.name}</div>
                       {key.description && <div className="text-xs text-muted-foreground">{key.description}</div>}
-                      {dupes.length > 0 && <div className="text-xs text-[hsl(var(--status-warning))] mt-1">Дубликат: {dupes.map(k => k.name).join(', ')}</div>}
+                      {dupes.length > 0 && <div className="text-xs text-status-warning mt-1">Дубликат: {dupes.map(k => k.name).join(', ')}</div>}
                     </TableCell>
                     <TableCell>
                       <Badge variant={key.key_type === 'rsa' ? 'default' : 'secondary'}>{key.key_type.toUpperCase()}</Badge>
@@ -245,21 +245,21 @@ function SSHKeyManagement() {
                     <TableCell>
                       <div className="flex gap-1">
                         {userRole === 'admin' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingKey(key); setEditFormData({ name: key.name, description: key.description || '' }); setShowEditDialog(true); }}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingKey(key); setEditFormData({ name: key.name, description: key.description || '' }); setShowEditDialog(true); }} aria-label="Редактировать">
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedKey(key); setShowDetailsDialog(true); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedKey(key); setShowDetailsDialog(true); }} aria-label="Просмотр">
                           <Eye className="h-4 w-4" />
                         </Button>
                         {userRole === 'admin' && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(key)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(key)} aria-label="Скачать">
                               <Download className="h-4 w-4" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={key.servers_count > 0}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={key.servers_count > 0} aria-label="Удалить">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </AlertDialogTrigger>
@@ -421,7 +421,7 @@ function SSHKeyManagement() {
                 <Label className="text-xs text-muted-foreground">Fingerprint</Label>
                 <div className="flex items-center gap-2">
                   <code className="text-sm flex-1 bg-muted px-2 py-1 rounded">{selectedKey.fingerprint}</code>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard(selectedKey.fingerprint)}><Copy className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard(selectedKey.fingerprint)} aria-label="Копировать"><Copy className="h-4 w-4" /></Button>
                 </div>
               </div>
               {userRole === 'admin' && selectedKey.public_key && (

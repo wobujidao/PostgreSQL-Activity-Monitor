@@ -357,7 +357,7 @@ function ServerDetails() {
   };
 
   const getTileColor = (status) => {
-    const m = { dead: 'bg-[hsl(var(--status-danger)/0.1)] border-[hsl(var(--status-danger)/0.3)]', static: 'bg-[hsl(var(--status-info)/0.1)] border-[hsl(var(--status-info)/0.3)]', warning: 'bg-[hsl(var(--status-warning)/0.1)] border-[hsl(var(--status-warning)/0.3)]', healthy: 'bg-[hsl(var(--status-active)/0.1)] border-[hsl(var(--status-active)/0.3)]' };
+    const m = { dead: 'bg-status-danger/10 border-status-danger/30', static: 'bg-status-info/10 border-status-info/30', warning: 'bg-status-warning/10 border-status-warning/30', healthy: 'bg-status-active/10 border-status-active/30' };
     return m[status] || 'bg-muted border-border';
   };
 
@@ -455,33 +455,32 @@ function ServerDetails() {
 
       {/* Database filters */}
       <Card>
-        <CardContent className="py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Поиск:</span>
-              <Select value={nameFilterType} onValueChange={setNameFilterType}>
-                <SelectTrigger className="w-[140px] h-8"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contains">Содержит</SelectItem>
-                  <SelectItem value="starts">Начинается с</SelectItem>
-                  <SelectItem value="ends">Заканчивается на</SelectItem>
-                  <SelectItem value="not_contains">Не содержит</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input className="w-44 h-8" placeholder="Имя базы..." value={nameFilter} onChange={e => { setNameFilter(e.target.value); setCurrentPage(1); }} />
-            </div>
-            <Separator orientation="vertical" className="h-6" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Показать:</span>
-              <Select value={`${showNoConnections ? 'no-conn' : ''}${showStaticConnections ? 'static' : ''}` || 'all'} onValueChange={v => { setShowNoConnections(v === 'no-conn'); setShowStaticConnections(v === 'static'); setShowUnchangedConnections(false); setCurrentPage(1); }}>
-                <SelectTrigger className="w-[200px] h-8"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все базы</SelectItem>
-                  <SelectItem value="no-conn">Только активные</SelectItem>
-                  <SelectItem value="static">Неактивные {'>'} {criteria.deadDays} дней</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <CardContent className="py-3 space-y-3">
+          {/* Row 1: Search */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium whitespace-nowrap">Поиск:</span>
+            <Select value={nameFilterType} onValueChange={setNameFilterType}>
+              <SelectTrigger className="w-[140px] h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Содержит</SelectItem>
+                <SelectItem value="starts">Начинается с</SelectItem>
+                <SelectItem value="ends">Заканчивается на</SelectItem>
+                <SelectItem value="not_contains">Не содержит</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input className="w-44 h-8" placeholder="Имя базы..." value={nameFilter} onChange={e => { setNameFilter(e.target.value); setCurrentPage(1); }} />
+          </div>
+          {/* Row 2: Quick filters + export */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium whitespace-nowrap">Фильтр:</span>
+            <Select value={`${showNoConnections ? 'no-conn' : ''}${showStaticConnections ? 'static' : ''}` || 'all'} onValueChange={v => { setShowNoConnections(v === 'no-conn'); setShowStaticConnections(v === 'static'); setShowUnchangedConnections(false); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[200px] h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все базы</SelectItem>
+                <SelectItem value="no-conn">Только активные</SelectItem>
+                <SelectItem value="static">Неактивные {'>'} {criteria.deadDays} дней</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant={showNoConnections ? 'default' : 'outline'} size="sm" onClick={() => { setShowNoConnections(!showNoConnections); if (!showNoConnections) { setShowStaticConnections(false); setShowUnchangedConnections(false); } setCurrentPage(1); }}>
               Без подключений
             </Button>
@@ -548,7 +547,7 @@ function ServerDetails() {
                     const lastAct = getLastConnectionChange(db.name);
 
                     return (
-                      <TableRow key={db.name} className={isInactive ? 'bg-[hsl(var(--status-warning)/0.05)]' : isUnchanged ? 'bg-[hsl(var(--status-info)/0.05)]' : ''}>
+                      <TableRow key={db.name} className={isInactive ? 'bg-status-warning/5' : isUnchanged ? 'bg-status-info/5' : ''}>
                         <TableCell>
                           <Link to={`/server/${name}/db/${db.name}`} className="text-primary hover:underline font-medium">
                             {db.name}
@@ -556,7 +555,7 @@ function ServerDetails() {
                         </TableCell>
                         <TableCell className="font-semibold">{formatSize(getDatabaseSize(db.name))}</TableCell>
                         <TableCell>
-                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-[hsl(var(--status-warning))]' : 'text-[hsl(var(--status-active))]'}>
+                          <span className={isInactive ? 'text-destructive' : isUnchanged ? 'text-status-warning' : 'text-status-active'}>
                             {conns.length > 0 ? conns[conns.length - 1] : 0}
                             {isUnchanged && <span className="text-xs ml-1">(стат.)</span>}
                           </span>
@@ -613,43 +612,43 @@ function ServerDetails() {
             <div className="space-y-4">
               {/* Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="border-[hsl(var(--status-danger)/0.3)]">
+                <Card className="border-status-danger/30">
                   <CardContent className="pt-4">
-                    <div className="flex items-center gap-2 text-[hsl(var(--status-danger))]">
+                    <div className="flex items-center gap-2 text-status-danger">
                       <XCircle className="h-4 w-4" />
                       <span className="text-xs">Неактивные {'>'} {criteria.deadDays}д</span>
                     </div>
-                    <div className="text-2xl font-bold text-[hsl(var(--status-danger))] mt-1 tabular-nums">{dbAnalysis.dead.length}</div>
+                    <div className="text-2xl font-bold text-status-danger mt-1 tabular-nums">{dbAnalysis.dead.length}</div>
                     <p className="text-xs text-muted-foreground">{dbAnalysis.dead.reduce((s, d) => s + d.sizeGB, 0).toFixed(1)} ГБ</p>
                   </CardContent>
                 </Card>
-                <Card className="border-[hsl(var(--status-warning)/0.3)]">
+                <Card className="border-status-warning/30">
                   <CardContent className="pt-4">
-                    <div className="flex items-center gap-2 text-[hsl(var(--status-warning))]">
+                    <div className="flex items-center gap-2 text-status-warning">
                       <AlertTriangle className="h-4 w-4" />
                       <span className="text-xs">Низкая активность</span>
                     </div>
-                    <div className="text-2xl font-bold text-[hsl(var(--status-warning))] mt-1 tabular-nums">{dbAnalysis.warning.length}</div>
+                    <div className="text-2xl font-bold text-status-warning mt-1 tabular-nums">{dbAnalysis.warning.length}</div>
                     <p className="text-xs text-muted-foreground">{'<'} {criteria.lowActivityThreshold} подключений</p>
                   </CardContent>
                 </Card>
-                <Card className="border-[hsl(var(--status-info)/0.3)]">
+                <Card className="border-status-info/30">
                   <CardContent className="pt-4">
-                    <div className="flex items-center gap-2 text-[hsl(var(--status-info))]">
+                    <div className="flex items-center gap-2 text-status-info">
                       <MinusCircle className="h-4 w-4" />
                       <span className="text-xs">Статичные</span>
                     </div>
-                    <div className="text-2xl font-bold text-[hsl(var(--status-info))] mt-1 tabular-nums">{dbAnalysis.static.length}</div>
+                    <div className="text-2xl font-bold text-status-info mt-1 tabular-nums">{dbAnalysis.static.length}</div>
                     <p className="text-xs text-muted-foreground">Без изменений {'>'} {criteria.staticConnectionsDays}д</p>
                   </CardContent>
                 </Card>
-                <Card className="border-[hsl(var(--status-active)/0.3)]">
+                <Card className="border-status-active/30">
                   <CardContent className="pt-4">
-                    <div className="flex items-center gap-2 text-[hsl(var(--status-active))]">
+                    <div className="flex items-center gap-2 text-status-active">
                       <CheckCircle className="h-4 w-4" />
                       <span className="text-xs">Активные</span>
                     </div>
-                    <div className="text-2xl font-bold text-[hsl(var(--status-active))] mt-1 tabular-nums">{dbAnalysis.healthy.length}</div>
+                    <div className="text-2xl font-bold text-status-active mt-1 tabular-nums">{dbAnalysis.healthy.length}</div>
                     <p className="text-xs text-muted-foreground">Используются регулярно</p>
                   </CardContent>
                 </Card>

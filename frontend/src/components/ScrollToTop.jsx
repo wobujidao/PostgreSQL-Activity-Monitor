@@ -19,6 +19,7 @@ function ScrollToTop() {
       className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg h-12 w-12"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       title="Наверх"
+      aria-label="Наверх"
     >
       <ArrowUp className="h-5 w-5" />
     </Button>

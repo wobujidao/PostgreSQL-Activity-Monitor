@@ -35,13 +35,14 @@ function Login({ onLogin, error: parentError, backendStatus }) {
         size="icon"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         className="absolute top-4 right-4 text-white/60 hover:text-white hover:bg-white/10 h-9 w-9"
+        aria-label="Переключить тему"
       >
         <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
         <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
       </Button>
-      <Card className="w-full max-w-md border-0 shadow-2xl bg-card/95 backdrop-blur-sm">
+      <Card className="w-full max-w-md border-0 shadow-sm bg-card">
         <CardHeader className="text-center pb-2 pt-8">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
             <Shield className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">PostgreSQL Monitor</h1>
@@ -104,7 +105,7 @@ function Login({ onLogin, error: parentError, backendStatus }) {
 
         <CardFooter className="flex-col gap-2 pb-6">
           <div className="flex items-center gap-1.5 text-xs">
-            <Circle className={`h-2 w-2 fill-current ${backendStatus === 'available' ? 'text-[hsl(var(--status-active))]' : backendStatus === 'unavailable' ? 'text-[hsl(var(--status-danger))]' : 'text-[hsl(var(--status-warning))]'}`} />
+            <Circle className={`h-2 w-2 fill-current ${backendStatus === 'available' ? 'text-status-active' : backendStatus === 'unavailable' ? 'text-status-danger' : 'text-status-warning'}`} />
             <span className="text-muted-foreground">
               Бэкенд: {backendStatus === 'available' ? 'доступен' : backendStatus === 'unavailable' ? 'недоступен' : 'проверка...'}
             </span>

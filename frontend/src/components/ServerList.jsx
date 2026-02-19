@@ -29,7 +29,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Filter, Settings,
+  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Filter, Settings, CheckCircle, XCircle, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -113,9 +113,9 @@ function ServerList() {
   };
 
   const getDiskInfo = (freeSpace, totalSpace) => {
-    if (!freeSpace || !totalSpace) return { percent: 0, color: 'bg-[hsl(var(--status-danger))]' };
+    if (!freeSpace || !totalSpace) return { percent: 0, color: 'bg-status-danger' };
     const usedPercent = ((totalSpace - freeSpace) / totalSpace) * 100;
-    const color = usedPercent < 70 ? 'bg-[hsl(var(--status-active))]' : usedPercent < 85 ? 'bg-[hsl(var(--status-warning))]' : 'bg-[hsl(var(--status-danger))]';
+    const color = usedPercent < 70 ? 'bg-status-active' : usedPercent < 85 ? 'bg-status-warning' : 'bg-status-danger';
     return { percent: usedPercent, color };
   };
 
@@ -171,6 +171,46 @@ function ServerList() {
 
   return (
     <div className="space-y-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Server className="h-4 w-4" />
+              <span className="text-xs">Всего</span>
+            </div>
+            <div className="text-2xl font-bold tabular-nums mt-1">{servers.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-status-active">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-xs">Активных</span>
+            </div>
+            <div className="text-2xl font-bold text-status-active tabular-nums mt-1">{onlineCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-status-warning">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-xs">Нагрузка</span>
+            </div>
+            <div className="text-2xl font-bold text-status-warning tabular-nums mt-1">{warningCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-status-danger">
+              <XCircle className="h-4 w-4" />
+              <span className="text-xs">Недоступных</span>
+            </div>
+            <div className="text-2xl font-bold text-status-danger tabular-nums mt-1">{errorCount}</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-4">
@@ -211,7 +251,7 @@ function ServerList() {
                 </SelectContent>
               </Select>
               <div className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${timeLeft <= 3 ? 'bg-[hsl(var(--status-warning))] animate-pulse' : 'bg-[hsl(var(--status-active))] animate-pulse'}`} />
+                <span className={`h-2 w-2 rounded-full ${timeLeft <= 3 ? 'bg-status-warning animate-pulse' : 'bg-status-active animate-pulse'}`} />
                 <span className="text-xs text-muted-foreground tabular-nums">{timeLeft}с</span>
               </div>
               <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
@@ -275,7 +315,7 @@ function ServerList() {
                       <TableCell className="text-sm">
                         {server.connections ? (
                           <span>
-                            <span className="text-[hsl(var(--status-active))] font-medium">{server.connections.active || 0}</span>
+                            <span className="text-status-active font-medium">{server.connections.active || 0}</span>
                             {' / '}
                             <span className="text-muted-foreground">{server.connections.idle || 0}</span>
                           </span>
@@ -287,7 +327,7 @@ function ServerList() {
                             <TooltipTrigger asChild>
                               <div className="space-y-1 min-w-[140px]">
                                 <div className="text-xs">
-                                  <span className={disk.percent > 85 ? 'text-[hsl(var(--status-danger))] font-medium' : disk.percent > 70 ? 'text-[hsl(var(--status-warning))] font-medium' : 'text-[hsl(var(--status-active))] font-medium'}>
+                                  <span className={disk.percent > 85 ? 'text-status-danger font-medium' : disk.percent > 70 ? 'text-status-warning font-medium' : 'text-status-active font-medium'}>
                                     {formatBytes(server.free_space)}
                                   </span>
                                   <span className="text-muted-foreground"> / {formatBytes(server.total_space)}</span>

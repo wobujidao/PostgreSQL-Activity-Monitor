@@ -320,7 +320,7 @@ function ServerEdit() {
               <Button className="w-full" onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Сохранить
-                {isDirty && <span className="ml-1.5 h-2 w-2 rounded-full bg-[hsl(var(--status-warning))] inline-block" />}
+                {isDirty && <span className="ml-1.5 h-2 w-2 rounded-full bg-status-warning inline-block" />}
               </Button>
               <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />

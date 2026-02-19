@@ -188,3 +188,27 @@ code {
     @apply bg-background text-foreground;
   }
 }
+
+/* Утилитарные классы для статусных цветов */
+@layer utilities {
+  .text-status-active { color: hsl(var(--status-active)); }
+  .text-status-warning { color: hsl(var(--status-warning)); }
+  .text-status-danger { color: hsl(var(--status-danger)); }
+  .text-status-info { color: hsl(var(--status-info)); }
+  .text-status-neutral { color: hsl(var(--status-neutral)); }
+
+  .bg-status-active { background-color: hsl(var(--status-active)); }
+  .bg-status-warning { background-color: hsl(var(--status-warning)); }
+  .bg-status-danger { background-color: hsl(var(--status-danger)); }
+  .bg-status-info { background-color: hsl(var(--status-info)); }
+
+  .bg-status-active\/10 { background-color: hsl(var(--status-active) / 0.1); }
+  .bg-status-warning\/10 { background-color: hsl(var(--status-warning) / 0.1); }
+  .bg-status-danger\/10 { background-color: hsl(var(--status-danger) / 0.1); }
+  .bg-status-info\/10 { background-color: hsl(var(--status-info) / 0.1); }
+
+  .border-status-active\/30 { border-color: hsl(var(--status-active) / 0.3); }
+  .border-status-warning\/30 { border-color: hsl(var(--status-warning) / 0.3); }
+  .border-status-danger\/30 { border-color: hsl(var(--status-danger) / 0.3); }
+  .border-status-info\/30 { border-color: hsl(var(--status-info) / 0.3); }
+}

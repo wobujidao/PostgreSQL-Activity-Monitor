@@ -169,9 +169,11 @@ npm run preview   # Предпросмотр сборки
 Палитра **Steel Blue** с HSL CSS-переменными. Полное описание: [`docs/DESIGN_SYSTEM.md`](../docs/DESIGN_SYSTEM.md)
 
 - Кастомные CSS-переменные для light и dark режимов
-- Статусные цвета: `--status-active`, `--status-warning`, `--status-danger`, `--status-info`
+- Статусные цвета через утилитарные классы: `text-status-active`, `bg-status-danger/10`, `border-status-warning/30`
 - Графики: `--chart-1` ... `--chart-5`
 - Sidebar: `--sidebar-background`, `--sidebar-foreground`, `--sidebar-accent`
+- KPI-карточки на странице серверов (всего/активных/нагрузка/недоступных)
+- ARIA-labels на всех icon-only кнопках
 
 ### API
 

@@ -138,12 +138,12 @@
 - **ЗАПРЕЩЕНО** использовать произвольные цвета Tailwind: `bg-blue-500`, `text-gray-600`, `border-slate-200` и т.п.
 - **ОБЯЗАТЕЛЬНО** использовать только CSS-переменные: `bg-primary`, `text-muted-foreground`, `border-border` и т.п.
 - **ЗАПРЕЩЕНО** использовать inline-стили для цветов: `style={{ color: '#2563EB' }}`
-- Статусные цвета применять через утилитарные классы (определить в проекте):
-  - `.status-active` — зелёный (сервер работает, БД активна)
-  - `.status-warning` — янтарный (высокая нагрузка, мало места на диске)
-  - `.status-danger` — красный (сервер недоступен, ошибка подключения)
-  - `.status-info` — синий (информация)
-  - `.status-neutral` — серый (неизвестный статус)
+- Статусные цвета применять через утилитарные классы (определены в `index.css`):
+  - Текст: `.text-status-active`, `.text-status-warning`, `.text-status-danger`, `.text-status-info`, `.text-status-neutral`
+  - Фон: `.bg-status-active`, `.bg-status-warning`, `.bg-status-danger`, `.bg-status-info`
+  - Фон 10% opacity: `.bg-status-active/10`, `.bg-status-warning/10`, `.bg-status-danger/10`, `.bg-status-info/10`
+  - Рамка 30% opacity: `.border-status-active/30`, `.border-status-warning/30`, `.border-status-danger/30`, `.border-status-info/30`
+  - **ЗАПРЕЩЕНО** использовать inline-HSL: `text-[hsl(var(--status-active))]` — только утилитарные классы
 
 ---
 
@@ -322,6 +322,7 @@
 - **ЗАПРЕЩЕНО** использовать `size="lg"` — это для лендингов, не для рабочих интерфейсов
 - На каждой странице должна быть **не более 1-2 primary-кнопок**
 - Primary-кнопка — всегда в правом верхнем углу или правом нижнем углу формы
+- **ОБЯЗАТЕЛЬНО**: `aria-label` на каждой icon-only кнопке (`size="icon"`) для accessibility
 
 ### 4.3. Расположение кнопок
 

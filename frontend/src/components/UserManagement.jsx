@@ -114,9 +114,9 @@ function UserManagement() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{users.length}</div><p className="text-xs text-muted-foreground">Всего</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-danger))] tabular-nums">{users.filter(u => u.role === 'admin').length}</div><p className="text-xs text-muted-foreground">Админов</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-warning))] tabular-nums">{users.filter(u => u.role === 'operator').length}</div><p className="text-xs text-muted-foreground">Операторов</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-[hsl(var(--status-info))] tabular-nums">{users.filter(u => u.role === 'viewer').length}</div><p className="text-xs text-muted-foreground">Просмотр</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-danger tabular-nums">{users.filter(u => u.role === 'admin').length}</div><p className="text-xs text-muted-foreground">Админов</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-warning tabular-nums">{users.filter(u => u.role === 'operator').length}</div><p className="text-xs text-muted-foreground">Операторов</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-info tabular-nums">{users.filter(u => u.role === 'viewer').length}</div><p className="text-xs text-muted-foreground">Просмотр</p></CardContent></Card>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -160,13 +160,13 @@ function UserManagement() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(user)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(user)} aria-label="Редактировать">
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"
-                            disabled={user.login === currentUser || user.login === 'admin'}>
+                            disabled={user.login === currentUser || user.login === 'admin'} aria-label="Удалить">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
