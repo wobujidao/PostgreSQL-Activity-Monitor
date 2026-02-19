@@ -120,19 +120,20 @@ sequenceDiagram
 | psycopg2 | 2.9 | PostgreSQL драйвер + connection pooling |
 | Paramiko | 3.5 | SSH клиент |
 | PyJWT + bcrypt | 2.11 / 4.3 | Авторизация |
-| cryptography | 44.0 | Fernet шифрование |
+| cryptography | 46.0 | Fernet шифрование |
+| slowapi | 0.1.9 | Rate limiting (защита от brute force) |
 
 ### Frontend
 | Технология | Версия | Назначение |
 |-----------|--------|------------|
 | React | 19.2 | UI фреймворк |
 | Vite | 7.3 | Сборка и dev-сервер |
-| Tailwind CSS | 4.1 | Utility-first CSS |
+| Tailwind CSS | 4.2 | Utility-first CSS |
 | shadcn/ui | 27 компонентов | UI-библиотека (Radix + Tailwind) |
 | Chart.js | 4.5 | Графики временных рядов |
 | React Router | 7.13 | SPA маршрутизация |
 | axios | 1.13 | HTTP клиент с JWT interceptors |
-| lucide-react | 0.564 | SVG иконки |
+| lucide-react | 0.575 | SVG иконки |
 
 ### Инфраструктура
 | Технология | Назначение |

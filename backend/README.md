@@ -61,13 +61,14 @@ graph TD
 |-----------|--------|------------|
 | Python | 3.13 | Среда выполнения |
 | FastAPI | 0.129 | REST API + автодокументация |
-| uvicorn | 0.40 | ASGI-сервер |
+| uvicorn | 0.41 | ASGI-сервер |
 | Pydantic | 2.12 | Валидация данных |
 | psycopg2-binary | 2.9.11 | PostgreSQL + connection pooling |
 | paramiko | 3.5 | SSH клиент |
 | PyJWT | 2.11 | JWT токены |
 | bcrypt | 4.3 | Хэширование паролей |
-| cryptography | 44.0 | Fernet шифрование |
+| cryptography | 46.0 | Fernet шифрование |
+| slowapi | 0.1.9 | Rate limiting |
 
 ## Структура
 

@@ -54,12 +54,12 @@ graph TD
 |-----------|-----------|--------|----------|
 | UI-фреймворк | [React](https://react.dev) | 19.2 | Хуки, Context API, Error Boundaries |
 | Сборщик | [Vite](https://vite.dev) | 7.3 | HMR, ESBuild + Rollup |
-| CSS | [Tailwind CSS](https://tailwindcss.com) | 4.1 | Utility-first, CSS-переменные, тёмная тема |
+| CSS | [Tailwind CSS](https://tailwindcss.com) | 4.2 | Utility-first, CSS-переменные, тёмная тема |
 | UI-компоненты | [shadcn/ui](https://ui.shadcn.com) | 27 шт. | Radix-примитивы + Tailwind |
 | Графики | [Chart.js](https://www.chartjs.org) | 4.5 | Canvas-графики временных рядов |
 | HTTP | [axios](https://axios-http.com) | 1.13 | JWT interceptors |
 | Маршрутизация | [React Router](https://reactrouter.com) | 7.13 | SPA-роутинг с защитой маршрутов |
-| Иконки | [Lucide React](https://lucide.dev) | 0.564 | 1500+ SVG-иконок |
+| Иконки | [Lucide React](https://lucide.dev) | 0.575 | 1500+ SVG-иконок |
 | Уведомления | [Sonner](https://sonner.emilkowal.dev) | 2.0 | Toast (success / error / info) |
 | Даты | [date-fns](https://date-fns.org) + react-datepicker | 4.1 / 9.1 | Форматирование, локаль ru |
 | Шрифты | [Inter](https://rsms.me/inter/) + [JetBrains Mono](https://www.jetbrains.com/lp/mono/) | — | @fontsource |
