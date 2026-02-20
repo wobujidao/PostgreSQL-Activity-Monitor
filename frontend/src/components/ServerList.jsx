@@ -7,12 +7,11 @@ import { useServers } from '@/hooks/use-servers';
 import { isValidServerName, isValidHostname, isValidPort } from '@/lib/validation';
 import ServerListSkeleton from './skeletons/ServerListSkeleton';
 import EmptyState from './EmptyState';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -20,7 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -29,7 +28,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Filter, Settings,
+  Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Server, Loader2, KeyRound, Lock, Search, Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -53,13 +52,8 @@ function ServerList() {
   const [testingSSH, setTestingSSH] = useState(false);
   const [sshTestResult, setSSHTestResult] = useState(null);
 
-  useEffect(() => {
-    setPaused(showAddModal);
-  }, [showAddModal, setPaused]);
-
-  useEffect(() => {
-    api.get('/ssh-keys').then(res => setSSHKeys(res.data)).catch(() => {});
-  }, []);
+  useEffect(() => { setPaused(showAddModal); }, [showAddModal, setPaused]);
+  useEffect(() => { api.get('/ssh-keys').then(res => setSSHKeys(res.data)).catch(() => {}); }, []);
 
   const handleSaveAdd = async () => {
     try {
@@ -152,147 +146,128 @@ function ServerList() {
     const active = sortField === field;
     const Icon = active ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
     return (
-      <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort(field)}>
+      <TableHead className="cursor-pointer select-none hover:bg-muted/50 text-xs h-8" onClick={() => handleSort(field)}>
         <div className="flex items-center gap-1">
           {children}
-          <Icon className={`h-3 w-3 ${active ? 'text-foreground' : 'text-muted-foreground'}`} />
+          <Icon className={`h-2.5 w-2.5 ${active ? 'text-foreground' : 'text-muted-foreground'}`} />
         </div>
       </TableHead>
     );
   };
 
-  if (loading) {
-    return <ServerListSkeleton />;
-  }
+  if (loading) return <ServerListSkeleton />;
 
   const onlineCount = servers.filter(s => getServerStatus(s).variant === 'success').length;
   const errorCount = servers.filter(s => getServerStatus(s).variant === 'destructive').length;
   const warningCount = servers.filter(s => getServerStatus(s).variant === 'warning').length;
 
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все серверы</SelectItem>
-                  <SelectItem value="online">Активные</SelectItem>
-                  <SelectItem value="error">С ошибками</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 flex-1">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Поиск по имени или IP..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
-              />
-            </div>
-            <div className="flex items-center gap-3 ml-auto">
-              <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5000">5 сек</SelectItem>
-                  <SelectItem value="10000">10 сек</SelectItem>
-                  <SelectItem value="15000">15 сек</SelectItem>
-                  <SelectItem value="30000">30 сек</SelectItem>
-                  <SelectItem value="60000">1 мин</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${timeLeft <= 3 ? 'bg-status-warning animate-pulse' : 'bg-status-active animate-pulse'}`} />
-                <span className="text-xs text-muted-foreground tabular-nums">{timeLeft}с</span>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
+    <div className="space-y-3">
+      {/* Фильтры + поиск + обновление — одна строка */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-32 h-7 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все ({servers.length})</SelectItem>
+            <SelectItem value="online">Активные ({onlineCount})</SelectItem>
+            <SelectItem value="error">Ошибки ({errorCount})</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+          <Input
+            placeholder="Поиск..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-7 h-7 text-sm"
+          />
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className={`h-1.5 w-1.5 rounded-full ${timeLeft <= 3 ? 'bg-status-warning animate-pulse' : 'bg-status-active animate-pulse'}`} />
+            <span className="text-[11px] text-muted-foreground tabular-nums">{timeLeft}с</span>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Server table */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="flex items-center gap-2">
-            <Server className="h-5 w-5" />
-            Серверы PostgreSQL
-          </CardTitle>
-          <Button size="sm" onClick={() => { setErrorMessage(''); setShowAddModal(true); setSSHTestResult(null); }}>
-            <Plus className="h-4 w-4 mr-1" />
-            Добавить
+          <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
+            <SelectTrigger className="w-20 h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5000">5 сек</SelectItem>
+              <SelectItem value="10000">10 сек</SelectItem>
+              <SelectItem value="15000">15 сек</SelectItem>
+              <SelectItem value="30000">30 сек</SelectItem>
+              <SelectItem value="60000">1 мин</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => window.location.reload()}>
+            <RefreshCw className="h-3 w-3" />
           </Button>
-        </CardHeader>
+          <Button size="sm" className="h-7 text-xs" onClick={() => { setErrorMessage(''); setShowAddModal(true); setSSHTestResult(null); }}>
+            <Plus className="h-3 w-3 mr-1" />Добавить
+          </Button>
+        </div>
+      </div>
+
+      {errorMessage && (
+        <Alert variant="destructive"><AlertDescription>{errorMessage}</AlertDescription></Alert>
+      )}
+
+      {/* Таблица серверов */}
+      <Card>
         <CardContent className="p-0">
-          {errorMessage && (
-            <Alert variant="destructive" className="mx-6 mb-4">
-              <AlertDescription>{errorMessage}</AlertDescription>
-            </Alert>
-          )}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <SortHeader field="name">Сервер</SortHeader>
-                  <SortHeader field="host">IP адрес</SortHeader>
-                  <SortHeader field="version">Версия PG</SortHeader>
-                  <SortHeader field="connections">Соединения</SortHeader>
+                  <SortHeader field="host">IP</SortHeader>
+                  <SortHeader field="version">PG</SortHeader>
+                  <SortHeader field="connections">Соед.</SortHeader>
                   <SortHeader field="free_space">Диск</SortHeader>
                   <SortHeader field="uptime">Uptime</SortHeader>
                   <SortHeader field="status">Статус</SortHeader>
-                  <TableHead>SSH</TableHead>
-                  <TableHead>Действия</TableHead>
+                  <TableHead className="text-xs h-8">SSH</TableHead>
+                  <TableHead className="text-xs h-8 w-24"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredServers.map(server => {
                   const status = getServerStatus(server);
                   const disk = getDiskInfo(server.free_space, server.total_space);
-                  const freePercent = disk.percent ? (100 - disk.percent).toFixed(1) : 0;
 
                   return (
                     <TableRow key={server.name}>
-                      <TableCell className="font-medium">
-                        <Link to={`/server/${server.name}`} className="text-primary hover:underline">
+                      <TableCell className="py-1.5">
+                        <Link to={`/server/${server.name}`} className="text-sm font-medium text-primary hover:underline">
                           {server.name}
                         </Link>
                       </TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{server.host}</code>
+                      <TableCell className="py-1.5">
+                        <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{server.host}</code>
                       </TableCell>
-                      <TableCell className="text-sm">{server.version || '—'}</TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-xs py-1.5">{server.version || '—'}</TableCell>
+                      <TableCell className="text-xs py-1.5 tabular-nums">
                         {server.connections ? (
-                          <span>
+                          <>
                             <span className="text-status-active font-medium">{server.connections.active || 0}</span>
-                            {' / '}
-                            <span className="text-muted-foreground">{server.connections.idle || 0}</span>
-                          </span>
+                            <span className="text-muted-foreground">/{server.connections.idle || 0}</span>
+                          </>
                         ) : '—'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1.5">
                         {server.total_space ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className="space-y-1 min-w-[140px]">
-                                <div className="text-xs">
+                              <div className="min-w-[100px]">
+                                <div className="text-[11px]">
                                   <span className={disk.percent > 85 ? 'text-status-danger font-medium' : disk.percent > 70 ? 'text-status-warning font-medium' : 'text-status-active font-medium'}>
                                     {formatBytes(server.free_space)}
                                   </span>
-                                  <span className="text-muted-foreground"> / {formatBytes(server.total_space)}</span>
+                                  <span className="text-muted-foreground">/{formatBytes(server.total_space)}</span>
                                 </div>
-                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                <div className="h-1 w-full bg-muted rounded-full overflow-hidden mt-0.5">
                                   <div className={`h-full rounded-full transition-all ${disk.color}`} style={{ width: `${disk.percent}%` }} />
                                 </div>
                               </div>
@@ -303,35 +278,28 @@ function ServerList() {
                           </Tooltip>
                         ) : '—'}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatUptime(server.uptime_hours)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-xs text-muted-foreground py-1.5">{formatUptime(server.uptime_hours)}</TableCell>
+                      <TableCell className="py-1.5">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge variant={status.variant}>
-                              {status.text}
-                            </Badge>
+                            <Badge variant={status.variant} className="text-[11px] px-1.5 py-0">{status.text}</Badge>
                           </TooltipTrigger>
                           <TooltipContent>{status.tooltip}</TooltipContent>
                         </Tooltip>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1.5">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="text-sm">
-                              {server.ssh_auth_type === 'key' ? <KeyRound className="h-4 w-4 inline" /> : <Lock className="h-4 w-4 inline" />}
-                            </span>
+                            <span>{server.ssh_auth_type === 'key' ? <KeyRound className="h-3 w-3" /> : <Lock className="h-3 w-3" />}</span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {server.ssh_auth_type === 'key' && server.ssh_key_info
-                              ? `Ключ: ${server.ssh_key_info.name}`
-                              : 'Пароль'}
+                            {server.ssh_auth_type === 'key' && server.ssh_key_info ? `Ключ: ${server.ssh_key_info.name}` : 'Пароль'}
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/server/${server.name}/edit`)}>
-                          <Settings className="h-3 w-3 mr-1" />
-                          Управление
+                      <TableCell className="py-1.5">
+                        <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => navigate(`/server/${server.name}/edit`)}>
+                          <Settings className="h-3 w-3 mr-1" />Управление
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -343,7 +311,7 @@ function ServerList() {
                       {searchTerm || statusFilter !== 'all' ? (
                         <EmptyState icon={Search} title="Серверы не найдены" description="Попробуйте изменить условия поиска" />
                       ) : (
-                        <EmptyState icon={Server} title="Нет добавленных серверов" description="Добавьте первый сервер для мониторинга" actionLabel="Добавить сервер" onAction={() => { setErrorMessage(''); setShowAddModal(true); }} />
+                        <EmptyState icon={Server} title="Нет добавленных серверов" description="Добавьте первый сервер" actionLabel="Добавить сервер" onAction={() => { setErrorMessage(''); setShowAddModal(true); }} />
                       )}
                     </TableCell>
                   </TableRow>
@@ -352,153 +320,129 @@ function ServerList() {
             </Table>
           </div>
           {filteredServers.length > 0 && (
-            <div className="flex items-center gap-3 px-6 py-3 border-t text-sm text-muted-foreground">
-              <span>Итого: {filteredServers.length} из {servers.length}</span>
-              <Separator orientation="vertical" className="h-4" />
-              <Badge variant="success" className="text-xs">{onlineCount} активных</Badge>
-              {errorCount > 0 && <Badge variant="destructive" className="text-xs">{errorCount} с ошибками</Badge>}
-              {warningCount > 0 && <Badge variant="warning" className="text-xs">{warningCount} нагрузка</Badge>}
+            <div className="flex items-center gap-2 px-4 py-2 border-t text-xs text-muted-foreground">
+              <span>{filteredServers.length} из {servers.length}</span>
+              <Separator orientation="vertical" className="h-3" />
+              <Badge variant="success" className="text-[10px] px-1 py-0">{onlineCount}</Badge>
+              {errorCount > 0 && <Badge variant="destructive" className="text-[10px] px-1 py-0">{errorCount}</Badge>}
+              {warningCount > 0 && <Badge variant="warning" className="text-[10px] px-1 py-0">{warningCount}</Badge>}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Add server dialog */}
+      {/* Диалог добавления сервера */}
       <Dialog open={showAddModal} onOpenChange={(open) => { if (!open) { setShowAddModal(false); setSSHTestResult(null); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Добавить сервер</DialogTitle>
-            <DialogDescription>Укажите параметры подключения к PostgreSQL и SSH</DialogDescription>
           </DialogHeader>
           {errorMessage && (
-            <Alert variant="destructive">
-              <AlertDescription>{errorMessage}</AlertDescription>
-            </Alert>
+            <Alert variant="destructive"><AlertDescription>{errorMessage}</AlertDescription></Alert>
           )}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Название *</Label>
-                <Input value={newServer.name} onChange={(e) => setNewServer({ ...newServer, name: e.target.value })} />
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Название *</Label>
+                <Input value={newServer.name} onChange={(e) => setNewServer({ ...newServer, name: e.target.value })} className="h-8 text-sm" />
                 {newServer.name && !isValidServerName(newServer.name) && (
-                  <p className="text-xs text-destructive">Только буквы, цифры, дефис и подчёркивание</p>
+                  <p className="text-[11px] text-destructive">Буквы, цифры, дефис, _</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Хост *</Label>
-                <Input value={newServer.host} onChange={(e) => setNewServer({ ...newServer, host: e.target.value })} />
+              <div className="space-y-1">
+                <Label className="text-xs">Хост *</Label>
+                <Input value={newServer.host} onChange={(e) => setNewServer({ ...newServer, host: e.target.value })} className="h-8 text-sm" />
                 {newServer.host && !isValidHostname(newServer.host) && (
-                  <p className="text-xs text-destructive">Некорректный IP-адрес или hostname</p>
+                  <p className="text-[11px] text-destructive">Некорректный адрес</p>
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Пользователь PG *</Label>
-                <Input value={newServer.user} onChange={(e) => setNewServer({ ...newServer, user: e.target.value })} />
+            <div className="grid grid-cols-5 gap-3">
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Пользователь PG *</Label>
+                <Input value={newServer.user} onChange={(e) => setNewServer({ ...newServer, user: e.target.value })} className="h-8 text-sm" />
               </div>
-              <div className="space-y-2">
-                <Label>Пароль PG *</Label>
-                <Input type="password" value={newServer.password} onChange={(e) => setNewServer({ ...newServer, password: e.target.value })} />
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Пароль PG *</Label>
+                <Input type="password" value={newServer.password} onChange={(e) => setNewServer({ ...newServer, password: e.target.value })} className="h-8 text-sm" />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Порт PG</Label>
-              <Input type="number" value={newServer.port} onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })} className="w-32" />
-              {newServer.port && !isValidPort(newServer.port) && (
-                <p className="text-xs text-destructive">Порт: 1-65535</p>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Пользователь SSH</Label>
-                <Input value={newServer.ssh_user} onChange={(e) => setNewServer({ ...newServer, ssh_user: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Порт SSH</Label>
-                <Input type="number" value={newServer.ssh_port} onChange={(e) => setNewServer({ ...newServer, ssh_port: parseInt(e.target.value) })} className="w-32" />
+              <div className="space-y-1">
+                <Label className="text-xs">Порт</Label>
+                <Input type="number" value={newServer.port} onChange={(e) => setNewServer({ ...newServer, port: parseInt(e.target.value) })} className="h-8 text-sm" />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>SSH Аутентификация</Label>
-              <RadioGroup value={newServer.ssh_auth_type} onValueChange={(v) => setNewServer({ ...newServer, ssh_auth_type: v })} className="flex gap-4">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="password" id="ssh-password" />
-                  <Label htmlFor="ssh-password" className="font-normal">По паролю</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="key" id="ssh-key" />
-                  <Label htmlFor="ssh-key" className="font-normal">По SSH-ключу</Label>
-                </div>
-              </RadioGroup>
+            <Separator className="my-1" />
+
+            <div className="grid grid-cols-5 gap-3">
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Пользователь SSH</Label>
+                <Input value={newServer.ssh_user} onChange={(e) => setNewServer({ ...newServer, ssh_user: e.target.value })} className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Порт SSH</Label>
+                <Input type="number" value={newServer.ssh_port} onChange={(e) => setNewServer({ ...newServer, ssh_port: parseInt(e.target.value) })} className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Аутентификация</Label>
+                <RadioGroup value={newServer.ssh_auth_type} onValueChange={(v) => setNewServer({ ...newServer, ssh_auth_type: v })} className="flex gap-3 h-8 items-center">
+                  <div className="flex items-center space-x-1"><RadioGroupItem value="password" id="ssh-pw" /><Label htmlFor="ssh-pw" className="text-xs font-normal cursor-pointer">Пароль</Label></div>
+                  <div className="flex items-center space-x-1"><RadioGroupItem value="key" id="ssh-k" /><Label htmlFor="ssh-k" className="text-xs font-normal cursor-pointer">Ключ</Label></div>
+                </RadioGroup>
+              </div>
             </div>
 
             {newServer.ssh_auth_type === 'password' ? (
-              <div className="space-y-2">
-                <Label>Пароль SSH</Label>
-                <Input type="password" value={newServer.ssh_password} onChange={(e) => setNewServer({ ...newServer, ssh_password: e.target.value })} />
+              <div className="space-y-1">
+                <Label className="text-xs">Пароль SSH</Label>
+                <Input type="password" value={newServer.ssh_password} onChange={(e) => setNewServer({ ...newServer, ssh_password: e.target.value })} className="h-8 text-sm" />
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>SSH-ключ</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">SSH-ключ</Label>
                   <Select value={newServer.ssh_key_id || ''} onValueChange={(v) => setNewServer({ ...newServer, ssh_key_id: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите ключ..." />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Выберите..." /></SelectTrigger>
                     <SelectContent>
                       {sshKeys.map(key => (
-                        <SelectItem key={key.id} value={key.id}>
-                          {key.name} ({key.key_type.toUpperCase()})
-                        </SelectItem>
+                        <SelectItem key={key.id} value={key.id}>{key.name} ({key.key_type.toUpperCase()})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {sshKeys.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Нет доступных ключей. <Link to="/ssh-keys" className="text-primary">Управление ключами</Link>
-                    </p>
+                    <p className="text-[11px] text-muted-foreground">Нет ключей. <Link to="/ssh-keys" className="text-primary">Создать</Link></p>
                   )}
                 </div>
                 {newServer.ssh_key_id && sshKeys.find(k => k.id === newServer.ssh_key_id)?.has_passphrase && (
-                  <div className="space-y-2">
-                    <Label>Пароль от ключа</Label>
-                    <Input type="password" value={newServer.ssh_key_passphrase} onChange={(e) => setNewServer({ ...newServer, ssh_key_passphrase: e.target.value })} />
+                  <div className="space-y-1">
+                    <Label className="text-xs">Пароль от ключа</Label>
+                    <Input type="password" value={newServer.ssh_key_passphrase} onChange={(e) => setNewServer({ ...newServer, ssh_key_passphrase: e.target.value })} className="h-8 text-sm" />
                   </div>
                 )}
               </div>
             )}
 
             {newServer.name && (
-              <div className="space-y-2">
-                <Button variant="outline" size="sm" onClick={() => handleTestSSH(newServer)} disabled={testingSSH}>
-                  {testingSSH ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                  Тест SSH
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleTestSSH(newServer)} disabled={testingSSH}>
+                  {testingSSH ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}Тест SSH
                 </Button>
                 {sshTestResult && (
-                  <Alert variant={sshTestResult.success ? 'default' : 'destructive'} className="mt-2">
-                    <AlertDescription>{sshTestResult.success ? '✅ ' : '❌ '}{sshTestResult.message}</AlertDescription>
-                  </Alert>
+                  <span className={`text-xs ${sshTestResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                    {sshTestResult.message}
+                  </span>
                 )}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowAddModal(false); setSSHTestResult(null); }}>
-              Отмена
-            </Button>
-            <Button onClick={handleSaveAdd} disabled={
+            <Button variant="outline" size="sm" onClick={() => { setShowAddModal(false); setSSHTestResult(null); }}>Отмена</Button>
+            <Button size="sm" onClick={handleSaveAdd} disabled={
               !newServer.name || !isValidServerName(newServer.name) ||
               !newServer.host || !isValidHostname(newServer.host) ||
               !newServer.user || !newServer.password ||
               !isValidPort(newServer.port)
-            }>
-              Добавить
-            </Button>
+            }>Добавить</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

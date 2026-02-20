@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatTimestamp } from '@/lib/format';
 import { LS_USERNAME } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
 import PageHeader from './PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -24,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, ArrowLeft, Users, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const INITIAL_FORM = { login: '', password: '', role: 'viewer', email: '' };
@@ -98,82 +97,79 @@ function UserManagement() {
   };
 
   const getRoleBadge = (role) => {
-    if (role === 'admin') return <Badge variant="destructive">Администратор</Badge>;
-    if (role === 'operator') return <Badge variant="warning">Оператор</Badge>;
-    return <Badge variant="secondary">Просмотр</Badge>;
+    if (role === 'admin') return <Badge variant="destructive" className="text-[11px] px-1.5 py-0">Админ</Badge>;
+    if (role === 'operator') return <Badge variant="warning" className="text-[11px] px-1.5 py-0">Оператор</Badge>;
+    return <Badge variant="secondary" className="text-[11px] px-1.5 py-0">Просмотр</Badge>;
   };
 
   if (loading) return <LoadingSpinner text="Загрузка пользователей..." />;
 
   return (
-    <div className="space-y-4">
-      <PageHeader title="Управление пользователями" breadcrumbs={[
-        { label: 'Пользователи' },
-      ]} />
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{users.length}</div><p className="text-xs text-muted-foreground">Всего</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-danger tabular-nums">{users.filter(u => u.role === 'admin').length}</div><p className="text-xs text-muted-foreground">Админов</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-warning tabular-nums">{users.filter(u => u.role === 'operator').length}</div><p className="text-xs text-muted-foreground">Операторов</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-info tabular-nums">{users.filter(u => u.role === 'viewer').length}</div><p className="text-xs text-muted-foreground">Просмотр</p></CardContent></Card>
+    <div className="space-y-3">
+      {/* Заголовок + статистика + кнопка */}
+      <div className="flex items-center justify-between">
+        <PageHeader title="Пользователи" breadcrumbs={[{ label: 'Пользователи' }]} />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">Всего <strong className="text-foreground tabular-nums">{users.length}</strong></span>
+            <span className="text-muted-foreground">Админов <strong className="text-status-danger tabular-nums">{users.filter(u => u.role === 'admin').length}</strong></span>
+            <span className="text-muted-foreground">Операторов <strong className="text-status-warning tabular-nums">{users.filter(u => u.role === 'operator').length}</strong></span>
+          </div>
+          <Button size="sm" onClick={() => { setFormData(INITIAL_FORM); setError(null); setShowAddDialog(true); }} className="h-7 text-xs">
+            <Plus className="h-3 w-3 mr-1" />Добавить
+          </Button>
+        </div>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
+      {/* Таблица */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" />Пользователи</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-1" />Назад</Button>
-            <Button size="sm" onClick={() => { setFormData(INITIAL_FORM); setError(null); setShowAddDialog(true); }}><Plus className="h-4 w-4 mr-1" />Добавить</Button>
-          </div>
-        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Логин</TableHead>
-                <TableHead>Роль</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Создан</TableHead>
-                <TableHead>Последний вход</TableHead>
-                <TableHead>Статус</TableHead>
-                <TableHead className="text-right">Действия</TableHead>
+                <TableHead className="text-xs h-8">Логин</TableHead>
+                <TableHead className="text-xs h-8">Роль</TableHead>
+                <TableHead className="text-xs h-8">Email</TableHead>
+                <TableHead className="text-xs h-8">Создан</TableHead>
+                <TableHead className="text-xs h-8">Последний вход</TableHead>
+                <TableHead className="text-xs h-8">Статус</TableHead>
+                <TableHead className="text-xs h-8 w-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map(user => (
                 <TableRow key={user.login}>
-                  <TableCell className="font-medium">
+                  <TableCell className="text-sm font-medium py-1.5">
                     {user.login}
-                    {user.login === currentUser && <Badge variant="outline" className="ml-2 text-xs">Вы</Badge>}
+                    {user.login === currentUser && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0">Вы</Badge>}
                   </TableCell>
-                  <TableCell>{getRoleBadge(user.role)}</TableCell>
-                  <TableCell className="text-sm">{user.email || '—'}</TableCell>
-                  <TableCell className="text-sm">{formatTimestamp(user.created_at)}</TableCell>
-                  <TableCell className="text-sm">{formatTimestamp(user.last_login)}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.is_active ? 'success' : 'destructive'}>
+                  <TableCell className="py-1.5">{getRoleBadge(user.role)}</TableCell>
+                  <TableCell className="text-xs py-1.5">{user.email || '—'}</TableCell>
+                  <TableCell className="text-xs py-1.5 tabular-nums">{formatTimestamp(user.created_at)}</TableCell>
+                  <TableCell className="text-xs py-1.5 tabular-nums">{formatTimestamp(user.last_login)}</TableCell>
+                  <TableCell className="py-1.5">
+                    <Badge variant={user.is_active ? 'success' : 'destructive'} className="text-[11px] px-1.5 py-0">
                       {user.is_active ? 'Активен' : 'Заблокирован'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(user)} aria-label="Редактировать">
-                        <Pencil className="h-4 w-4" />
+                  <TableCell className="py-1.5">
+                    <div className="flex gap-0.5">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(user)} aria-label="Редактировать">
+                        <Pencil className="h-3 w-3" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"
                             disabled={user.login === currentUser || user.login === 'admin'} aria-label="Удалить">
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Удалить пользователя?</AlertDialogTitle>
-                            <AlertDialogDescription>Удалить пользователя <strong>{user.login}</strong>? Это действие необратимо.</AlertDialogDescription>
+                            <AlertDialogDescription>Удалить <strong>{user.login}</strong>? Это действие необратимо.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Отмена</AlertDialogCancel>
@@ -192,83 +188,74 @@ function UserManagement() {
 
       {/* Add dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Новый пользователь</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Логин *</Label>
-              <Input value={formData.login} onChange={(e) => setFormData({ ...formData, login: e.target.value })} placeholder="Введите логин" />
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Новый пользователь</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Логин *</Label>
+                <Input value={formData.login} onChange={(e) => setFormData({ ...formData, login: e.target.value })} placeholder="login" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Пароль *</Label>
+                <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="min 8 символов" className={`h-8 text-sm ${formData.password && formData.password.length < 8 ? 'border-destructive' : ''}`} />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Пароль *</Label>
-              <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Минимум 8 символов" />
-              {formData.password && formData.password.length < 8 && (
-                <p className="text-xs text-destructive">Минимум 8 символов (сейчас: {formData.password.length})</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Роль *</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="viewer">Просмотр</SelectItem>
-                  <SelectItem value="operator">Оператор</SelectItem>
-                  <SelectItem value="admin">Администратор</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com (необязательно)" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Роль *</Label>
+                <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="viewer">Просмотр</SelectItem>
+                    <SelectItem value="operator">Оператор</SelectItem>
+                    <SelectItem value="admin">Администратор</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="необязательно" className="h-8 text-sm" />
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Отмена</Button>
-            <Button onClick={handleCreate} disabled={!formData.login.trim() || !formData.password || formData.password.length < 8}>Создать</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAddDialog(false)}>Отмена</Button>
+            <Button size="sm" onClick={handleCreate} disabled={!formData.login.trim() || !formData.password || formData.password.length < 8}>Создать</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Редактировать пользователя</DialogTitle>
-            <DialogDescription>Редактирование {formData.login}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Логин</Label>
-              <Input value={formData.login} disabled />
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Редактировать: {formData.login}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Новый пароль</Label>
+              <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Пусто = не меняется" className={`h-8 text-sm ${formData.password && formData.password.length < 8 ? 'border-destructive' : ''}`} />
             </div>
-            <div className="space-y-2">
-              <Label>Новый пароль</Label>
-              <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Оставьте пустым если не меняете" />
-              {formData.password && formData.password.length < 8 && (
-                <p className="text-xs text-destructive">Минимум 8 символов</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Роль</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })} disabled={editingUser?.login === 'admin'}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="viewer">Просмотр</SelectItem>
-                  <SelectItem value="operator">Оператор</SelectItem>
-                  <SelectItem value="admin">Администратор</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Роль</Label>
+                <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })} disabled={editingUser?.login === 'admin'}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="viewer">Просмотр</SelectItem>
+                    <SelectItem value="operator">Оператор</SelectItem>
+                    <SelectItem value="admin">Администратор</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email" className="h-8 text-sm" />
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Отмена</Button>
-            <Button onClick={handleUpdate} disabled={formData.password && formData.password.length < 8}>Сохранить</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowEditDialog(false)}>Отмена</Button>
+            <Button size="sm" onClick={handleUpdate} disabled={formData.password && formData.password.length < 8}>Сохранить</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
