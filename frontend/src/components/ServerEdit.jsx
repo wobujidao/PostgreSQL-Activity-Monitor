@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatBytesGB } from '@/lib/format';
 import LoadingSpinner from './LoadingSpinner';
 import PageHeader from './PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -20,7 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { isValidHostname, isValidPort } from '@/lib/validation';
-import { Save, ArrowLeft, Trash2, Loader2, KeyRound, Lock, AlertTriangle } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Loader2, Database, Terminal, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 function ServerEdit() {
@@ -35,8 +35,9 @@ function ServerEdit() {
   const [sshTestResult, setSSHTestResult] = useState(null);
   const initialServerRef = useRef(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavigate, setPendingNavigate] = useState(null);
 
-  // Отслеживание несохранённых изменений
   const checkDirty = useCallback((current) => {
     if (!initialServerRef.current || !current) return false;
     const init = initialServerRef.current;
@@ -44,16 +45,12 @@ function ServerEdit() {
       .some(k => String(current[k] ?? '') !== String(init[k] ?? ''));
   }, []);
 
-  // Предупреждение при закрытии вкладки
   useEffect(() => {
     if (!isDirty) return;
     const handler = (e) => { e.preventDefault(); };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
-
-  // Блокировка навигации react-router
-  const blocker = useBlocker(isDirty);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,6 +117,15 @@ function ServerEdit() {
     });
   };
 
+  const goBack = () => {
+    if (isDirty) {
+      setPendingNavigate('/');
+      setShowLeaveDialog(true);
+    } else {
+      navigate('/');
+    }
+  };
+
   if (loading) return <LoadingSpinner text="Загрузка данных сервера..." />;
 
   if (!server) {
@@ -136,11 +142,56 @@ function ServerEdit() {
   const selectedKey = server.ssh_key_id ? sshKeys.find(k => k.id === server.ssh_key_id) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 max-w-2xl">
       <PageHeader title="Редактирование сервера" breadcrumbs={[
         { label: 'Серверы', href: '/' },
         { label: serverName },
       ]} />
+
+      {/* Инфо-полоска + действия */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          <Badge variant={server.status === 'ok' ? 'success' : 'destructive'}>
+            {server.status === 'ok' ? 'Активен' : 'Недоступен'}
+          </Badge>
+          {server.version && <span className="text-muted-foreground">PG {server.version}</span>}
+          {server.uptime_hours != null && <span className="text-muted-foreground">{Math.floor(server.uptime_hours / 24)}д uptime</span>}
+          {server.free_space && server.total_space && (
+            <span className="text-muted-foreground">{formatBytesGB(server.free_space)}/{formatBytesGB(server.total_space)}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={goBack}>
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" />Назад
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+            Сохранить
+            {isDirty && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-status-warning inline-block" />}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="destructive">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Удалить сервер?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Вы уверены что хотите удалить <strong>{serverName}</strong>? Это действие нельзя отменить.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Удалить
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
 
       {error && (
         <Alert variant="destructive">
@@ -148,94 +199,92 @@ function ServerEdit() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Main settings */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Основные настройки</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Название сервера</Label>
-                <Input value={server.name} disabled />
-                <p className="text-xs text-muted-foreground">Название нельзя изменить</p>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 space-y-2">
-                  <Label>Хост</Label>
-                  <Input value={server.host} onChange={(e) => update('host', e.target.value)} placeholder="192.168.1.100" />
+      {/* Основная карточка с табами */}
+      <Card>
+        <Tabs defaultValue="pg">
+          <div className="px-4 pt-3">
+            <TabsList>
+              <TabsTrigger value="pg"><Database className="h-3.5 w-3.5 mr-1.5" />PostgreSQL</TabsTrigger>
+              <TabsTrigger value="ssh"><Terminal className="h-3.5 w-3.5 mr-1.5" />SSH</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <CardContent className="pt-4 pb-4">
+            {/* Вкладка PostgreSQL */}
+            <TabsContent value="pg" className="mt-0 space-y-3">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-4 space-y-1">
+                  <Label className="text-xs">Сервер</Label>
+                  <Input value={server.name} disabled className="h-8 text-sm bg-muted" />
+                </div>
+                <div className="col-span-3 space-y-1">
+                  <Label className="text-xs">Хост</Label>
+                  <Input value={server.host} onChange={(e) => update('host', e.target.value)} placeholder="192.168.1.100" className="h-8 text-sm" />
                   {server.host && !isValidHostname(server.host) && (
-                    <p className="text-xs text-destructive">Некорректный IP-адрес или hostname</p>
+                    <p className="text-[11px] text-destructive">Некорректный адрес</p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Порт PG</Label>
-                  <Input type="number" value={server.port} onChange={(e) => update('port', parseInt(e.target.value))} />
+                <div className="space-y-1">
+                  <Label className="text-xs">Порт</Label>
+                  <Input type="number" value={server.port} onChange={(e) => update('port', parseInt(e.target.value))} className="h-8 text-sm" />
                   {server.port && !isValidPort(server.port) && (
-                    <p className="text-xs text-destructive">Порт: 1-65535</p>
+                    <p className="text-[11px] text-destructive">1-65535</p>
                   )}
                 </div>
               </div>
-              <Separator />
-              <h4 className="font-medium">Учетные данные PostgreSQL</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Пользователь</Label>
-                  <Input value={server.user} onChange={(e) => update('user', e.target.value)} placeholder="postgres" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Пользователь</Label>
+                  <Input value={server.user} onChange={(e) => update('user', e.target.value)} placeholder="postgres" className="h-8 text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Пароль</Label>
-                  <Input type="password" value={server.password} onChange={(e) => update('password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" />
+                <div className="space-y-1">
+                  <Label className="text-xs">Пароль</Label>
+                  <Input type="password" value={server.password} onChange={(e) => update('password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" className="h-8 text-sm" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Настройки SSH</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 space-y-2">
-                  <Label>Пользователь SSH</Label>
-                  <Input value={server.ssh_user} onChange={(e) => update('ssh_user', e.target.value)} placeholder="root" />
+            {/* Вкладка SSH */}
+            <TabsContent value="ssh" className="mt-0 space-y-3">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-3 space-y-1">
+                  <Label className="text-xs">Пользователь SSH</Label>
+                  <Input value={server.ssh_user} onChange={(e) => update('ssh_user', e.target.value)} placeholder="root" className="h-8 text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Порт SSH</Label>
-                  <Input type="number" value={server.ssh_port} onChange={(e) => update('ssh_port', parseInt(e.target.value))} />
+                <div className="space-y-1">
+                  <Label className="text-xs">Порт</Label>
+                  <Input type="number" value={server.ssh_port} onChange={(e) => update('ssh_port', parseInt(e.target.value))} className="h-8 text-sm" />
                   {server.ssh_port && !isValidPort(server.ssh_port) && (
-                    <p className="text-xs text-destructive">Порт: 1-65535</p>
+                    <p className="text-[11px] text-destructive">1-65535</p>
                   )}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Метод аутентификации</Label>
+              <div className="space-y-1">
+                <Label className="text-xs">Аутентификация</Label>
                 <RadioGroup value={server.ssh_auth_type} onValueChange={(v) => update('ssh_auth_type', v)} className="flex gap-4">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
                     <RadioGroupItem value="password" id="edit-ssh-pw" />
-                    <Label htmlFor="edit-ssh-pw" className="font-normal">По паролю</Label>
+                    <Label htmlFor="edit-ssh-pw" className="text-sm font-normal cursor-pointer">Пароль</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
                     <RadioGroupItem value="key" id="edit-ssh-key" />
-                    <Label htmlFor="edit-ssh-key" className="font-normal">По SSH-ключу</Label>
+                    <Label htmlFor="edit-ssh-key" className="text-sm font-normal cursor-pointer">SSH-ключ</Label>
                   </div>
                 </RadioGroup>
               </div>
 
               {server.ssh_auth_type === 'password' ? (
-                <div className="space-y-2">
-                  <Label>Пароль SSH</Label>
-                  <Input type="password" value={server.ssh_password} onChange={(e) => update('ssh_password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" />
+                <div className="space-y-1">
+                  <Label className="text-xs">Пароль SSH</Label>
+                  <Input type="password" value={server.ssh_password} onChange={(e) => update('ssh_password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" className="h-8 text-sm" />
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>SSH-ключ</Label>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">SSH-ключ</Label>
                     <Select value={server.ssh_key_id} onValueChange={(v) => update('ssh_key_id', v)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 text-sm">
                         <SelectValue placeholder="Выберите ключ..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -247,124 +296,36 @@ function ServerEdit() {
                       </SelectContent>
                     </Select>
                     {selectedKey && (
-                      <p className="text-xs text-muted-foreground">Fingerprint: <code>{selectedKey.fingerprint}</code></p>
+                      <p className="text-[11px] text-muted-foreground">Fingerprint: <code>{selectedKey.fingerprint}</code></p>
                     )}
                   </div>
                   {selectedKey?.has_passphrase && (
-                    <div className="space-y-2">
-                      <Label>Пароль от ключа</Label>
-                      <Input type="password" value={server.ssh_key_passphrase} onChange={(e) => update('ssh_key_passphrase', e.target.value)} autoComplete="new-password" />
+                    <div className="space-y-1">
+                      <Label className="text-xs">Пароль от ключа</Label>
+                      <Input type="password" value={server.ssh_key_passphrase} onChange={(e) => update('ssh_key_passphrase', e.target.value)} autoComplete="new-password" className="h-8 text-sm" />
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="pt-2">
-                <Button variant="outline" size="sm" onClick={handleTestSSH} disabled={testingSSH}>
-                  {testingSSH ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              <div className="flex items-center gap-3 pt-1">
+                <Button variant="outline" size="sm" onClick={handleTestSSH} disabled={testingSSH} className="h-7 text-xs">
+                  {testingSSH ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
                   Тест SSH
                 </Button>
                 {sshTestResult && (
-                  <Alert variant={sshTestResult.success ? 'default' : 'destructive'} className="mt-3">
-                    <AlertDescription>{sshTestResult.success ? '✅ ' : '❌ '}{sshTestResult.message}</AlertDescription>
-                  </Alert>
+                  <span className={`text-xs ${sshTestResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                    {sshTestResult.message}
+                  </span>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Информация</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Статус</span>
-                <Badge variant={server.status === 'ok' ? 'success' : 'destructive'}>
-                  {server.status === 'ok' ? 'Активен' : 'Недоступен'}
-                </Badge>
-              </div>
-              {server.version && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">PostgreSQL</span>
-                  <span>{server.version}</span>
-                </div>
-              )}
-              {server.uptime_hours != null && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Uptime</span>
-                  <span>{Math.floor(server.uptime_hours / 24)} дней</span>
-                </div>
-              )}
-              {server.free_space && server.total_space && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Диск</span>
-                  <span>{formatBytesGB(server.free_space)} / {formatBytesGB(server.total_space)}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Действия</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button className="w-full" onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Сохранить
-                {isDirty && <span className="ml-1.5 h-2 w-2 rounded-full bg-status-warning inline-block" />}
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                К списку
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="text-destructive flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Опасная зона
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-3">
-                Удаление сервера приведет к потере всей истории мониторинга. Это действие необратимо.
-              </p>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" className="w-full">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Удалить сервер
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Удалить сервер?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Вы уверены что хотите удалить сервер <strong>{serverName}</strong>? Это действие нельзя отменить.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Отмена</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Удалить
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+      </Card>
 
       {/* Диалог несохранённых изменений */}
-      <AlertDialog open={blocker.state === 'blocked'}>
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
@@ -373,8 +334,8 @@ function ServerEdit() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => blocker.reset()}>Остаться</AlertDialogCancel>
-            <AlertDialogAction onClick={() => blocker.proceed()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel onClick={() => { setShowLeaveDialog(false); setPendingNavigate(null); }}>Остаться</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowLeaveDialog(false); setIsDirty(false); if (pendingNavigate) navigate(pendingNavigate); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Покинуть
             </AlertDialogAction>
           </AlertDialogFooter>

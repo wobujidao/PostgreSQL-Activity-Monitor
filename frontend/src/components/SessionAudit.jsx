@@ -3,7 +3,7 @@ import api from '@/lib/api';
 import { formatTimestamp } from '@/lib/format';
 import LoadingSpinner from './LoadingSpinner';
 import PageHeader from './PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -14,22 +14,21 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  ClipboardList, LogIn, LogOut, RefreshCw, ShieldAlert,
-  ChevronLeft, ChevronRight, Users, CalendarDays, AlertTriangle,
+  LogIn, LogOut, RefreshCw, ShieldAlert,
+  ChevronLeft, ChevronRight, RotateCcw,
 } from 'lucide-react';
 
 const PAGE_SIZE = 25;
 
 const EVENT_TYPES = {
   login_success: { label: 'Вход', icon: LogIn, variant: 'success' },
-  login_failed: { label: 'Ошибка входа', icon: ShieldAlert, variant: 'destructive' },
+  login_failed: { label: 'Ошибка', icon: ShieldAlert, variant: 'destructive' },
   refresh: { label: 'Продление', icon: RefreshCw, variant: 'secondary' },
   logout: { label: 'Выход', icon: LogOut, variant: 'outline' },
 };
 
 function parseUserAgent(ua) {
   if (!ua || ua === 'unknown') return '—';
-  // Короткий формат: "Chrome 131 / Windows"
   let browser = '—';
   let os = '';
   if (ua.includes('Firefox/')) browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)?.[1]?.split('.')[0];
@@ -38,13 +37,13 @@ function parseUserAgent(ua) {
   else if (ua.includes('Safari/') && !ua.includes('Chrome')) browser = 'Safari ' + ua.match(/Version\/([\d.]+)/)?.[1]?.split('.')[0];
   else if (ua.includes('curl/')) browser = 'curl';
 
-  if (ua.includes('Windows')) os = 'Windows';
-  else if (ua.includes('Mac OS')) os = 'macOS';
+  if (ua.includes('Windows')) os = 'Win';
+  else if (ua.includes('Mac OS')) os = 'Mac';
   else if (ua.includes('Linux')) os = 'Linux';
   else if (ua.includes('Android')) os = 'Android';
   else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
 
-  return os ? `${browser} / ${os}` : browser;
+  return os ? `${browser}/${os}` : browser;
 }
 
 function SessionAudit() {
@@ -54,7 +53,6 @@ function SessionAudit() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
 
-  // Фильтры
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -88,6 +86,8 @@ function SessionAudit() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  const hasFilters = filterUser || filterType || filterDateFrom || filterDateTo;
+
   const handleFilterReset = () => {
     setFilterUser('');
     setFilterType('');
@@ -100,8 +100,8 @@ function SessionAudit() {
     const cfg = EVENT_TYPES[eventType] || { label: eventType, variant: 'outline' };
     const Icon = cfg.icon;
     return (
-      <Badge variant={cfg.variant} className="gap-1">
-        {Icon && <Icon className="h-3 w-3" />}
+      <Badge variant={cfg.variant} className="gap-1 text-[11px] px-1.5 py-0">
+        {Icon && <Icon className="h-2.5 w-2.5" />}
         {cfg.label}
       </Badge>
     );
@@ -110,146 +110,95 @@ function SessionAudit() {
   if (loading && events.length === 0) return <LoadingSpinner text="Загрузка аудита..." />;
 
   return (
-    <div className="space-y-4">
-      <PageHeader title="Аудит сессий" breadcrumbs={[{ label: 'Аудит' }]} />
-
-      {/* Статистика */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-1">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">Всего событий</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{stats.total_events}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-1">
-                <CalendarDays className="h-4 w-4 text-status-active" />
-                <p className="text-xs text-muted-foreground">Входов сегодня</p>
-              </div>
-              <div className="text-2xl font-bold text-status-active tabular-nums">{stats.logins_today}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="h-4 w-4 text-status-info" />
-                <p className="text-xs text-muted-foreground">Пользователей за неделю</p>
-              </div>
-              <div className="text-2xl font-bold text-status-info tabular-nums">{stats.unique_users_week}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="h-4 w-4 text-status-danger" />
-                <p className="text-xs text-muted-foreground">Неудачных попыток</p>
-              </div>
-              <div className="text-2xl font-bold text-status-danger tabular-nums">
-                {stats.failed_today}
-                {stats.failed_total > 0 && (
-                  <span className="text-sm font-normal text-muted-foreground ml-1">/ {stats.failed_total}</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Фильтры */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Пользователь</label>
-              <Input
-                placeholder="Логин"
-                value={filterUser}
-                onChange={(e) => { setFilterUser(e.target.value); setPage(0); }}
-                className="w-36 h-9"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Событие</label>
-              <Select value={filterType} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(0); }}>
-                <SelectTrigger className="w-40 h-9">
-                  <SelectValue placeholder="Все" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="login_success">Вход</SelectItem>
-                  <SelectItem value="login_failed">Ошибка входа</SelectItem>
-                  <SelectItem value="refresh">Продление</SelectItem>
-                  <SelectItem value="logout">Выход</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Дата от</label>
-              <Input
-                type="date"
-                value={filterDateFrom}
-                onChange={(e) => { setFilterDateFrom(e.target.value); setPage(0); }}
-                className="w-36 h-9"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Дата до</label>
-              <Input
-                type="date"
-                value={filterDateTo}
-                onChange={(e) => { setFilterDateTo(e.target.value); setPage(0); }}
-                className="w-36 h-9"
-              />
-            </div>
-            <Button variant="outline" size="sm" onClick={handleFilterReset} className="h-9">
-              Сбросить
-            </Button>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <PageHeader title="Аудит сессий" breadcrumbs={[{ label: 'Аудит' }]} />
+        {/* Статистика — компактная полоска */}
+        {stats && (
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-muted-foreground">Всего <strong className="text-foreground tabular-nums">{stats.total_events}</strong></span>
+            <span className="text-muted-foreground">Сегодня <strong className="text-status-active tabular-nums">{stats.logins_today}</strong></span>
+            <span className="text-muted-foreground">За неделю <strong className="text-status-info tabular-nums">{stats.unique_users_week}</strong> польз.</span>
+            {stats.failed_today > 0 && (
+              <span className="text-muted-foreground">Ошибок <strong className="text-status-danger tabular-nums">{stats.failed_today}</strong></span>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
+
+      {/* Фильтры — одна строка */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input
+          placeholder="Пользователь"
+          value={filterUser}
+          onChange={(e) => { setFilterUser(e.target.value); setPage(0); }}
+          className="w-32 h-7 text-sm"
+        />
+        <Select value={filterType || 'all'} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(0); }}>
+          <SelectTrigger className="w-36 h-7 text-sm">
+            <SelectValue placeholder="Все события" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все события</SelectItem>
+            <SelectItem value="login_success">Вход</SelectItem>
+            <SelectItem value="login_failed">Ошибка входа</SelectItem>
+            <SelectItem value="refresh">Продление</SelectItem>
+            <SelectItem value="logout">Выход</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={filterDateFrom}
+          onChange={(e) => { setFilterDateFrom(e.target.value); setPage(0); }}
+          className="w-32 h-7 text-sm"
+        />
+        <span className="text-xs text-muted-foreground">—</span>
+        <Input
+          type="date"
+          value={filterDateTo}
+          onChange={(e) => { setFilterDateTo(e.target.value); setPage(0); }}
+          className="w-32 h-7 text-sm"
+        />
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={handleFilterReset} className="h-7 px-2 text-xs">
+            <RotateCcw className="h-3 w-3 mr-1" />Сброс
+          </Button>
+        )}
+        <div className="ml-auto text-xs text-muted-foreground tabular-nums">
+          {total > 0 && <>{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} из {total}</>}
+        </div>
+      </div>
 
       {/* Таблица */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
-            События
-            <Badge variant="outline" className="ml-1 tabular-nums">{total}</Badge>
-          </CardTitle>
-        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-44">Время</TableHead>
-                <TableHead className="w-36">Событие</TableHead>
-                <TableHead>Пользователь</TableHead>
-                <TableHead>IP адрес</TableHead>
-                <TableHead>Браузер</TableHead>
-                <TableHead>Детали</TableHead>
+                <TableHead className="text-xs h-8">Время</TableHead>
+                <TableHead className="text-xs h-8">Событие</TableHead>
+                <TableHead className="text-xs h-8">Пользователь</TableHead>
+                <TableHead className="text-xs h-8">IP</TableHead>
+                <TableHead className="text-xs h-8">Браузер</TableHead>
+                <TableHead className="text-xs h-8">Детали</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {events.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-6 text-muted-foreground text-sm">
                     Нет событий
                   </TableCell>
                 </TableRow>
               ) : (
                 events.map((event, i) => (
                   <TableRow key={`${event.timestamp}-${i}`}>
-                    <TableCell className="text-sm tabular-nums">{formatTimestamp(event.timestamp)}</TableCell>
-                    <TableCell>{getEventBadge(event.event_type)}</TableCell>
-                    <TableCell className="font-medium">{event.username}</TableCell>
-                    <TableCell className="text-sm font-mono">{event.ip_address || '—'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{parseUserAgent(event.user_agent)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{event.details || '—'}</TableCell>
+                    <TableCell className="text-xs tabular-nums py-1.5">{formatTimestamp(event.timestamp)}</TableCell>
+                    <TableCell className="py-1.5">{getEventBadge(event.event_type)}</TableCell>
+                    <TableCell className="text-sm font-medium py-1.5">{event.username}</TableCell>
+                    <TableCell className="text-xs font-mono py-1.5">{event.ip_address || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-1.5">{parseUserAgent(event.user_agent)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-1.5 max-w-48 truncate">{event.details || '—'}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -260,33 +209,14 @@ function SessionAudit() {
 
       {/* Пагинация */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Показано {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} из {total}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 0}
-              onClick={() => setPage(p => p - 1)}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Назад
-            </Button>
-            <span className="text-sm tabular-nums">
-              {page + 1} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage(p => p + 1)}
-            >
-              Далее
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} className="h-7 text-xs">
+            <ChevronLeft className="h-3 w-3 mr-0.5" />Назад
+          </Button>
+          <span className="text-xs tabular-nums text-muted-foreground">{page + 1}/{totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="h-7 text-xs">
+            Далее<ChevronRight className="h-3 w-3 ml-0.5" />
+          </Button>
         </div>
       )}
     </div>

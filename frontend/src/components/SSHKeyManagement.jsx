@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatTimestamp } from '@/lib/format';
 import { LS_USER_ROLE } from '@/lib/constants';
 import LoadingSpinner from './LoadingSpinner';
 import PageHeader from './PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -26,7 +25,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, ArrowLeft, KeyRound, Download, Eye, Upload, Loader2, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Eye, Upload, Loader2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 function SSHKeyManagement() {
@@ -182,45 +181,44 @@ function SSHKeyManagement() {
   if (loading) return <LoadingSpinner text="Загрузка SSH-ключей..." />;
 
   return (
-    <div className="space-y-4">
-      <PageHeader title="Управление SSH-ключами" breadcrumbs={[
-        { label: 'SSH-ключи' },
-      ]} />
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold tabular-nums">{keys.length}</div><p className="text-xs text-muted-foreground">Всего ключей</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-info tabular-nums">{keys.filter(k => k.key_type === 'rsa').length}</div><p className="text-xs text-muted-foreground">RSA</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-status-active tabular-nums">{keys.filter(k => k.key_type === 'ed25519').length}</div><p className="text-xs text-muted-foreground">Ed25519</p></CardContent></Card>
-        <Card><CardContent className="pt-4"><div className="text-2xl font-bold text-chart-5 tabular-nums">{keys.reduce((s, k) => s + k.servers_count, 0)}</div><p className="text-xs text-muted-foreground">Используется</p></CardContent></Card>
+    <div className="space-y-3">
+      {/* Заголовок + статистика + кнопки */}
+      <div className="flex items-center justify-between">
+        <PageHeader title="SSH-ключи" breadcrumbs={[{ label: 'SSH-ключи' }]} />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">Всего <strong className="text-foreground tabular-nums">{keys.length}</strong></span>
+            <span className="text-muted-foreground">RSA <strong className="text-status-info tabular-nums">{keys.filter(k => k.key_type === 'rsa').length}</strong></span>
+            <span className="text-muted-foreground">Ed25519 <strong className="text-status-active tabular-nums">{keys.filter(k => k.key_type === 'ed25519').length}</strong></span>
+          </div>
+          {userRole === 'admin' && (
+            <div className="flex gap-1.5">
+              <Button size="sm" onClick={() => { setModalMode('generate'); setShowModal(true); }} className="h-7 text-xs">
+                <Plus className="h-3 w-3 mr-1" />Создать
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setModalMode('import'); setShowModal(true); }} className="h-7 text-xs">
+                <Upload className="h-3 w-3 mr-1" />Импорт
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
+      {/* Таблица */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" />SSH-ключи</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.history.back()}><ArrowLeft className="h-4 w-4 mr-1" />Назад</Button>
-            {userRole === 'admin' && (
-              <>
-                <Button size="sm" onClick={() => { setModalMode('generate'); setShowModal(true); }}><Plus className="h-4 w-4 mr-1" />Сгенерировать</Button>
-                <Button variant="secondary" size="sm" onClick={() => { setModalMode('import'); setShowModal(true); }}><Upload className="h-4 w-4 mr-1" />Импорт</Button>
-              </>
-            )}
-          </div>
-        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Название</TableHead>
-                <TableHead>Тип</TableHead>
-                <TableHead>Fingerprint</TableHead>
-                <TableHead>Создан</TableHead>
-                <TableHead>Автор</TableHead>
-                <TableHead>Серверов</TableHead>
-                <TableHead>Действия</TableHead>
+                <TableHead className="text-xs h-8">Название</TableHead>
+                <TableHead className="text-xs h-8">Тип</TableHead>
+                <TableHead className="text-xs h-8">Fingerprint</TableHead>
+                <TableHead className="text-xs h-8">Создан</TableHead>
+                <TableHead className="text-xs h-8">Автор</TableHead>
+                <TableHead className="text-xs h-8 text-center">Серв.</TableHead>
+                <TableHead className="text-xs h-8 w-28"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -228,39 +226,39 @@ function SSHKeyManagement() {
                 const dupes = keys.filter(k => k.fingerprint === key.fingerprint && k.id !== key.id);
                 return (
                   <TableRow key={key.id} className={dupes.length > 0 ? 'bg-status-warning/5' : ''}>
-                    <TableCell>
-                      <div className="font-medium">{key.name}</div>
-                      {key.description && <div className="text-xs text-muted-foreground">{key.description}</div>}
-                      {dupes.length > 0 && <div className="text-xs text-status-warning mt-1">Дубликат: {dupes.map(k => k.name).join(', ')}</div>}
+                    <TableCell className="py-1.5">
+                      <span className="text-sm font-medium">{key.name}</span>
+                      {key.description && <span className="text-xs text-muted-foreground ml-2">{key.description}</span>}
+                      {dupes.length > 0 && <div className="text-[11px] text-status-warning">Дубликат: {dupes.map(k => k.name).join(', ')}</div>}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={key.key_type === 'rsa' ? 'default' : 'secondary'}>{key.key_type.toUpperCase()}</Badge>
+                    <TableCell className="py-1.5">
+                      <Badge variant={key.key_type === 'rsa' ? 'default' : 'secondary'} className="text-[11px] px-1.5 py-0">{key.key_type.toUpperCase()}</Badge>
                     </TableCell>
-                    <TableCell><code className="text-xs">{key.fingerprint}</code></TableCell>
-                    <TableCell className="text-sm">{formatTimestamp(key.created_at)}</TableCell>
-                    <TableCell className="text-sm">{key.created_by}</TableCell>
-                    <TableCell>
-                      {key.servers_count > 0 ? <Badge>{key.servers_count}</Badge> : <span className="text-muted-foreground">—</span>}
+                    <TableCell className="py-1.5"><code className="text-[11px]">{key.fingerprint}</code></TableCell>
+                    <TableCell className="text-xs py-1.5 tabular-nums">{formatTimestamp(key.created_at)}</TableCell>
+                    <TableCell className="text-xs py-1.5">{key.created_by}</TableCell>
+                    <TableCell className="text-center py-1.5">
+                      {key.servers_count > 0 ? <Badge className="text-[11px] px-1.5 py-0">{key.servers_count}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
+                    <TableCell className="py-1.5">
+                      <div className="flex gap-0.5">
                         {userRole === 'admin' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingKey(key); setEditFormData({ name: key.name, description: key.description || '' }); setShowEditDialog(true); }} aria-label="Редактировать">
-                            <Pencil className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingKey(key); setEditFormData({ name: key.name, description: key.description || '' }); setShowEditDialog(true); }} aria-label="Редактировать">
+                            <Pencil className="h-3 w-3" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedKey(key); setShowDetailsDialog(true); }} aria-label="Просмотр">
-                          <Eye className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setSelectedKey(key); setShowDetailsDialog(true); }} aria-label="Просмотр">
+                          <Eye className="h-3 w-3" />
                         </Button>
                         {userRole === 'admin' && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(key)} aria-label="Скачать">
-                              <Download className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownload(key)} aria-label="Скачать">
+                              <Download className="h-3 w-3" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={key.servers_count > 0} aria-label="Удалить">
-                                  <Trash2 className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" disabled={key.servers_count > 0} aria-label="Удалить">
+                                  <Trash2 className="h-3 w-3" />
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -282,7 +280,7 @@ function SSHKeyManagement() {
                 );
               })}
               {keys.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Нет SSH-ключей</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground text-sm">Нет SSH-ключей</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -291,7 +289,7 @@ function SSHKeyManagement() {
 
       {/* Generate/Import dialog */}
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) { setShowModal(false); resetForms(); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{modalMode === 'generate' ? 'Генерация SSH-ключа' : 'Импорт SSH-ключа'}</DialogTitle>
           </DialogHeader>
@@ -300,81 +298,86 @@ function SSHKeyManagement() {
               <TabsTrigger value="generate">Сгенерировать</TabsTrigger>
               <TabsTrigger value="import">Импортировать</TabsTrigger>
             </TabsList>
-            <TabsContent value="generate" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Название *</Label>
-                <Input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="prod-servers-key" />
-              </div>
-              <div className="space-y-2">
-                <Label>Тип ключа</Label>
-                <RadioGroup value={keyType} onValueChange={setKeyType} className="flex gap-4">
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="rsa" id="kt-rsa" /><Label htmlFor="kt-rsa" className="font-normal">RSA</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="ed25519" id="kt-ed" /><Label htmlFor="kt-ed" className="font-normal">Ed25519 (рекомендуется)</Label></div>
-                </RadioGroup>
-              </div>
-              {keyType === 'rsa' && (
-                <div className="space-y-2">
-                  <Label>Размер ключа</Label>
-                  <Select value={keySize} onValueChange={setKeySize}>
-                    <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2048">2048 бит</SelectItem>
-                      <SelectItem value="3072">3072 бит</SelectItem>
-                      <SelectItem value="4096">4096 бит</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <TabsContent value="generate" className="space-y-3 mt-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Название *</Label>
+                  <Input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="prod-servers-key" className="h-8 text-sm" />
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label>Пароль (опционально)</Label>
-                <Input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder="Без пароля если пусто" />
-              </div>
-              {passphrase && (
-                <div className="space-y-2">
-                  <Label>Подтвердите пароль</Label>
-                  <Input type="password" value={confirmPassphrase} onChange={(e) => setConfirmPassphrase(e.target.value)} />
-                  {confirmPassphrase && passphrase !== confirmPassphrase && <p className="text-xs text-destructive">Пароли не совпадают</p>}
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Тип ключа</Label>
+                  <RadioGroup value={keyType} onValueChange={setKeyType} className="flex gap-4">
+                    <div className="flex items-center space-x-1.5"><RadioGroupItem value="rsa" id="kt-rsa" /><Label htmlFor="kt-rsa" className="text-sm font-normal cursor-pointer">RSA</Label></div>
+                    <div className="flex items-center space-x-1.5"><RadioGroupItem value="ed25519" id="kt-ed" /><Label htmlFor="kt-ed" className="text-sm font-normal cursor-pointer">Ed25519</Label></div>
+                  </RadioGroup>
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label>Описание</Label>
-                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Назначение ключа" />
+                {keyType === 'rsa' && (
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Размер</Label>
+                    <Select value={keySize} onValueChange={setKeySize}>
+                      <SelectTrigger className="h-8 text-sm w-36"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2048">2048 бит</SelectItem>
+                        <SelectItem value="3072">3072 бит</SelectItem>
+                        <SelectItem value="4096">4096 бит</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label className="text-xs">Пароль</Label>
+                  <Input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder="Опционально" className="h-8 text-sm" />
+                </div>
+                {passphrase ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Подтверждение</Label>
+                    <Input type="password" value={confirmPassphrase} onChange={(e) => setConfirmPassphrase(e.target.value)} className={`h-8 text-sm ${confirmPassphrase && passphrase !== confirmPassphrase ? 'border-destructive' : ''}`} />
+                  </div>
+                ) : <div />}
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Описание</Label>
+                  <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Назначение ключа" className="h-8 text-sm" />
+                </div>
               </div>
             </TabsContent>
-            <TabsContent value="import" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Название *</Label>
-                <Input value={importKeyName} onChange={(e) => setImportKeyName(e.target.value)} placeholder="legacy-server-key" />
+            <TabsContent value="import" className="space-y-3 mt-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Название *</Label>
+                <Input value={importKeyName} onChange={(e) => setImportKeyName(e.target.value)} placeholder="legacy-server-key" className="h-8 text-sm" />
               </div>
-              <div className="space-y-2">
-                <Label>Приватный ключ *</Label>
-                <textarea className="flex min-h-[160px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Приватный ключ *</Label>
+                  <Label className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    <Input type="file" accept=".pem,.key,id_rsa,id_ed25519" onChange={handleFileUpload} className="hidden" />
+                    <Upload className="h-3 w-3 inline mr-1" />Файл
+                  </Label>
+                </div>
+                <textarea className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={privateKey} onChange={(e) => setPrivateKey(e.target.value)}
                   placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----" />
               </div>
-              <div className="space-y-2">
-                <Label>Или загрузите файл</Label>
-                <Input type="file" accept=".pem,.key,id_rsa,id_ed25519" onChange={handleFileUpload} />
-              </div>
-              <div className="space-y-2">
-                <Label>Пароль от ключа</Label>
-                <Input type="password" value={importPassphrase} onChange={(e) => setImportPassphrase(e.target.value)} placeholder="Если есть" />
-              </div>
-              <div className="space-y-2">
-                <Label>Описание</Label>
-                <Input value={importDescription} onChange={(e) => setImportDescription(e.target.value)} placeholder="Назначение ключа" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Пароль от ключа</Label>
+                  <Input type="password" value={importPassphrase} onChange={(e) => setImportPassphrase(e.target.value)} placeholder="Если есть" className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Описание</Label>
+                  <Input value={importDescription} onChange={(e) => setImportDescription(e.target.value)} placeholder="Назначение" className="h-8 text-sm" />
+                </div>
               </div>
             </TabsContent>
           </Tabs>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowModal(false); resetForms(); }}>Отмена</Button>
+            <Button variant="outline" size="sm" onClick={() => { setShowModal(false); resetForms(); }}>Отмена</Button>
             {modalMode === 'generate' ? (
-              <Button onClick={handleGenerate} disabled={isGenerating || !keyName.trim() || (passphrase && passphrase !== confirmPassphrase)}>
-                {isGenerating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}Сгенерировать
+              <Button size="sm" onClick={handleGenerate} disabled={isGenerating || !keyName.trim() || (passphrase && passphrase !== confirmPassphrase)}>
+                {isGenerating ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}Сгенерировать
               </Button>
             ) : (
-              <Button onClick={handleImport} disabled={isImporting || !importKeyName.trim() || !privateKey.trim()}>
-                {isImporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}Импортировать
+              <Button size="sm" onClick={handleImport} disabled={isImporting || !importKeyName.trim() || !privateKey.trim()}>
+                {isImporting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}Импортировать
               </Button>
             )}
           </DialogFooter>
@@ -383,67 +386,61 @@ function SSHKeyManagement() {
 
       {/* Edit dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Редактировать SSH-ключ</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2"><Label>Название *</Label><Input value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Описание</Label><Input value={editFormData.description} onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })} /></div>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Редактировать ключ</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label className="text-xs">Название *</Label><Input value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className="h-8 text-sm" /></div>
+            <div className="space-y-1"><Label className="text-xs">Описание</Label><Input value={editFormData.description} onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })} className="h-8 text-sm" /></div>
             {editingKey && (
-              <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
-                <div><strong>Тип:</strong> {editingKey.key_type.toUpperCase()}</div>
-                <div><strong>Fingerprint:</strong> <code>{editingKey.fingerprint}</code></div>
-                <div><strong>Создан:</strong> {formatTimestamp(editingKey.created_at)}</div>
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                <div>{editingKey.key_type.toUpperCase()} | {formatTimestamp(editingKey.created_at)}</div>
+                <div className="font-mono truncate">{editingKey.fingerprint}</div>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Отмена</Button>
-            <Button onClick={handleUpdate} disabled={!editFormData.name.trim()}>Сохранить</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowEditDialog(false)}>Отмена</Button>
+            <Button size="sm" onClick={handleUpdate} disabled={!editFormData.name.trim()}>Сохранить</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Details dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Детали SSH-ключа</DialogTitle></DialogHeader>
           {selectedKey && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg">{selectedKey.name}</h3>
-                {selectedKey.description && <p className="text-sm text-muted-foreground">{selectedKey.description}</p>}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{selectedKey.name}</span>
+                <Badge variant={selectedKey.key_type === 'rsa' ? 'default' : 'secondary'} className="text-[11px] px-1.5 py-0">{selectedKey.key_type.toUpperCase()}</Badge>
+                {selectedKey.has_passphrase && <Badge variant="outline" className="text-[11px] px-1.5 py-0">С паролем</Badge>}
               </div>
-              <div className="flex gap-2">
-                <Badge variant={selectedKey.key_type === 'rsa' ? 'default' : 'secondary'}>{selectedKey.key_type.toUpperCase()}</Badge>
-                {selectedKey.has_passphrase && <Badge variant="outline">С паролем</Badge>}
-              </div>
+              {selectedKey.description && <p className="text-sm text-muted-foreground">{selectedKey.description}</p>}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Fingerprint</Label>
-                <div className="flex items-center gap-2">
-                  <code className="text-sm flex-1 bg-muted px-2 py-1 rounded">{selectedKey.fingerprint}</code>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard(selectedKey.fingerprint)} aria-label="Копировать"><Copy className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-1">
+                  <code className="text-xs flex-1 bg-muted px-2 py-1 rounded font-mono truncate">{selectedKey.fingerprint}</code>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => copyToClipboard(selectedKey.fingerprint)} aria-label="Копировать"><Copy className="h-3 w-3" /></Button>
                 </div>
               </div>
               {userRole === 'admin' && selectedKey.public_key && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-muted-foreground">Публичный ключ</Label>
-                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(selectedKey.public_key)}><Copy className="h-3 w-3 mr-1" />Копировать</Button>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => copyToClipboard(selectedKey.public_key)}><Copy className="h-3 w-3 mr-1" />Копировать</Button>
                   </div>
-                  <pre className="text-xs bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all font-mono">{selectedKey.public_key}</pre>
+                  <pre className="text-[11px] bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap break-all font-mono max-h-32">{selectedKey.public_key}</pre>
                 </div>
               )}
-              <div className="text-sm text-muted-foreground">
-                Создан: {formatTimestamp(selectedKey.created_at)} ({selectedKey.created_by}) | Серверов: {selectedKey.servers_count || 0}
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{formatTimestamp(selectedKey.created_at)} ({selectedKey.created_by}) | Серверов: {selectedKey.servers_count || 0}</span>
+                {userRole === 'admin' && (
+                  <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => handleDownload(selectedKey)}><Download className="h-3 w-3 mr-1" />Скачать .pub</Button>
+                )}
               </div>
-              {userRole === 'admin' && (
-                <Button variant="outline" onClick={() => handleDownload(selectedKey)}><Download className="h-4 w-4 mr-2" />Скачать публичный ключ</Button>
-              )}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>Закрыть</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
