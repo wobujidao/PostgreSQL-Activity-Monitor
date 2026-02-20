@@ -334,6 +334,26 @@ async def sync_server_db_info(server: Server) -> dict:
                     list(common_dbs - recreated_dbs),
                 )
 
+        # 4b. Backfill: заполняем creation_time для записей где он NULL
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            null_rows = await conn.fetch(
+                "SELECT datname, oid FROM db_info WHERE server_name = $1 AND creation_time IS NULL",
+                server.name,
+            )
+        for nr in null_rows:
+            try:
+                ct = await _get_db_creation_time(server, nr["oid"])
+                if ct:
+                    pool = get_pool()
+                    async with pool.acquire() as conn:
+                        await conn.execute(
+                            "UPDATE db_info SET creation_time = $1 WHERE server_name = $2 AND datname = $3",
+                            ct, server.name, nr["datname"],
+                        )
+            except Exception:
+                pass
+
         # 5. Обработка новых БД
         for dbname in new_dbs:
             try:

@@ -183,6 +183,26 @@ async def _init_schema():
             END $$;
         """)
 
+        # Таблица настроек
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key         TEXT PRIMARY KEY,
+                value       TEXT NOT NULL,
+                value_type  TEXT NOT NULL DEFAULT 'int',
+                description TEXT,
+                updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+        """)
+        await conn.execute("""
+            INSERT INTO settings (key, value, value_type, description) VALUES
+                ('collect_interval', '600', 'int', 'Интервал сбора статистики (сек)'),
+                ('size_update_interval', '1800', 'int', 'Интервал обновления размеров БД (сек)'),
+                ('db_check_interval', '1800', 'int', 'Интервал проверки новых/удалённых БД (сек)'),
+                ('retention_months', '12', 'int', 'Срок хранения данных (месяцев)'),
+                ('audit_retention_days', '90', 'int', 'Срок хранения аудита (дней)')
+            ON CONFLICT (key) DO NOTHING;
+        """)
+
         logger.info("Схема БД проверена/создана")
 
 

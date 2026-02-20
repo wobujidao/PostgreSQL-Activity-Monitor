@@ -6,11 +6,20 @@ import logging
 from app.config import COLLECT_INTERVAL, SIZE_UPDATE_INTERVAL, DB_CHECK_INTERVAL
 from app.collector.tasks import collect_server_stats, collect_server_sizes, sync_server_db_info
 from app.database.local_db import ensure_partitions, cleanup_old_partitions
+from app.database.repositories import settings_repo
 from app.services.server import load_servers  # async
 
 logger = logging.getLogger(__name__)
 
 DAILY = 86400  # 24 часа в секундах
+
+
+async def _get_interval(key: str, default: int) -> int:
+    """Получить интервал из БД с fallback на default из config."""
+    try:
+        return await settings_repo.get_int_setting(key, default)
+    except Exception:
+        return default
 
 
 async def stats_loop():
@@ -31,7 +40,8 @@ async def stats_loop():
             logger.info(f"[stats] Завершено: {ok} успешно, {errors} ошибок")
         except Exception as e:
             logger.error(f"[stats] Критическая ошибка в цикле: {e}")
-        await asyncio.sleep(COLLECT_INTERVAL)
+        interval = await _get_interval("collect_interval", COLLECT_INTERVAL)
+        await asyncio.sleep(interval)
 
 
 async def sizes_loop():
@@ -52,7 +62,8 @@ async def sizes_loop():
             logger.info(f"[sizes] Завершено: {ok} успешно, {errors} ошибок")
         except Exception as e:
             logger.error(f"[sizes] Критическая ошибка в цикле: {e}")
-        await asyncio.sleep(SIZE_UPDATE_INTERVAL)
+        interval = await _get_interval("size_update_interval", SIZE_UPDATE_INTERVAL)
+        await asyncio.sleep(interval)
 
 
 async def db_info_loop():
@@ -73,7 +84,8 @@ async def db_info_loop():
             logger.info(f"[db_info] Завершено: {ok} успешно, {errors} ошибок")
         except Exception as e:
             logger.error(f"[db_info] Критическая ошибка в цикле: {e}")
-        await asyncio.sleep(DB_CHECK_INTERVAL)
+        interval = await _get_interval("db_check_interval", DB_CHECK_INTERVAL)
+        await asyncio.sleep(interval)
 
 
 async def maintenance_loop():

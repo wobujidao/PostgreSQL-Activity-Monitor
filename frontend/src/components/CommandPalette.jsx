@@ -8,7 +8,7 @@ import {
   CommandItem, CommandList, CommandSeparator,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Server, Home, Users, KeyRound, ClipboardList, Sun, Moon, LogOut, Plus } from 'lucide-react';
+import { Server, Home, Users, KeyRound, ClipboardList, Settings, Sun, Moon, LogOut, Plus } from 'lucide-react';
 
 export default function CommandPalette({ open, onOpenChange }) {
   const navigate = useNavigate();
@@ -70,6 +70,12 @@ export default function CommandPalette({ open, onOpenChange }) {
             <CommandItem onSelect={() => runAction(() => navigate('/audit'))}>
               <ClipboardList className="mr-2 h-4 w-4" />
               Аудит сессий
+            </CommandItem>
+          )}
+          {userRole === 'admin' && (
+            <CommandItem onSelect={() => runAction(() => navigate('/settings'))}>
+              <Settings className="mr-2 h-4 w-4" />
+              Настройки
             </CommandItem>
           )}
         </CommandGroup>

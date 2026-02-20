@@ -13,7 +13,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.config import ALLOWED_ORIGINS, LOG_LEVEL
-from app.api import auth_router, servers_router, health_router, stats_router, users_router, audit_router
+from app.api import auth_router, servers_router, health_router, stats_router, users_router, audit_router, settings_router
 from app.database import db_pool
 from app.database.local_db import init_pool, close_pool
 from app.api.ssh_keys import router as ssh_keys_router
@@ -94,6 +94,7 @@ app.include_router(stats_router)
 app.include_router(users_router, tags=["users"])
 app.include_router(ssh_keys_router, tags=["ssh-keys"])
 app.include_router(audit_router, tags=["audit"])
+app.include_router(settings_router, tags=["settings"])
 # Корневой маршрут
 @app.get("/")
 async def root():
