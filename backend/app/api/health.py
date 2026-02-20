@@ -9,7 +9,7 @@ from app.database import db_pool
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["health"])
+router = APIRouter(tags=["health"])
 
 @router.get("/pools/status")
 async def get_pools_status(current_user: User = Depends(get_current_user)):

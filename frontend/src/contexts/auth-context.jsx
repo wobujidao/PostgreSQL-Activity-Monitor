@@ -118,7 +118,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const check = async () => {
       try {
-        await api.get('/api/health', { timeout: 3000 });
+        await api.get('/health', { timeout: 3000 });
         setBackendStatus('available');
       } catch {
         setBackendStatus('unavailable');

@@ -2,7 +2,7 @@
 """
 PostgreSQL Activity Monitor API - точка входа
 """
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -86,15 +86,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Подключение роутеров
-app.include_router(auth_router)
-app.include_router(servers_router)
-app.include_router(health_router)
-app.include_router(stats_router)
-app.include_router(users_router, tags=["users"])
-app.include_router(ssh_keys_router, tags=["ssh-keys"])
-app.include_router(audit_router, tags=["audit"])
-app.include_router(settings_router, tags=["settings"])
+# Общий роутер /api — все эндпоинты под одним префиксом
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth_router)
+api_router.include_router(servers_router)
+api_router.include_router(health_router)
+api_router.include_router(stats_router)
+api_router.include_router(users_router, tags=["users"])
+api_router.include_router(ssh_keys_router, tags=["ssh-keys"])
+api_router.include_router(audit_router, tags=["audit"])
+api_router.include_router(settings_router, tags=["settings"])
+app.include_router(api_router)
+
 # Корневой маршрут
 @app.get("/")
 async def root():

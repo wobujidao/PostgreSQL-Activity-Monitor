@@ -1,5 +1,5 @@
-// API — автоматически определяем по текущему домену
-export const API_BASE_URL = window.location.origin;
+// API — все запросы через /api/ префикс
+export const API_BASE_URL = window.location.origin + '/api';
 
 // Session & Token
 export const SESSION_WARNING_SEC = 300; // 5 минут до истечения — показать modal
