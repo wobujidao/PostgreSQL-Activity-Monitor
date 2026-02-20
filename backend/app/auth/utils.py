@@ -9,10 +9,10 @@ from app.config import SECRET_KEY, ALGORITHM, TOKEN_EXPIRATION, REFRESH_TOKEN_EX
 logger = logging.getLogger(__name__)
 
 
-def load_users():
-    """Загрузка пользователей (делегирует в user_manager с блокировкой файла)"""
+async def load_users():
+    """Загрузка пользователей (делегирует в user_manager)."""
     from app.services import user_manager
-    return user_manager._load_users()
+    return await user_manager.load_users()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

@@ -1,153 +1,79 @@
-import json
-import fcntl
-from datetime import datetime, timezone
-from pathlib import Path
+# app/services/user_manager.py
+"""Управление пользователями через PostgreSQL."""
 import bcrypt
 import logging
-
 from app.models.user import User, UserCreate, UserUpdate, UserResponse, UserRole
+from app.database.repositories import user_repo
 
 logger = logging.getLogger(__name__)
 
-class UserManager:
-    def __init__(self, users_file: str = '/etc/pg_activity_monitor/users.json'):
-        self.users_file = Path(users_file)
-        self.backup_dir = Path('/etc/pg_activity_monitor/backups')
-        self._ensure_dirs()
-    
-    def _ensure_dirs(self):
-        """Создаем необходимые директории"""
-        self.users_file.parent.mkdir(parents=True, exist_ok=True)
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Создаем файл если не существует
-        if not self.users_file.exists():
-            with open(self.users_file, 'w') as f:
-                json.dump([], f)
-    
-    def _load_users(self) -> list[dict]:
-        """Загружаем пользователей с блокировкой файла"""
-        try:
-            with open(self.users_file, 'r') as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
-                try:
-                    users = json.load(f)
-                finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-            return users
-        except Exception as e:
-            logger.error(f"Ошибка загрузки пользователей: {e}")
-            return []
-    
-    def _save_users(self, users: list[dict]):
-        """Сохраняем с блокировкой и бэкапом"""
-        try:
-            # Создаем бэкап если файл существует
-            if self.users_file.exists():
-                backup_file = self.backup_dir / f"users_{datetime.now(timezone.utc):%Y%m%d_%H%M%S}.json"
-                with open(self.users_file, 'rb') as src, open(backup_file, 'wb') as dst:
-                    dst.write(src.read())
-            
-            # Сохраняем новую версию
-            with open(self.users_file, 'w') as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                try:
-                    json.dump(users, f, indent=2, default=str)
-                finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        except Exception as e:
-            logger.error(f"Ошибка сохранения пользователей: {e}")
-            raise
-    
-    def get_user(self, username: str) -> User | None:
-        """Получить пользователя по логину"""
-        users = self._load_users()
-        for user_data in users:
-            if user_data.get('login') == username:
-                return User(**user_data)
+
+async def get_user(username: str) -> User | None:
+    data = await user_repo.get_user(username)
+    if not data:
         return None
-    
-    def create_user(self, user_create: UserCreate) -> UserResponse:
-        """Создать нового пользователя"""
-        users = self._load_users()
-        
-        # Проверка существования
-        if any(u.get('login') == user_create.login for u in users):
-            raise ValueError(f"Пользователь {user_create.login} уже существует")
-        
-        # Хэшируем пароль
-        hashed = bcrypt.hashpw(user_create.password.encode(), bcrypt.gensalt()).decode()
-        
-        # Создаем пользователя
-        user_data = {
-            'login': user_create.login,
-            'password': hashed,
-            'role': user_create.role,
-            'email': user_create.email,
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'is_active': True
-        }
-        
-        users.append(user_data)
-        self._save_users(users)
-        
-        logger.info(f"Создан пользователь: {user_create.login}")
-        return UserResponse(**user_data)
-    
-    def update_user(self, username: str, user_update: UserUpdate) -> UserResponse | None:
-        """Обновить пользователя"""
-        users = self._load_users()
-        
-        for user_data in users:
-            if user_data.get('login') == username:
-                # Обновляем только переданные поля
-                if user_update.password is not None:
-                    user_data['password'] = bcrypt.hashpw(
-                        user_update.password.encode(), 
-                        bcrypt.gensalt()
-                    ).decode()
-                
-                if user_update.role is not None:
-                    user_data['role'] = user_update.role
-                
-                if user_update.email is not None:
-                    user_data['email'] = user_update.email
-                
-                if user_update.is_active is not None:
-                    user_data['is_active'] = user_update.is_active
-                
-                user_data['updated_at'] = datetime.now(timezone.utc).isoformat()
-                self._save_users(users)
-                
-                logger.info(f"Обновлен пользователь: {username}")
-                return UserResponse(**user_data)
-        
+    # Map password_hash -> password for the User model
+    data["password"] = data.pop("password_hash")
+    return User(**data)
+
+
+async def create_user(user_create: UserCreate) -> UserResponse:
+    # Check existence
+    existing = await user_repo.get_user(user_create.login)
+    if existing:
+        raise ValueError(f"Пользователь {user_create.login} уже существует")
+
+    # Hash password
+    hashed = bcrypt.hashpw(user_create.password.encode(), bcrypt.gensalt()).decode()
+
+    data = await user_repo.create_user(
+        login=user_create.login,
+        password_hash=hashed,
+        role=user_create.role,
+        email=user_create.email,
+    )
+    logger.info(f"Создан пользователь: {user_create.login}")
+    return UserResponse(**data)
+
+
+async def update_user(username: str, user_update: UserUpdate) -> UserResponse | None:
+    kwargs = {}
+    if user_update.password is not None:
+        kwargs["password_hash"] = bcrypt.hashpw(user_update.password.encode(), bcrypt.gensalt()).decode()
+    if user_update.role is not None:
+        kwargs["role"] = user_update.role
+    if user_update.email is not None:
+        kwargs["email"] = user_update.email
+    if user_update.is_active is not None:
+        kwargs["is_active"] = user_update.is_active
+
+    data = await user_repo.update_user(username, **kwargs)
+    if not data:
         return None
-    
-    def delete_user(self, username: str) -> bool:
-        """Удалить пользователя"""
-        users = self._load_users()
-        original_count = len(users)
-        users = [u for u in users if u.get('login') != username]
-        
-        if len(users) < original_count:
-            self._save_users(users)
-            logger.info(f"Удален пользователь: {username}")
-            return True
-        
-        return False
-    
-    def list_users(self) -> list[UserResponse]:
-        """Список всех пользователей"""
-        users = self._load_users()
-        return [UserResponse(**u) for u in users]
-    
-    def update_last_login(self, username: str):
-        """Обновить время последнего входа"""
-        users = self._load_users()
-        
-        for user_data in users:
-            if user_data.get('login') == username:
-                user_data['last_login'] = datetime.now(timezone.utc).isoformat()
-                self._save_users(users)
-                break
+    logger.info(f"Обновлен пользователь: {username}")
+    return UserResponse(**data)
+
+
+async def delete_user(username: str) -> bool:
+    deleted = await user_repo.delete_user(username)
+    if deleted:
+        logger.info(f"Удален пользователь: {username}")
+    return deleted
+
+
+async def list_users() -> list[UserResponse]:
+    rows = await user_repo.list_users()
+    return [UserResponse(**r) for r in rows]
+
+
+async def update_last_login(username: str) -> None:
+    await user_repo.update_last_login(username)
+
+
+async def load_users() -> list[dict]:
+    """Для совместимости с auth: возвращает raw dicts с password_hash переименованным в password."""
+    rows = await user_repo.get_all_users_raw()
+    # Auth expects "login" and "password" keys (where password is the hash)
+    for r in rows:
+        r["password"] = r.pop("password_hash")
+    return rows

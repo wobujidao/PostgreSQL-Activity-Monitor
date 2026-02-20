@@ -27,7 +27,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         if jti and token_blacklist.is_blacklisted(jti):
             raise HTTPException(status_code=401, detail="Token revoked")
 
-        users = load_users()
+        users = await load_users()
         for user_data in users:
             if user_data["login"] == username:
                 logger.debug(f"Авторизован пользователь: {username}")

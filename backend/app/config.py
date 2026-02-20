@@ -15,6 +15,11 @@ ALGORITHM = "HS256"
 TOKEN_EXPIRATION = 60  # минут
 REFRESH_TOKEN_EXPIRATION_DAYS = 7  # дней
 
+# Ключ шифрования для pgcrypto (pgp_sym_encrypt/decrypt)
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+if not ENCRYPTION_KEY:
+    raise RuntimeError("ENCRYPTION_KEY не установлен! Задайте переменную окружения или укажите в .env")
+
 # Пути к файлам
 CONFIG_DIR = Path("/etc/pg_activity_monitor")
 SERVERS_FILE = CONFIG_DIR / "servers.json"

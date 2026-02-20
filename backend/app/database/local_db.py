@@ -3,6 +3,7 @@
 Модуль для работы с локальной БД pam_stats через asyncpg.
 Хранит историческую статистику, собранную коллектором.
 """
+import asyncio
 import asyncpg
 import logging
 from datetime import datetime, timedelta, timezone
@@ -12,13 +13,24 @@ logger = logging.getLogger(__name__)
 
 # Глобальный пул asyncpg
 _pool: asyncpg.Pool | None = None
+# Ссылка на main event loop (для вызова async из sync-потоков)
+_main_loop: asyncio.AbstractEventLoop | None = None
+
+
+def get_main_loop() -> asyncio.AbstractEventLoop:
+    """Получить main event loop (для вызова async из sync-потоков)."""
+    if _main_loop is None:
+        raise RuntimeError("Main loop не инициализирован. Вызовите init_pool() сначала.")
+    return _main_loop
 
 
 async def init_pool() -> asyncpg.Pool:
     """Инициализация пула подключений asyncpg."""
-    global _pool
+    global _pool, _main_loop
     if _pool is not None:
         return _pool
+
+    _main_loop = asyncio.get_running_loop()
 
     logger.info(f"Создание asyncpg пула: {LOCAL_DB_DSN.split('@')[1] if '@' in LOCAL_DB_DSN else LOCAL_DB_DSN}")
     _pool = await asyncpg.create_pool(
@@ -89,6 +101,58 @@ async def _init_schema():
                     CREATE INDEX idx_stats_server_db_ts ON statistics (server_name, datname, ts DESC);
                 END IF;
             END $$;
+        """)
+
+        # Расширение pgcrypto для шифрования
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+
+        # Таблица пользователей
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                login         TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                role          TEXT NOT NULL DEFAULT 'viewer',
+                email         TEXT,
+                is_active     BOOLEAN NOT NULL DEFAULT true,
+                created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at    TIMESTAMPTZ,
+                last_login    TIMESTAMPTZ
+            );
+        """)
+
+        # Таблица SSH-ключей (до servers из-за FK)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS ssh_keys (
+                id              TEXT PRIMARY KEY,
+                name            TEXT UNIQUE NOT NULL,
+                fingerprint     TEXT UNIQUE NOT NULL,
+                key_type        TEXT NOT NULL,
+                public_key      TEXT NOT NULL,
+                private_key_enc TEXT NOT NULL,
+                created_by      TEXT NOT NULL,
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                has_passphrase  BOOLEAN NOT NULL DEFAULT false,
+                description     TEXT
+            );
+        """)
+
+        # Таблица серверов
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS servers (
+                name                   TEXT PRIMARY KEY,
+                host                   TEXT NOT NULL,
+                port                   INTEGER NOT NULL DEFAULT 5432,
+                pg_user                TEXT NOT NULL,
+                password_enc           TEXT,
+                ssh_user               TEXT NOT NULL,
+                ssh_password_enc       TEXT,
+                ssh_port               INTEGER NOT NULL DEFAULT 22,
+                ssh_auth_type          TEXT NOT NULL DEFAULT 'password',
+                ssh_key_id             TEXT REFERENCES ssh_keys(id),
+                ssh_key_passphrase_enc TEXT,
+                created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at             TIMESTAMPTZ
+            );
         """)
 
         # Таблица аудита сессий

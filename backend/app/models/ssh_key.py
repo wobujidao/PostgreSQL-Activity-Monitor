@@ -18,7 +18,7 @@ class SSHKey(BaseModel):
     created_at: datetime
     created_by: str
     public_key: str
-    private_key_path: str
+    private_key_path: str = ""  # deprecated: ключи хранятся в БД
     has_passphrase: bool = False
     servers_count: int = 0
     description: str | None = None

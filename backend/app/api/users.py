@@ -20,7 +20,7 @@ async def list_users(
     current_user: User = Depends(require_admin)
 ):
     """Получить список всех пользователей"""
-    return user_manager.list_users()
+    return await user_manager.list_users()
 
 @router.post("/users", response_model=UserResponse)
 async def create_user(
@@ -29,7 +29,7 @@ async def create_user(
 ):
     """Создать нового пользователя"""
     try:
-        return user_manager.create_user(user_create)
+        return await user_manager.create_user(user_create)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -56,7 +56,7 @@ async def get_user(
     current_user: User = Depends(require_admin)
 ):
     """Получить информацию о пользователе"""
-    user = user_manager.get_user(username)
+    user = await user_manager.get_user(username)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -79,7 +79,7 @@ async def update_user(
     current_user: User = Depends(require_admin)
 ):
     """Обновить пользователя"""
-    updated_user = user_manager.update_user(username, user_update)
+    updated_user = await user_manager.update_user(username, user_update)
     if not updated_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -99,11 +99,11 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Нельзя удалить свою учетную запись"
         )
-    
-    if not user_manager.delete_user(username):
+
+    if not await user_manager.delete_user(username):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Пользователь {username} не найден"
         )
-    
+
     return {"message": f"Пользователь {username} удален"}

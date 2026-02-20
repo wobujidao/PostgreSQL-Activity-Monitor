@@ -6,7 +6,8 @@ from typing import Any
 import logging
 from app.models import Server
 from app.auth import get_current_user
-from app.services import load_servers, save_servers, connect_to_server, cache_manager, SSHKeyManager
+from app.services.server import load_servers, save_server, update_server_config, delete_server_config, connect_to_server
+from app.services import cache_manager, SSHKeyManager
 from app.services.ssh import is_host_reachable
 from app.database import db_pool
 from app.database.local_db import delete_server_data
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/servers", tags=["servers"])
 @router.get("", response_model=list[dict])
 async def get_servers(current_user: dict = Depends(get_current_user)):
     """Get list of all servers with their status"""
-    servers = load_servers()
+    servers = await load_servers()
     tasks = [asyncio.to_thread(connect_to_server, server) for server in servers]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     output = []
@@ -37,57 +38,55 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
         # Validate name and host
         if not server.name or server.name.lower() == 'test':
             raise HTTPException(status_code=400, detail="Invalid server name")
-            
+
         if not server.host or server.host.lower() in ['test', 'localhost']:
             raise HTTPException(status_code=400, detail="Invalid host address")
-        
-        servers = load_servers()
+
+        servers = await load_servers()
         if any(s.name == server.name for s in servers):
             logger.warning("Attempt to add existing server: {}".format(server.name))
             raise HTTPException(status_code=400, detail="Server with this name already exists")
-        
+
         # Quick availability check
         logger.info("Checking server availability {} ({}:{})".format(server.name, server.host, server.port))
         if not is_host_reachable(server.host, server.port):
             logger.warning("Server {} unreachable at {}:{}".format(server.name, server.host, server.port))
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="Server {}:{} is unreachable. Check address and port.".format(server.host, server.port)
             )
-        
+
         # Validate SSH key if provided
         if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_key_id', None):
-            # Импортируем ssh_key_storage здесь чтобы избежать циклических импортов
-            from app.services.ssh_key_storage import ssh_key_storage
-            
+            from app.services import ssh_key_storage
+
             # Проверяем существование ключа
-            ssh_key = ssh_key_storage.get_key(server.ssh_key_id)
+            ssh_key = await ssh_key_storage.get_key(server.ssh_key_id)
             if not ssh_key:
                 raise HTTPException(status_code=400, detail="SSH key not found: {}".format(server.ssh_key_id))
-        
+
         # Save server
-        servers.append(server)
-        save_servers(servers)
+        await save_server(server)
         logger.info("Added new server: {}".format(server.name))
-        
+
         # Return full server information
         try:
             return connect_to_server(server)
         except Exception as e:
             # If connection failed, return basic info
             logger.warning("Could not get full server info for {}: {}".format(server.name, e))
-            
+
             # Получаем информацию о ключе если используется
             ssh_key_info = None
             if getattr(server, "ssh_auth_type", "password") == "key" and getattr(server, "ssh_key_id", None):
-                from app.services.ssh_key_storage import ssh_key_storage
-                ssh_key = ssh_key_storage.get_key(server.ssh_key_id)
+                from app.services import ssh_key_storage
+                ssh_key = await ssh_key_storage.get_key(server.ssh_key_id)
                 if ssh_key:
                     ssh_key_info = {
                         "name": ssh_key.name,
                         "fingerprint": ssh_key.fingerprint
                     }
-            
+
             return {
                 "name": server.name,
                 "host": server.host,
@@ -108,7 +107,7 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
                 "uptime_hours": None,
                 "data_dir": None
             }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -117,29 +116,26 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
 
 @router.put("/{server_name}", response_model=dict)
 async def update_server(
-    server_name: str, 
-    updated_server: Server, 
+    server_name: str,
+    updated_server: Server,
     current_user: dict = Depends(get_current_user)
 ):
     """Update server configuration"""
     try:
-        servers = load_servers()
-        server_index = next((i for i, s in enumerate(servers) if s.name == server_name), None)
-        if server_index is None:
+        servers = await load_servers()
+        old_server = next((s for s in servers if s.name == server_name), None)
+        if old_server is None:
             raise HTTPException(status_code=404, detail="Server not found")
-        
-        old_server = servers[server_index]
-        
+
         # Validate SSH key if provided
         if getattr(updated_server, 'ssh_auth_type', 'password') == 'key' and getattr(updated_server, 'ssh_key_id', None):
-            # Импортируем ssh_key_storage здесь чтобы избежать циклических импортов
-            from app.services.ssh_key_storage import ssh_key_storage
-            
+            from app.services import ssh_key_storage
+
             # Проверяем существование ключа
-            ssh_key = ssh_key_storage.get_key(updated_server.ssh_key_id)
+            ssh_key = await ssh_key_storage.get_key(updated_server.ssh_key_id)
             if not ssh_key:
                 raise HTTPException(status_code=400, detail="SSH key not found: {}".format(updated_server.ssh_key_id))
-        
+
         # Сохраняем старые пароли если новые не переданы
         if not updated_server.password:
             updated_server.password = old_server.password
@@ -158,12 +154,11 @@ async def update_server(
             old_server.user != updated_server.user):
             db_pool.close_pool(old_server)
 
-        servers[server_index] = updated_server
-        save_servers(servers)
+        await update_server_config(server_name, updated_server)
         logger.info("Updated server: {}".format(server_name))
-        
+
         return connect_to_server(updated_server)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -173,16 +168,16 @@ async def update_server(
 @router.delete("/{server_name}")
 async def delete_server(server_name: str, current_user: dict = Depends(get_current_user)):
     """Delete server from configuration"""
-    servers = load_servers()
+    servers = await load_servers()
     server_to_delete = next((s for s in servers if s.name == server_name), None)
-    
+
     if not server_to_delete:
         raise HTTPException(status_code=404, detail="Server not found")
-    
+
     # Clear caches
     cache_key = "{}:{}".format(server_to_delete.host, server_to_delete.port)
     cache_manager.invalidate_server_cache(cache_key)
-    
+
     # Close pools for deleted server
     db_pool.close_pool(server_to_delete)
 
@@ -192,8 +187,7 @@ async def delete_server(server_name: str, current_user: dict = Depends(get_curre
     except Exception as e:
         logger.warning(f"Ошибка очистки local_db для {server_name}: {e}")
 
-    updated_servers = [s for s in servers if s.name != server_name]
-    save_servers(updated_servers)
+    await delete_server_config(server_name)
     logger.info("Deleted server: {}".format(server_name))
 
     return {"message": "Server {} deleted".format(server_name)}
@@ -204,28 +198,23 @@ async def test_ssh_connection(
     current_user: dict = Depends(get_current_user)
 ):
     """Test SSH connection to server"""
-    servers = load_servers()
+    servers = await load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    
+
     try:
         if getattr(server, 'ssh_auth_type', 'password') == 'key' and getattr(server, 'ssh_key_id', None):
-            # Импортируем ssh_key_storage здесь чтобы избежать циклических импортов
-            from app.services.ssh_key_storage import ssh_key_storage
-            from app.utils import ensure_decrypted
-            
-            # Получаем содержимое ключа
-            passphrase = None
-            if getattr(server, 'ssh_key_passphrase', None):
-                # Расшифровываем passphrase
-                passphrase = ensure_decrypted(server.ssh_key_passphrase)
-            
-            private_key_content, key_passphrase = ssh_key_storage.get_private_key_content(
-                server.ssh_key_id, 
+            from app.services import ssh_key_storage
+
+            # passphrase уже расшифрован из БД
+            passphrase = getattr(server, 'ssh_key_passphrase', None) or None
+
+            private_key_content, key_passphrase = await ssh_key_storage.get_private_key_content(
+                server.ssh_key_id,
                 passphrase
             )
-            
+
             success, message = SSHKeyManager.test_ssh_connection(
                 host=server.host,
                 port=server.ssh_port,
@@ -240,13 +229,13 @@ async def test_ssh_connection(
                 username=server.ssh_user,
                 password=server.ssh_password
             )
-        
+
         return {
             "success": success,
             "message": message,
             "auth_type": getattr(server, 'ssh_auth_type', 'password')
         }
-        
+
     except Exception as e:
         logger.error("Error testing SSH for {}: {}".format(server_name, e))
         return {

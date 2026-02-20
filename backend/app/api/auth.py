@@ -59,7 +59,7 @@ def _check_origin(request: Request) -> None:
 @limiter.limit("5/minute")
 async def login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     """Авторизация: access token в JSON, refresh token в httpOnly cookie."""
-    users = load_users()
+    users = await load_users()
     for user in users:
         if user["login"] == form_data.username and verify_password(form_data.password, user["password"]):
             access_token = create_access_token(
@@ -112,7 +112,7 @@ async def refresh(request: Request, response: Response, refresh_token: str | Non
 
     # Проверка что пользователь ещё активен
     username = payload.get("sub")
-    users = load_users()
+    users = await load_users()
     user_found = None
     for user in users:
         if user["login"] == username:

@@ -6,7 +6,7 @@ import logging
 from app.config import COLLECT_INTERVAL, SIZE_UPDATE_INTERVAL, DB_CHECK_INTERVAL
 from app.collector.tasks import collect_server_stats, collect_server_sizes, sync_server_db_info
 from app.database.local_db import ensure_partitions, cleanup_old_partitions
-from app.services.server import load_servers
+from app.services.server import load_servers  # async
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ async def stats_loop():
     await asyncio.sleep(10)
     while True:
         try:
-            servers = load_servers()
+            servers = await load_servers()
             logger.info(f"[stats] Запуск сбора статистики для {len(servers)} серверов")
             tasks = [collect_server_stats(s) for s in servers]
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -39,7 +39,7 @@ async def sizes_loop():
     await asyncio.sleep(10)
     while True:
         try:
-            servers = load_servers()
+            servers = await load_servers()
             logger.info(f"[sizes] Запуск обновления размеров для {len(servers)} серверов")
             tasks = [collect_server_sizes(s) for s in servers]
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -60,7 +60,7 @@ async def db_info_loop():
     await asyncio.sleep(10)
     while True:
         try:
-            servers = load_servers()
+            servers = await load_servers()
             logger.info(f"[db_info] Запуск синхронизации БД для {len(servers)} серверов")
             tasks = [sync_server_db_info(s) for s in servers]
             results = await asyncio.gather(*tasks, return_exceptions=True)

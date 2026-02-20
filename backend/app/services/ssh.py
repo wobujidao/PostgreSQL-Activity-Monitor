@@ -7,7 +7,7 @@ import os
 from app.models import Server
 from app.services.cache import cache_manager
 from app.config import SSH_CACHE_TTL
-from app.utils import ensure_decrypted
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -59,21 +59,20 @@ def get_ssh_client(server: Server) -> paramiko.SSHClient:
         # Подключение по SSH-ключу из системы управления ключами
         logger.debug(f"Подключение к {server.name} по SSH-ключу (ID: {server.ssh_key_id})")
         
-        # Импортируем ssh_key_storage здесь чтобы избежать циклических импортов
-        from app.services.ssh_key_storage import ssh_key_storage
-        
+        from app.services import ssh_key_storage
+
         try:
-            # Получаем содержимое ключа
-            passphrase = None
-            if getattr(server, 'ssh_key_passphrase', None):
-                # Расшифровываем passphrase
-                passphrase = ensure_decrypted(server.ssh_key_passphrase)
-                logger.debug(f"Passphrase для ключа {server.ssh_key_id} расшифрован")
-            
-            private_key_content, key_passphrase = ssh_key_storage.get_private_key_content(
-                server.ssh_key_id, 
-                passphrase
+            # passphrase уже расшифрован из БД
+            passphrase = getattr(server, 'ssh_key_passphrase', None) or None
+
+            # Вызываем async функцию из sync-контекста (executor thread)
+            from app.database.local_db import get_main_loop
+            loop = get_main_loop()
+            future = asyncio.run_coroutine_threadsafe(
+                ssh_key_storage.get_private_key_content(server.ssh_key_id, passphrase),
+                loop,
             )
+            private_key_content, key_passphrase = future.result(timeout=10)
             
             # Создаем временный файл для ключа с ограниченными правами
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.key') as tmp_file:
