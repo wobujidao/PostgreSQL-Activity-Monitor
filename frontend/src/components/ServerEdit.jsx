@@ -33,6 +33,8 @@ function ServerEdit() {
   const [error, setError] = useState('');
   const [testingSSH, setTestingSSH] = useState(false);
   const [sshTestResult, setSSHTestResult] = useState(null);
+  const [testingPG, setTestingPG] = useState(false);
+  const [pgTestResult, setPGTestResult] = useState(null);
   const initialServerRef = useRef(null);
   const [isDirty, setIsDirty] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -93,6 +95,19 @@ function ServerEdit() {
       navigate('/');
     } catch (err) {
       setError('Ошибка удаления: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleTestPG = async () => {
+    setTestingPG(true);
+    setPGTestResult(null);
+    try {
+      const res = await api.post(`/servers/${serverName}/test-pg`);
+      setPGTestResult(res.data);
+    } catch (err) {
+      setPGTestResult({ success: false, message: err.response?.data?.detail || err.message });
+    } finally {
+      setTestingPG(false);
     }
   };
 
@@ -241,6 +256,17 @@ function ServerEdit() {
                   <Label className="text-xs">Пароль</Label>
                   <Input type="password" value={server.password} onChange={(e) => update('password', e.target.value)} placeholder="Не меняется если пусто" autoComplete="new-password" className="h-8 text-sm" />
                 </div>
+              </div>
+              <div className="flex items-center gap-3 pt-1">
+                <Button variant="outline" size="sm" onClick={handleTestPG} disabled={testingPG} className="h-7 text-xs">
+                  {testingPG ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                  Тест PostgreSQL
+                </Button>
+                {pgTestResult && (
+                  <span className={`text-xs ${pgTestResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                    {pgTestResult.message}
+                  </span>
+                )}
               </div>
             </TabsContent>
 

@@ -193,6 +193,42 @@ async def delete_server(server_name: str, current_user: User = Depends(get_curre
 
     return {"message": "Server {} deleted".format(server_name)}
 
+@router.post("/{server_name}/test-pg")
+async def test_pg_connection(
+    server_name: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Test PostgreSQL connection to server"""
+    servers = await load_servers()
+    server = next((s for s in servers if s.name == server_name), None)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    try:
+        if not is_host_reachable(server.host, server.port):
+            return {"success": False, "message": f"Хост {server.host}:{server.port} недоступен"}
+
+        import time
+        start = time.time()
+        result = await asyncio.to_thread(connect_to_server, server)
+        elapsed = time.time() - start
+
+        if result.get("status", "").startswith("ok"):
+            version = result.get("version", "?")
+            conns = result.get("connections", {})
+            active = conns.get("active", 0)
+            idle = conns.get("idle", 0)
+            return {
+                "success": True,
+                "message": f"PG {version}, соединений: {active} акт. / {idle} idle ({elapsed:.1f}с)"
+            }
+        else:
+            return {"success": False, "message": result.get("status", "Неизвестная ошибка")}
+
+    except Exception as e:
+        logger.error("Error testing PG for {}: {}".format(server_name, e))
+        return {"success": False, "message": str(e)}
+
 @router.post("/{server_name}/test-ssh")
 async def test_ssh_connection(
     server_name: str,

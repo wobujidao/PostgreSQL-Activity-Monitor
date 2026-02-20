@@ -293,7 +293,7 @@ function ServerList() {
                             <span>{server.ssh_auth_type === 'key' ? <KeyRound className="h-3 w-3" /> : <Lock className="h-3 w-3" />}</span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {server.ssh_auth_type === 'key' && server.ssh_key_info ? `Ключ: ${server.ssh_key_info.name}` : 'Пароль'}
+                            {server.ssh_auth_type === 'key' ? (server.ssh_key_info ? `Ключ: ${server.ssh_key_info.name}` : 'SSH-ключ') : 'Пароль'}
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
