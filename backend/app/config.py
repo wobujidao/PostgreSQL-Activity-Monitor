@@ -24,8 +24,8 @@ ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
 # Аудит сессий
 AUDIT_RETENTION_DAYS = 90  # хранить записи N дней
 
-# Локальная БД (asyncpg)
-LOCAL_DB_DSN = os.getenv("LOCAL_DB_DSN", "postgresql://pam:pam@127.0.0.1:5432/pam_stats")
+# Локальная БД (asyncpg через Unix-сокет)
+LOCAL_DB_DSN = os.getenv("LOCAL_DB_DSN", "postgresql://pam:pam@/pam_stats?host=/tmp")
 
 # Интервалы коллектора (секунды)
 COLLECT_INTERVAL = int(os.getenv("COLLECT_INTERVAL", "600"))           # 10 минут — основной сбор

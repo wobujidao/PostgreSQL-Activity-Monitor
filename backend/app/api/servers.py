@@ -140,16 +140,24 @@ async def update_server(
             if not ssh_key:
                 raise HTTPException(status_code=400, detail="SSH key not found: {}".format(updated_server.ssh_key_id))
         
+        # Сохраняем старые пароли если новые не переданы
+        if not updated_server.password:
+            updated_server.password = old_server.password
+        if not updated_server.ssh_password:
+            updated_server.ssh_password = old_server.ssh_password
+        if not getattr(updated_server, 'ssh_key_passphrase', None):
+            updated_server.ssh_key_passphrase = getattr(old_server, 'ssh_key_passphrase', None)
+
         # Clear caches when server changes
         cache_key = "{}:{}".format(old_server.host, old_server.port)
         cache_manager.invalidate_server_cache(cache_key)
-        
+
         # Close old pools if connection params changed
         if (old_server.host != updated_server.host or
             old_server.port != updated_server.port or
             old_server.user != updated_server.user):
             db_pool.close_pool(old_server)
-        
+
         servers[server_index] = updated_server
         save_servers(servers)
         logger.info("Updated server: {}".format(server_name))

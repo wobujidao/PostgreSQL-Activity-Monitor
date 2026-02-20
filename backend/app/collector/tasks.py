@@ -248,17 +248,12 @@ async def collect_server_sizes(server: Server) -> dict:
         async with pool.acquire() as conn:
             for entry in sizes:
                 try:
-                    # Обновляем последнюю запись для данной БД
+                    # Обновляем ВСЕ записи с NULL db_size для данной БД
                     tag = await conn.execute(
                         """
                         UPDATE statistics
                         SET db_size = $1
-                        WHERE id = (
-                            SELECT id FROM statistics
-                            WHERE server_name = $2 AND datname = $3
-                            ORDER BY ts DESC
-                            LIMIT 1
-                        )
+                        WHERE server_name = $2 AND datname = $3 AND db_size IS NULL
                         """,
                         entry["db_size"],
                         server.name,
@@ -266,12 +261,7 @@ async def collect_server_sizes(server: Server) -> dict:
                     )
                     # asyncpg возвращает строку вида "UPDATE N"
                     updated_count = int(tag.split()[-1])
-                    if updated_count > 0:
-                        result["updated"] += 1
-                    else:
-                        logger.debug(
-                            f"Нет записей для обновления размера {server.name}/{entry['datname']}"
-                        )
+                    result["updated"] += updated_count
                 except Exception as e:
                     result["errors"].append(f"{entry['datname']}: {e}")
                     logger.error(
