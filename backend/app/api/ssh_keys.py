@@ -1,10 +1,10 @@
 # app/api/ssh_keys.py
-from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Request
 import logging
 from app.models.ssh_key import SSHKeyCreate, SSHKeyImport, SSHKeyResponse
 from app.models.user import User, UserRole
 from app.auth.dependencies import get_current_user
-from app.services import ssh_key_storage
+from app.services import ssh_key_storage, audit_logger
 from app.services.server import load_servers
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ async def get_ssh_key(key_id: str, current_user: User = Depends(get_current_user
 @router.post("/generate", response_model=SSHKeyResponse)
 async def generate_ssh_key(
     key_data: SSHKeyCreate,
+    request: Request,
     current_user: User = Depends(require_admin_or_operator)
 ):
     """Сгенерировать новый SSH-ключ"""
@@ -96,6 +97,10 @@ async def generate_ssh_key(
                 detail=f"Ключ с таким fingerprint уже существует в системе"
             )
 
+        await audit_logger.log_event(
+            "ssh_key_create", current_user.login, request,
+            details=f"Ключ {key.name} ({key.key_type}, генерация)"
+        )
         return SSHKeyResponse(**key.model_dump())
     except HTTPException:
         raise
@@ -108,6 +113,7 @@ async def generate_ssh_key(
 @router.post("/import", response_model=SSHKeyResponse)
 async def import_ssh_key(
     key_data: SSHKeyImport,
+    request: Request,
     current_user: User = Depends(require_admin_or_operator)
 ):
     """Импортировать существующий SSH-ключ"""
@@ -141,6 +147,10 @@ async def import_ssh_key(
 
         # Импортируем ключ
         key = await ssh_key_storage.import_key(key_data, current_user.login)
+        await audit_logger.log_event(
+            "ssh_key_create", current_user.login, request,
+            details=f"Ключ {key.name} ({key.key_type}, импорт)"
+        )
         return SSHKeyResponse(**key.model_dump())
     except HTTPException:
         raise
@@ -152,6 +162,7 @@ async def import_ssh_key(
 
 @router.post("/import-file", response_model=SSHKeyResponse)
 async def import_ssh_key_file(
+    request: Request,
     file: UploadFile = File(...),
     name: str = None,
     passphrase: str | None = None,
@@ -207,6 +218,10 @@ async def import_ssh_key_file(
 
         # Импортируем ключ
         key = await ssh_key_storage.import_key(key_import, current_user.login)
+        await audit_logger.log_event(
+            "ssh_key_create", current_user.login, request,
+            details=f"Ключ {key.name} ({key.key_type}, импорт файла)"
+        )
         return SSHKeyResponse(**key.model_dump())
     except HTTPException:
         raise
@@ -220,6 +235,7 @@ async def import_ssh_key_file(
 async def update_ssh_key(
     key_id: str,
     update_data: dict,
+    request: Request,
     current_user: User = Depends(require_admin_or_operator)
 ):
     """Обновить информацию о SSH-ключе"""
@@ -251,6 +267,10 @@ async def update_ssh_key(
         if not updated_key:
             raise HTTPException(status_code=500, detail="Ошибка обновления ключа")
 
+        await audit_logger.log_event(
+            "ssh_key_update", current_user.login, request,
+            details=f"Ключ {updated_key.name}"
+        )
         return SSHKeyResponse(**updated_key.model_dump())
 
     except HTTPException:
@@ -262,6 +282,7 @@ async def update_ssh_key(
 @router.delete("/{key_id}")
 async def delete_ssh_key(
     key_id: str,
+    request: Request,
     current_user: User = Depends(require_admin_or_operator)
 ):
     """Удалить SSH-ключ"""
@@ -279,10 +300,18 @@ async def delete_ssh_key(
                 detail=f"Ключ используется на серверах: {', '.join(servers_using_key)}"
             )
 
+        # Получаем имя ключа для аудита перед удалением
+        key = await ssh_key_storage.get_key(key_id)
+        key_name = key.name if key else key_id
+
         # Удаляем ключ
         if not await ssh_key_storage.delete_key(key_id):
             raise HTTPException(status_code=404, detail="SSH-ключ не найден")
 
+        await audit_logger.log_event(
+            "ssh_key_delete", current_user.login, request,
+            details=f"Ключ {key_name}"
+        )
         return {"message": "SSH-ключ успешно удален"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

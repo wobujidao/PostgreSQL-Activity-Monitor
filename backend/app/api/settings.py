@@ -1,10 +1,11 @@
 # app/api/settings.py
 """API настроек системы (admin only)."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from app.auth.dependencies import get_current_user
 from app.models.user import User, UserRole
 from app.database.repositories import settings_repo
+from app.services import audit_logger
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -41,9 +42,13 @@ async def get_settings(current_user: User = Depends(_require_admin)):
 @router.put("")
 async def update_settings(
     data: SettingsUpdate,
+    request: Request,
     current_user: User = Depends(_require_admin),
 ):
     """Обновить настройки."""
+    # Получаем старые значения для аудита
+    old_settings = await settings_repo.get_all_settings()
+
     updates = {}
     for field_name, value in data.model_dump(exclude_none=True).items():
         rule = VALIDATION_RULES.get(field_name)
@@ -58,4 +63,19 @@ async def update_settings(
     if not updates:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
 
-    return await settings_repo.update_settings(updates)
+    result = await settings_repo.update_settings(updates)
+
+    # Формируем детали аудита: что изменилось
+    changes = []
+    for key, new_val in updates.items():
+        old_val = str(old_settings.get(key, "?"))
+        if old_val != new_val:
+            label = VALIDATION_RULES.get(key, {}).get("label", key)
+            changes.append(f"{label}: {old_val} → {new_val}")
+    if changes:
+        await audit_logger.log_event(
+            "settings_update", current_user.login, request,
+            details="; ".join(changes)
+        )
+
+    return result

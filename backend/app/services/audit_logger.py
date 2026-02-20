@@ -143,6 +143,10 @@ async def get_stats() -> dict:
         "SELECT COUNT(DISTINCT username) FROM audit_sessions WHERE event_type = 'login_success' AND timestamp >= $1",
         week_ago,
     )
+    actions_today = await pool.fetchval(
+        "SELECT COUNT(*) FROM audit_sessions WHERE event_type NOT IN ('login_success','login_failed','refresh','logout') AND timestamp >= $1",
+        today_start,
+    )
 
     return {
         "total_events": total_events,
@@ -150,6 +154,7 @@ async def get_stats() -> dict:
         "unique_users_week": unique_users_week,
         "failed_total": failed_total,
         "failed_today": failed_today,
+        "actions_today": actions_today,
     }
 
 

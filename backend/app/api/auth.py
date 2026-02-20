@@ -12,7 +12,7 @@ from app.auth import (
     token_blacklist,
 )
 from app.config import TOKEN_EXPIRATION, REFRESH_TOKEN_EXPIRATION_DAYS, ALLOWED_ORIGINS
-from app.services import audit_logger
+from app.services import audit_logger, user_manager
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,7 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
             # Извлекаем jti из access token для аудита
             access_payload = decode_token(access_token)
             await audit_logger.log_event("login_success", user["login"], request, jti=access_payload.get("jti"))
+            await user_manager.update_last_login(user["login"])
             return {"access_token": access_token, "token_type": "bearer"}
 
     logger.warning(f"Неудачная попытка авторизации: {form_data.username}")

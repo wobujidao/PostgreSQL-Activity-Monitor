@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 # app/api/servers.py
 import asyncio
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Any
 import logging
 from app.models import Server
 from app.models.user import User
 from app.auth import get_current_user
 from app.services.server import load_servers, save_server, update_server_config, delete_server_config, connect_to_server
-from app.services import cache_manager, SSHKeyManager
+from app.services import cache_manager, SSHKeyManager, audit_logger
 from app.services.ssh import is_host_reachable
 from app.database import db_pool
 from app.database.local_db import delete_server_data
@@ -33,7 +33,7 @@ async def get_servers(current_user: User = Depends(get_current_user)):
     return output
 
 @router.post("", response_model=dict)
-async def add_server(server: Server, current_user: User = Depends(get_current_user)):
+async def add_server(server: Server, request: Request, current_user: User = Depends(get_current_user)):
     """Add new server"""
     try:
         # Validate name and host
@@ -69,6 +69,10 @@ async def add_server(server: Server, current_user: User = Depends(get_current_us
         # Save server
         await save_server(server)
         logger.info("Added new server: {}".format(server.name))
+        await audit_logger.log_event(
+            "server_create", current_user.login, request,
+            details=f"Сервер {server.name} ({server.host}:{server.port})"
+        )
 
         # Return full server information
         try:
@@ -119,6 +123,7 @@ async def add_server(server: Server, current_user: User = Depends(get_current_us
 async def update_server(
     server_name: str,
     updated_server: Server,
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
     """Update server configuration"""
@@ -157,6 +162,10 @@ async def update_server(
 
         await update_server_config(server_name, updated_server)
         logger.info("Updated server: {}".format(server_name))
+        await audit_logger.log_event(
+            "server_update", current_user.login, request,
+            details=f"Сервер {server_name}"
+        )
 
         return await asyncio.to_thread(connect_to_server, updated_server)
 
@@ -167,7 +176,7 @@ async def update_server(
         raise HTTPException(status_code=500, detail="Error updating server: {}".format(str(e)))
 
 @router.delete("/{server_name}")
-async def delete_server(server_name: str, current_user: User = Depends(get_current_user)):
+async def delete_server(server_name: str, request: Request, current_user: User = Depends(get_current_user)):
     """Delete server from configuration"""
     servers = await load_servers()
     server_to_delete = next((s for s in servers if s.name == server_name), None)
@@ -190,6 +199,10 @@ async def delete_server(server_name: str, current_user: User = Depends(get_curre
 
     await delete_server_config(server_name)
     logger.info("Deleted server: {}".format(server_name))
+    await audit_logger.log_event(
+        "server_delete", current_user.login, request,
+        details=f"Сервер {server_name}"
+    )
 
     return {"message": "Server {} deleted".format(server_name)}
 

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from app.models.user import UserCreate, UserUpdate, UserResponse, UserRole
 from app.services import user_manager
+from app.services import audit_logger
 from app.auth.dependencies import get_current_user
 from app.models.user import User
 
@@ -25,11 +26,17 @@ async def list_users(
 @router.post("/users", response_model=UserResponse)
 async def create_user(
     user_create: UserCreate,
+    request: Request,
     current_user: User = Depends(require_admin)
 ):
     """Создать нового пользователя"""
     try:
-        return await user_manager.create_user(user_create)
+        result = await user_manager.create_user(user_create)
+        await audit_logger.log_event(
+            "user_create", current_user.login, request,
+            details=f"Пользователь {user_create.login} ({user_create.role})"
+        )
+        return result
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -76,6 +83,7 @@ async def get_user(
 async def update_user(
     username: str,
     user_update: UserUpdate,
+    request: Request,
     current_user: User = Depends(require_admin)
 ):
     """Обновить пользователя"""
@@ -85,11 +93,25 @@ async def update_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Пользователь {username} не найден"
         )
+    changes = []
+    if user_update.role is not None:
+        changes.append(f"роль → {user_update.role}")
+    if user_update.email is not None:
+        changes.append(f"email → {user_update.email}")
+    if user_update.password is not None:
+        changes.append("пароль изменён")
+    if user_update.is_active is not None:
+        changes.append(f"активен → {user_update.is_active}")
+    detail_str = f"Пользователь {username}"
+    if changes:
+        detail_str += ": " + ", ".join(changes)
+    await audit_logger.log_event("user_update", current_user.login, request, details=detail_str)
     return updated_user
 
 @router.delete("/users/{username}")
 async def delete_user(
     username: str,
+    request: Request,
     current_user: User = Depends(require_admin)
 ):
     """Удалить пользователя"""
@@ -106,4 +128,5 @@ async def delete_user(
             detail=f"Пользователь {username} не найден"
         )
 
+    await audit_logger.log_event("user_delete", current_user.login, request, details=f"Пользователь {username}")
     return {"message": f"Пользователь {username} удален"}

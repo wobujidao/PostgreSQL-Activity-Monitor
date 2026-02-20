@@ -28,6 +28,14 @@ import { toast } from 'sonner';
 
 const INITIAL_FORM = { login: '', password: '', role: 'viewer', email: '' };
 
+function extractError(err) {
+  const detail = err.response?.data?.detail;
+  if (!detail) return err.message;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map(d => d.msg?.replace(/^Value error, /, '') || d.msg || JSON.stringify(d)).join('; ');
+  return JSON.stringify(detail);
+}
+
 function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +53,7 @@ function UserManagement() {
       const res = await api.get('/users');
       setUsers(res.data);
     } catch (err) {
-      setError('Ошибка загрузки: ' + (err.response?.data?.detail || err.message));
+      setError('Ошибка загрузки: ' + (extractError(err)));
     } finally {
       setLoading(false);
     }
@@ -61,7 +69,7 @@ function UserManagement() {
       toast.success('Пользователь создан');
       fetchUsers();
     } catch (err) {
-      setError('Ошибка создания: ' + (err.response?.data?.detail || err.message));
+      setError('Ошибка создания: ' + (extractError(err)));
     }
   };
 
@@ -76,7 +84,7 @@ function UserManagement() {
       toast.success('Пользователь обновлён');
       fetchUsers();
     } catch (err) {
-      setError('Ошибка обновления: ' + (err.response?.data?.detail || err.message));
+      setError('Ошибка обновления: ' + (extractError(err)));
     }
   };
 
@@ -86,7 +94,7 @@ function UserManagement() {
       setUsers(users.filter(u => u.login !== login));
       toast.success('Пользователь удалён');
     } catch (err) {
-      setError('Ошибка удаления: ' + (err.response?.data?.detail || err.message));
+      setError('Ошибка удаления: ' + (extractError(err)));
     }
   };
 
