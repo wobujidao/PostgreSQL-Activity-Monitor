@@ -1,13 +1,14 @@
 # app/services/ssh.py
+import re
 import paramiko
 import socket
 import logging
 import tempfile
 import os
+import asyncio
 from app.models import Server
 from app.services.cache import cache_manager
 from app.config import SSH_CACHE_TTL
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,6 @@ def get_ssh_disk_usage(server: Server, data_dir: str) -> tuple[int | None, int |
             logger.warning(f"Невалидный mount_point для {server.name}: {mount_point}")
             return None, None, "invalid mount point"
         # Удаляем опасные символы
-        import re
         if not re.match(r'^[a-zA-Z0-9/_.-]+$', mount_point):
             logger.warning(f"Подозрительный mount_point для {server.name}: {mount_point}")
             return None, None, "invalid mount point characters"

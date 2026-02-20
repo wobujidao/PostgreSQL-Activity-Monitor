@@ -218,7 +218,8 @@ class SSHKeyManager:
             
             if private_key_content:
                 # Подключение по ключу
-                with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.key') as tmp_file:
+                    os.chmod(tmp_file.name, 0o600)
                     tmp_file.write(private_key_content)
                     tmp_file_path = tmp_file.name
                 

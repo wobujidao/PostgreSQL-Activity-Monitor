@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timedelta, timezone
 import logging
+from app.models.user import User
 from app.auth import get_current_user
 from app.services import load_servers
 from app.database import db_pool
@@ -62,9 +63,9 @@ def get_aggregation_params(start_dt, end_dt):
     return {"trunc": agg["trunc"], "group": agg["group"], "level": level}
 
 @router.get("/server_stats/{server_name}")
-async def get_server_stats(server_name: str, current_user: dict = Depends(get_current_user)):
+async def get_server_stats(server_name: str, current_user: User = Depends(get_current_user)):
     """Получить текущую активность на сервере (live с удалённого сервера)"""
-    servers = load_servers()
+    servers = await load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -85,10 +86,10 @@ async def get_server_stats_details(
     server_name: str,
     start_date: str | None = None,
     end_date: str | None = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Получить детальную статистику сервера за период (из локальной pam_stats)"""
-    servers = load_servers()
+    servers = await load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -189,10 +190,10 @@ async def get_server_stats_details(
 async def get_database_stats(
     server_name: str,
     db_name: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Получить краткую статистику по базе данных (из локальной pam_stats)"""
-    servers = load_servers()
+    servers = await load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -246,10 +247,10 @@ async def get_database_stats_details(
     db_name: str,
     start_date: str | None = None,
     end_date: str | None = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Получить детальную статистику по базе данных за период (из локальной pam_stats)"""
-    servers = load_servers()
+    servers = await load_servers()
     server = next((s for s in servers if s.name == server_name), None)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Any
 import logging
 from app.models import Server
+from app.models.user import User
 from app.auth import get_current_user
 from app.services.server import load_servers, save_server, update_server_config, delete_server_config, connect_to_server
 from app.services import cache_manager, SSHKeyManager
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/servers", tags=["servers"])
 
 @router.get("", response_model=list[dict])
-async def get_servers(current_user: dict = Depends(get_current_user)):
+async def get_servers(current_user: User = Depends(get_current_user)):
     """Get list of all servers with their status"""
     servers = await load_servers()
     tasks = [asyncio.to_thread(connect_to_server, server) for server in servers]
@@ -32,7 +33,7 @@ async def get_servers(current_user: dict = Depends(get_current_user)):
     return output
 
 @router.post("", response_model=dict)
-async def add_server(server: Server, current_user: dict = Depends(get_current_user)):
+async def add_server(server: Server, current_user: User = Depends(get_current_user)):
     """Add new server"""
     try:
         # Validate name and host
@@ -71,7 +72,7 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
 
         # Return full server information
         try:
-            return connect_to_server(server)
+            return await asyncio.to_thread(connect_to_server, server)
         except Exception as e:
             # If connection failed, return basic info
             logger.warning("Could not get full server info for {}: {}".format(server.name, e))
@@ -118,7 +119,7 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
 async def update_server(
     server_name: str,
     updated_server: Server,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Update server configuration"""
     try:
@@ -157,7 +158,7 @@ async def update_server(
         await update_server_config(server_name, updated_server)
         logger.info("Updated server: {}".format(server_name))
 
-        return connect_to_server(updated_server)
+        return await asyncio.to_thread(connect_to_server, updated_server)
 
     except HTTPException:
         raise
@@ -166,7 +167,7 @@ async def update_server(
         raise HTTPException(status_code=500, detail="Error updating server: {}".format(str(e)))
 
 @router.delete("/{server_name}")
-async def delete_server(server_name: str, current_user: dict = Depends(get_current_user)):
+async def delete_server(server_name: str, current_user: User = Depends(get_current_user)):
     """Delete server from configuration"""
     servers = await load_servers()
     server_to_delete = next((s for s in servers if s.name == server_name), None)
@@ -195,7 +196,7 @@ async def delete_server(server_name: str, current_user: dict = Depends(get_curre
 @router.post("/{server_name}/test-ssh")
 async def test_ssh_connection(
     server_name: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Test SSH connection to server"""
     servers = await load_servers()

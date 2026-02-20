@@ -1,10 +1,8 @@
 # app/api/ssh_keys.py
 from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 import logging
-import io
-from datetime import datetime
 from app.models.ssh_key import SSHKeyCreate, SSHKeyImport, SSHKeyResponse
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.auth.dependencies import get_current_user
 from app.services import ssh_key_storage
 from app.services.server import load_servers
@@ -15,7 +13,7 @@ router = APIRouter(prefix="/ssh-keys", tags=["ssh-keys"])
 
 def require_admin_or_operator(current_user: User = Depends(get_current_user)) -> User:
     """Проверка прав администратора или оператора"""
-    if current_user.role not in ["admin", "operator"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав. Требуется роль администратора или оператора"
@@ -26,7 +24,7 @@ def require_admin_or_operator(current_user: User = Depends(get_current_user)) ->
 async def list_ssh_keys(current_user: User = Depends(get_current_user)):
     """Получить список всех SSH-ключей"""
     # Viewer не может видеть SSH-ключи
-    if current_user.role == "viewer":
+    if current_user.role == UserRole.VIEWER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав для просмотра SSH-ключей"
@@ -36,7 +34,7 @@ async def list_ssh_keys(current_user: User = Depends(get_current_user)):
         keys = await ssh_key_storage.list_keys()
 
         # Для оператора скрываем публичные ключи
-        if current_user.role == "operator":
+        if current_user.role == UserRole.OPERATOR:
             result = []
             for key in keys:
                 key_dict = key.model_dump()
@@ -52,7 +50,7 @@ async def list_ssh_keys(current_user: User = Depends(get_current_user)):
 async def get_ssh_key(key_id: str, current_user: User = Depends(get_current_user)):
     """Получить информацию о конкретном SSH-ключе"""
     # Viewer не может видеть SSH-ключи
-    if current_user.role == "viewer":
+    if current_user.role == UserRole.VIEWER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав для просмотра SSH-ключей"
@@ -63,7 +61,7 @@ async def get_ssh_key(key_id: str, current_user: User = Depends(get_current_user
         raise HTTPException(status_code=404, detail="SSH-ключ не найден")
 
     # Для оператора скрываем публичный ключ
-    if current_user.role == "operator":
+    if current_user.role == UserRole.OPERATOR:
         key_dict = key.model_dump()
         key_dict['public_key'] = "[Скрыто для оператора]"
         return SSHKeyResponse(**key_dict)
@@ -324,7 +322,7 @@ async def download_public_key(
 ):
     """Скачать публичный ключ"""
     # Только администратор может скачивать публичные ключи
-    if current_user.role != "admin":
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы могут скачивать публичные ключи"

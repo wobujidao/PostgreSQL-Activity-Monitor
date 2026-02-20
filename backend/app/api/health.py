@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from datetime import datetime, timezone
 import logging
+from app.models.user import User
 from app.auth import get_current_user
 from app.database import db_pool
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["health"])
 
 @router.get("/pools/status")
-async def get_pools_status(current_user: dict = Depends(get_current_user)):
+async def get_pools_status(current_user: User = Depends(get_current_user)):
     """Получить статус всех пулов подключений"""
     return db_pool.get_status()
 

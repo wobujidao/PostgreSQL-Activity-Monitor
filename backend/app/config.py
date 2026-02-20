@@ -20,11 +20,8 @@ ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 if not ENCRYPTION_KEY:
     raise RuntimeError("ENCRYPTION_KEY не установлен! Задайте переменную окружения или укажите в .env")
 
-# Пути к файлам
+# Пути
 CONFIG_DIR = Path("/etc/pg_activity_monitor")
-SERVERS_FILE = CONFIG_DIR / "servers.json"
-USERS_FILE = CONFIG_DIR / "users.json"
-ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
 
 # Аудит сессий
 AUDIT_RETENTION_DAYS = 90  # хранить записи N дней
