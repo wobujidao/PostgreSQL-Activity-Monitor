@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Shield, Server, Users, KeyRound, ClipboardList, Settings, LogOut, Sun, Moon, Search } from 'lucide-react';
+import { Shield, Server, Users, KeyRound, ClipboardList, ScrollText, Settings, LogOut, Sun, Moon, Search } from 'lucide-react';
 
 export default function AppSidebar({ onSearchOpen }) {
   const navigate = useNavigate();
@@ -32,6 +32,7 @@ export default function AppSidebar({ onSearchOpen }) {
     { label: 'Пользователи', icon: Users, path: '/users', roles: ['admin'] },
     { label: 'SSH-ключи', icon: KeyRound, path: '/ssh-keys', roles: ['admin', 'operator'] },
     { label: 'Аудит', icon: ClipboardList, path: '/audit', roles: ['admin'] },
+    { label: 'Логи', icon: ScrollText, path: '/logs', roles: ['admin'] },
     { label: 'Настройки', icon: Settings, path: '/settings', roles: ['admin'] },
   ];
 

@@ -8,6 +8,7 @@ from app.collector.tasks import collect_server_stats, collect_server_sizes, sync
 from app.database.local_db import ensure_partitions, cleanup_old_partitions
 from app.database.repositories import settings_repo
 from app.services.server import load_servers  # async
+from app.services import system_logger
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,19 @@ async def stats_loop():
 
             ok = sum(1 for r in results if not isinstance(r, Exception))
             errors = sum(1 for r in results if isinstance(r, Exception))
+            error_details = []
             for i, r in enumerate(results):
                 if isinstance(r, Exception):
                     logger.error(f"[stats] Ошибка для {servers[i].name}: {r}")
+                    error_details.append(f"{servers[i].name}: {r}")
             logger.info(f"[stats] Завершено: {ok} успешно, {errors} ошибок")
+            if errors > 0:
+                await system_logger.error("collector_stats", f"Сбор статистики: {errors} ошибок из {len(servers)} серверов", "; ".join(error_details))
+            else:
+                await system_logger.info("collector_stats", f"Сбор статистики: {ok} серверов ОК")
         except Exception as e:
             logger.error(f"[stats] Критическая ошибка в цикле: {e}")
+            await system_logger.error("collector_stats", f"Критическая ошибка: {e}")
         interval = await _get_interval("collect_interval", COLLECT_INTERVAL)
         await asyncio.sleep(interval)
 
@@ -56,12 +64,19 @@ async def sizes_loop():
 
             ok = sum(1 for r in results if not isinstance(r, Exception))
             errors = sum(1 for r in results if isinstance(r, Exception))
+            error_details = []
             for i, r in enumerate(results):
                 if isinstance(r, Exception):
                     logger.error(f"[sizes] Ошибка для {servers[i].name}: {r}")
+                    error_details.append(f"{servers[i].name}: {r}")
             logger.info(f"[sizes] Завершено: {ok} успешно, {errors} ошибок")
+            if errors > 0:
+                await system_logger.error("collector_sizes", f"Обновление размеров: {errors} ошибок из {len(servers)} серверов", "; ".join(error_details))
+            else:
+                await system_logger.info("collector_sizes", f"Обновление размеров: {ok} серверов ОК")
         except Exception as e:
             logger.error(f"[sizes] Критическая ошибка в цикле: {e}")
+            await system_logger.error("collector_sizes", f"Критическая ошибка: {e}")
         interval = await _get_interval("size_update_interval", SIZE_UPDATE_INTERVAL)
         await asyncio.sleep(interval)
 
@@ -78,18 +93,25 @@ async def db_info_loop():
 
             ok = sum(1 for r in results if not isinstance(r, Exception))
             errors = sum(1 for r in results if isinstance(r, Exception))
+            error_details = []
             for i, r in enumerate(results):
                 if isinstance(r, Exception):
                     logger.error(f"[db_info] Ошибка для {servers[i].name}: {r}")
+                    error_details.append(f"{servers[i].name}: {r}")
             logger.info(f"[db_info] Завершено: {ok} успешно, {errors} ошибок")
+            if errors > 0:
+                await system_logger.error("collector_db_info", f"Синхронизация БД: {errors} ошибок из {len(servers)} серверов", "; ".join(error_details))
+            else:
+                await system_logger.info("collector_db_info", f"Синхронизация БД: {ok} серверов ОК")
         except Exception as e:
             logger.error(f"[db_info] Критическая ошибка в цикле: {e}")
+            await system_logger.error("collector_db_info", f"Критическая ошибка: {e}")
         interval = await _get_interval("db_check_interval", DB_CHECK_INTERVAL)
         await asyncio.sleep(interval)
 
 
 async def maintenance_loop():
-    """Ежедневное обслуживание: создание/удаление партиций."""
+    """Ежедневное обслуживание: создание/удаление партиций + очистка логов."""
     await asyncio.sleep(10)
     while True:
         try:
@@ -98,8 +120,15 @@ async def maintenance_loop():
             logger.info("[maintenance] Партиции на будущие месяцы созданы")
             await cleanup_old_partitions()
             logger.info("[maintenance] Старые партиции очищены")
+
+            # Очистка системных логов
+            logs_days = await _get_interval("logs_retention_days", 30)
+            removed = await system_logger.cleanup(logs_days)
+
+            await system_logger.info("maintenance", f"Обслуживание завершено. Логов очищено: {removed}")
         except Exception as e:
             logger.error(f"[maintenance] Ошибка обслуживания: {e}")
+            await system_logger.error("maintenance", f"Ошибка обслуживания: {e}")
         await asyncio.sleep(DAILY)
 
 
@@ -113,6 +142,7 @@ async def start_collector() -> list[asyncio.Task]:
         asyncio.create_task(maintenance_loop(), name="collector-maintenance"),
     ]
     logger.info(f"Коллектор запущен: {len(tasks)} задач")
+    await system_logger.info("system", f"Коллектор запущен: {len(tasks)} задач")
     return tasks
 
 

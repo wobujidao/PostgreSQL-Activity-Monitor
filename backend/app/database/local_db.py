@@ -183,6 +183,29 @@ async def _init_schema():
             END $$;
         """)
 
+        # Таблица системных логов
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS system_log (
+                id        bigserial   PRIMARY KEY,
+                timestamp timestamptz NOT NULL DEFAULT now(),
+                level     text        NOT NULL,
+                source    text        NOT NULL,
+                message   text        NOT NULL,
+                details   text
+            );
+        """)
+        await conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_syslog_timestamp') THEN
+                    CREATE INDEX idx_syslog_timestamp ON system_log (timestamp DESC);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_syslog_level') THEN
+                    CREATE INDEX idx_syslog_level ON system_log (level);
+                END IF;
+            END $$;
+        """)
+
         # Таблица настроек
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS settings (
@@ -199,7 +222,8 @@ async def _init_schema():
                 ('size_update_interval', '1800', 'int', 'Интервал обновления размеров БД (сек)'),
                 ('db_check_interval', '1800', 'int', 'Интервал проверки новых/удалённых БД (сек)'),
                 ('retention_months', '12', 'int', 'Срок хранения данных (месяцев)'),
-                ('audit_retention_days', '90', 'int', 'Срок хранения аудита (дней)')
+                ('audit_retention_days', '90', 'int', 'Срок хранения аудита (дней)'),
+                ('logs_retention_days', '30', 'int', 'Срок хранения логов (дней)')
             ON CONFLICT (key) DO NOTHING;
         """)
 

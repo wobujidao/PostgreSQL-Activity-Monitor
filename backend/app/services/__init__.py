@@ -6,6 +6,7 @@ from .ssh_key_manager import SSHKeyManager
 from . import ssh_key_storage
 from . import user_manager
 from . import audit_logger
+from . import system_logger
 
 __all__ = [
     "cache_manager",
@@ -20,4 +21,5 @@ __all__ = [
     "ssh_key_storage",
     "user_manager",
     "audit_logger",
+    "system_logger",
 ]

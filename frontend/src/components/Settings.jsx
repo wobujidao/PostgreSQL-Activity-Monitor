@@ -25,6 +25,7 @@ const SETTING_GROUPS = [
     fields: [
       { key: 'retention_months', label: 'Статистика', unit: 'мес', min: 1, max: 120, default: '12' },
       { key: 'audit_retention_days', label: 'Аудит', unit: 'дней', min: 7, max: 3650, default: '90' },
+      { key: 'logs_retention_days', label: 'Логи', unit: 'дней', min: 7, max: 3650, default: '30' },
     ],
   },
 ];

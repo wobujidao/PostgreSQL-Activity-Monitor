@@ -16,6 +16,7 @@ VALIDATION_RULES = {
     "db_check_interval":    {"min": 300, "max": 86400, "label": "Интервал проверки БД"},
     "retention_months":     {"min": 1,   "max": 120,   "label": "Срок хранения данных"},
     "audit_retention_days": {"min": 7,   "max": 3650,  "label": "Срок хранения аудита"},
+    "logs_retention_days":  {"min": 7,   "max": 3650,  "label": "Срок хранения логов"},
 }
 
 
@@ -25,6 +26,7 @@ class SettingsUpdate(BaseModel):
     db_check_interval: int | None = None
     retention_months: int | None = None
     audit_retention_days: int | None = None
+    logs_retention_days: int | None = None
 
 
 def _require_admin(current_user: User = Depends(get_current_user)) -> User:
