@@ -52,6 +52,8 @@ def _fetch_db_sizes(server: Server) -> list[dict]:
     sizes = []
     with db_pool.get_connection(server) as conn:
         with conn.cursor() as cur:
+            # pg_database_size() может быть медленной на больших серверах
+            cur.execute("SET statement_timeout = '120s'")
             cur.execute("""
                 SELECT datname, pg_database_size(datname) AS db_size
                 FROM pg_database
@@ -60,6 +62,7 @@ def _fetch_db_sizes(server: Server) -> list[dict]:
             """)
             for row in cur.fetchall():
                 sizes.append({"datname": row[0], "db_size": row[1]})
+            cur.execute("SET statement_timeout = '5s'")
     return sizes
 
 
