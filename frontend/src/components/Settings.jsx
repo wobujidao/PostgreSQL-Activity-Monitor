@@ -16,7 +16,7 @@ const SETTING_GROUPS = [
     fields: [
       { key: 'collect_interval', label: 'Сбор статистики', unit: 'сек', min: 60, max: 86400, default: '10 мин' },
       { key: 'size_update_interval', label: 'Размеры БД', unit: 'сек', min: 300, max: 86400, default: '30 мин' },
-      { key: 'db_check_interval', label: 'Проверка новых БД', unit: 'сек', min: 300, max: 86400, default: '30 мин' },
+      { key: 'db_check_interval', label: 'Проверка новых БД', unit: 'сек', min: 300, max: 86400, default: '10 мин' },
     ],
   },
   {
