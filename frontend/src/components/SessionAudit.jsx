@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import { formatTimestamp } from '@/lib/format';
 import LoadingSpinner from './LoadingSpinner';
@@ -54,9 +54,18 @@ function SessionAudit() {
   const [page, setPage] = useState(0);
 
   const [filterUser, setFilterUser] = useState('');
+  const [debouncedUser, setDebouncedUser] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+
+  const debounceRef = useRef(null);
+  const handleUserInput = (value) => {
+    setFilterUser(value);
+    setPage(0);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedUser(value), 400);
+  };
 
   const fetchStats = useCallback(async () => {
     try {
@@ -69,7 +78,7 @@ function SessionAudit() {
     setLoading(true);
     try {
       const params = { limit: PAGE_SIZE, offset: page * PAGE_SIZE };
-      if (filterUser) params.username = filterUser;
+      if (debouncedUser) params.username = debouncedUser;
       if (filterType) params.event_type = filterType;
       if (filterDateFrom) params.date_from = filterDateFrom;
       if (filterDateTo) params.date_to = filterDateTo;
@@ -79,7 +88,7 @@ function SessionAudit() {
       setTotal(res.data.total);
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [page, filterUser, filterType, filterDateFrom, filterDateTo]);
+  }, [page, debouncedUser, filterType, filterDateFrom, filterDateTo]);
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
@@ -90,6 +99,8 @@ function SessionAudit() {
 
   const handleFilterReset = () => {
     setFilterUser('');
+    setDebouncedUser('');
+    clearTimeout(debounceRef.current);
     setFilterType('');
     setFilterDateFrom('');
     setFilterDateTo('');
@@ -129,9 +140,9 @@ function SessionAudit() {
       {/* Фильтры — одна строка */}
       <div className="flex items-center gap-2 flex-wrap">
         <Input
-          placeholder="Пользователь"
+          placeholder="Пользователь / IP"
           value={filterUser}
-          onChange={(e) => { setFilterUser(e.target.value); setPage(0); }}
+          onChange={(e) => handleUserInput(e.target.value)}
           className="w-32 h-7 text-sm"
         />
         <Select value={filterType || 'all'} onValueChange={(v) => { setFilterType(v === 'all' ? '' : v); setPage(0); }}>

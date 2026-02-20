@@ -69,8 +69,8 @@ async def get_events(
     idx = 1
 
     if username:
-        conditions.append(f"username = ${idx}")
-        params.append(username)
+        conditions.append(f"(username ILIKE ${idx} OR ip_address ILIKE ${idx})")
+        params.append(f"%{username}%")
         idx += 1
     if event_type:
         conditions.append(f"event_type = ${idx}")
@@ -78,15 +78,19 @@ async def get_events(
         idx += 1
     if date_from:
         conditions.append(f"timestamp >= ${idx}")
-        params.append(datetime.fromisoformat(date_from.replace("Z", "+00:00")))
+        dt_from = datetime.fromisoformat(date_from.replace("Z", "+00:00"))
+        if dt_from.tzinfo is None:
+            dt_from = dt_from.replace(tzinfo=timezone.utc)
+        params.append(dt_from)
         idx += 1
     if date_to:
         conditions.append(f"timestamp <= ${idx}")
-        params.append(
-            datetime.fromisoformat(date_to.replace("Z", "+00:00")).replace(
-                hour=23, minute=59, second=59
-            )
-        )
+        dt_to = datetime.fromisoformat(date_to.replace("Z", "+00:00"))
+        if dt_to.tzinfo is None:
+            dt_to = dt_to.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+        else:
+            dt_to = dt_to.replace(hour=23, minute=59, second=59)
+        params.append(dt_to)
         idx += 1
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
