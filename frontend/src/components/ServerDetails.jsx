@@ -431,12 +431,13 @@ function ServerDetails() {
               <span className="text-muted-foreground">—</span>
               <DatePicker selected={endDate} onChange={d => { setEndDate(d); setSelectedDateRange(null); }} selectsEnd startDate={startDate} endDate={endDate} minDate={startDate} className="h-8 w-28 rounded-md border border-input bg-background px-2 text-sm" dateFormat="dd.MM.yyyy" disabled={isLoading} />
             </div>
-            {isLoading && (
-              <div className="flex items-center gap-2 ml-auto text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Обновление...
-              </div>
-            )}
+            <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+              {isLoading ? (
+                <><Loader2 className="h-3 w-3 animate-spin" />Обновление...</>
+              ) : stats?.last_stat_update ? (
+                <>Данные на: <span className="tabular-nums font-medium">{formatTimestamp(stats.last_stat_update)}</span></>
+              ) : null}
+            </div>
           </div>
         </CardContent>
       </Card>

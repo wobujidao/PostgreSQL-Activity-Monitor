@@ -48,20 +48,33 @@ def _fetch_pg_stat_database(server: Server) -> list[dict]:
 
 
 def _fetch_db_sizes(server: Server) -> list[dict]:
-    """Получить размеры баз данных с удалённого сервера (sync)."""
+    """Получить размеры баз данных с удалённого сервера (sync).
+    Запрашиваем размер каждой БД отдельно, чтобы не словить общий таймаут
+    на серверах с большим количеством баз (80+).
+    """
     sizes = []
     with db_pool.get_connection(server) as conn:
         with conn.cursor() as cur:
-            # pg_database_size() может быть медленной на больших серверах
-            cur.execute("SET statement_timeout = '120s'")
+            # Сначала получаем список БД
             cur.execute("""
-                SELECT datname, pg_database_size(datname) AS db_size
-                FROM pg_database
+                SELECT datname FROM pg_database
                 WHERE NOT datistemplate AND datname != 'postgres'
                 ORDER BY datname;
             """)
-            for row in cur.fetchall():
-                sizes.append({"datname": row[0], "db_size": row[1]})
+            db_names = [row[0] for row in cur.fetchall()]
+
+            # Запрашиваем размер каждой БД отдельно с таймаутом на каждый запрос
+            for dbname in db_names:
+                try:
+                    cur.execute("SET statement_timeout = '600s'")
+                    cur.execute("SELECT pg_database_size(%s)", (dbname,))
+                    row = cur.fetchone()
+                    if row:
+                        sizes.append({"datname": dbname, "db_size": row[0]})
+                except Exception as e:
+                    logger.warning(f"Таймаут pg_database_size для {server.name}/{dbname}: {e}")
+                    # Сброс состояния после ошибки
+                    conn.rollback()
             cur.execute("SET statement_timeout = '5s'")
     return sizes
 
