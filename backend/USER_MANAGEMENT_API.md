@@ -199,20 +199,19 @@ curl -X DELETE http://localhost:8000/users/operator1 \
 
 ## Хранение
 
-Пользователи хранятся в `/etc/pg_activity_monitor/users.json`:
+Пользователи хранятся в таблице `users` локальной БД `pam_stats` (PostgreSQL):
 
-```json
-[
-    {
-        "login": "admin",
-        "password": "$2b$12$...",
-        "role": "admin",
-        "email": null,
-        "created_at": "2025-06-18T09:00:00",
-        "last_login": "2025-06-18T10:00:00",
-        "is_active": true
-    }
-]
+```sql
+CREATE TABLE users (
+    login         TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,          -- bcrypt
+    role          TEXT NOT NULL DEFAULT 'viewer',
+    email         TEXT,
+    is_active     BOOLEAN NOT NULL DEFAULT true,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ,
+    last_login    TIMESTAMPTZ
+);
 ```
 
-Пароли хранятся как bcrypt хэши. Файл блокируется через `fcntl` при записи.
+Пароли хранятся как bcrypt хэши. CRUD-операции выполняются через async-репозиторий `user_repo.py` (asyncpg).

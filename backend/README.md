@@ -44,11 +44,10 @@ graph TD
     subgraph Storage["Хранение"]
         Pool["database/pool.py<br/>psycopg2 Pool"]
         LocalDB["database/local_db.py<br/>asyncpg Pool"]
-        Crypto["utils/crypto.py<br/>Fernet"]
+        Repos["database/repositories/<br/>async CRUD + pgcrypto"]
         PG[("Удалённые PG")]
-        LocalPG[("Локальный PG<br/>pam_stats")]
+        LocalPG[("Локальный PG<br/>pam_stats<br/>users, servers, ssh_keys,<br/>statistics, audit")]
         SSH["SSH серверы"]
-        Config[("/etc/pg_activity_monitor/")]
     end
 
     Client -->|HTTP| Auth
@@ -56,12 +55,12 @@ graph TD
     Router --> Models
     Router --> Services
 
-    ServerSvc --> Config
-    ServerSvc --> Crypto
+    ServerSvc --> Repos
     SSHSvc -->|paramiko| SSH
     CacheSvc --> ServerSvc
-    UserSvc --> Config
-    KeySvc --> Config
+    UserSvc --> Repos
+    KeySvc --> Repos
+    Repos --> LocalDB
     Pool -->|psycopg2| PG
     LocalDB -->|asyncpg| LocalPG
     AuditSvc --> LocalDB
@@ -84,7 +83,7 @@ graph TD
 | paramiko | 3.5 | SSH клиент |
 | PyJWT | 2.11 | JWT токены |
 | bcrypt | 4.3 | Хэширование паролей |
-| cryptography | 46.0 | Fernet шифрование |
+| cryptography | 46.0 | SSH-ключи (генерация, парсинг) |
 | slowapi | 0.1.9 | Rate limiting |
 
 ## Структура
@@ -94,7 +93,7 @@ backend/
 ├── main.py                       # Точка входа FastAPI
 ├── requirements.txt              # Python зависимости
 ├── pgmon-backend.service         # systemd сервис
-├── .env                          # SECRET_KEY, LOG_LEVEL
+├── .env                          # SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN
 └── app/
     ├── config.py                 # Конфигурация: JWT, CORS, pools, collector
     ├── api/
@@ -114,22 +113,21 @@ backend/
     │   └── tasks.py              # Логика сбора: pg_stat_database, sizes, disk, db_info
     ├── database/
     │   ├── pool.py               # DatabasePool (psycopg2, удалённые серверы)
-    │   └── local_db.py           # asyncpg pool (локальная БД pam_stats)
+    │   ├── local_db.py           # asyncpg pool (локальная БД pam_stats)
+    │   ├── repositories/          # async CRUD (asyncpg + pgcrypto)
     ├── models/                   # Pydantic v2
     │   ├── server.py             # Server
     │   ├── user.py               # User, UserCreate, UserUpdate, UserResponse
     │   ├── ssh_key.py            # SSHKey, SSHKeyCreate, SSHKeyImport
     │   └── audit.py              # AuditEvent
     ├── services/
-    │   ├── server.py             # load_servers, save_servers, connect_to_server
+    │   ├── server.py             # load_servers, save_server, connect_to_server (async)
     │   ├── ssh.py                # get_ssh_client, get_ssh_disk_usage
     │   ├── cache.py              # CacheManager (thread-safe, TTL)
-    │   ├── user_manager.py       # UserManager (file-based, bcrypt, fcntl)
+    │   ├── user_manager.py       # Пользователи (async, asyncpg)
     │   ├── ssh_key_manager.py    # Генерация SSH ключей (RSA, Ed25519)
-    │   ├── ssh_key_storage.py    # Хранение ключей (JSON + encrypted files)
+    │   ├── ssh_key_storage.py    # Хранение ключей (async, pgcrypto)
     │   └── audit_logger.py       # Аудит сессий (PostgreSQL asyncpg)
-    └── utils/
-        └── crypto.py             # Fernet: encrypt/decrypt/ensure_encrypted
 ```
 
 ## Установка
@@ -145,13 +143,16 @@ pip install -r requirements.txt
 sudo mkdir -p /etc/pg_activity_monitor
 sudo chown $USER:$USER /etc/pg_activity_monitor
 
-# Ключ шифрования
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" \
-  > /etc/pg_activity_monitor/encryption_key.key
-chmod 600 /etc/pg_activity_monitor/encryption_key.key
+# Локальная БД
+sudo -u postgres createuser pam
+sudo -u postgres createdb -O pam pam_stats
 
 # SECRET_KEY
-echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" > .env
+cat > .env << 'EOF'
+SECRET_KEY=<your-secret-key>
+ENCRYPTION_KEY=<your-encryption-key>
+LOCAL_DB_DSN=postgresql://pam:pam@/pam_stats?host=/tmp
+EOF
 ```
 
 ## Запуск
@@ -223,11 +224,8 @@ sudo systemctl enable --now pgmon-backend
 
 | Путь | Описание |
 |------|----------|
-| `/etc/pg_activity_monitor/servers.json` | Серверы (пароли зашифрованы Fernet) |
-| `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
-| `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
-| `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
-| `.env` | SECRET_KEY, LOG_LEVEL, LOCAL_DB_DSN |
+| `.env` | SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN |
+| PostgreSQL `pam_stats` | users, servers, ssh_keys, statistics, db_info, audit_sessions |
 
 ## Лицензия
 

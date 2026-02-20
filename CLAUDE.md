@@ -14,8 +14,8 @@ PostgreSQL Activity Monitor — веб-приложение для монито�
 ## Структура
 - `backend/` — FastAPI REST API (Python)
 - `frontend/` — React SPA (Vite + shadcn/ui)
-- Конфиги серверов: `/etc/pg_activity_monitor/`
-- Локальная БД: PostgresPro 1C 17 (`pam_stats`) — статистика + аудит
+- Локальная БД: PostgresPro 1C 17 (`pam_stats`) — все данные (серверы, пользователи, SSH-ключи, статистика, аудит)
+- Шифрование credentials: pgcrypto (pgp_sym_encrypt) в БД
 
 ## Стек
 - Backend: FastAPI, psycopg2, asyncpg, paramiko, PyJWT, bcrypt

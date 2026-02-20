@@ -37,7 +37,7 @@
 - **Автосбор статистики** — бэкенд сам подключается к серверам и собирает данные (коллектор v3)
 - **Connection pooling** — psycopg2 для удалённых серверов, asyncpg для локальной БД
 - **Кэширование** — двухуровневое (статус серверов 5с, SSH 30с)
-- **Шифрование** — Fernet для хранения credentials, bcrypt для паролей
+- **Шифрование** — pgcrypto (PGP-AES256) для credentials в БД, bcrypt для паролей
 
 ## Архитектура
 
@@ -70,7 +70,6 @@ graph TB
 
     subgraph Local["Локальное хранение"]
         LocalPG[("PostgresPro 17<br/>pam_stats")]
-        Config["/etc/pg_activity_monitor/"]
     end
 
     SPA -->|HTTPS| Proxy
@@ -87,7 +86,6 @@ graph TB
     Collector -->|paramiko| SSH
     Collector -->|asyncpg| LocalPG
     LocalPool -->|asyncpg| LocalPG
-    API --> Config
 ```
 
 ## Поток авторизации
@@ -138,7 +136,7 @@ sequenceDiagram
 | asyncpg | 0.31 | PostgreSQL (локальная БД pam_stats) |
 | Paramiko | 3.5 | SSH клиент |
 | PyJWT + bcrypt | 2.11 / 4.3 | Авторизация |
-| cryptography | 46.0 | Fernet шифрование |
+| cryptography | 46.0 | SSH-ключи (генерация, парсинг) |
 | slowapi | 0.1.9 | Rate limiting (защита от brute force) |
 
 ### Frontend
@@ -191,6 +189,7 @@ PostgreSQL-Activity-Monitor/
 │       ├── database/
 │       │   ├── pool.py             # psycopg2 Pool (удалённые серверы)
 │       │   └── local_db.py         # asyncpg Pool (локальная БД pam_stats)
+│       ├── repositories/          # async CRUD (asyncpg + pgcrypto)
 │       ├── models/                 # Pydantic v2 модели
 │       │   ├── server.py           # Server
 │       │   ├── user.py             # User, UserCreate, UserUpdate
@@ -200,12 +199,10 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── server.py           # Загрузка/сохранение серверов
 │       │   ├── ssh.py              # SSH подключения, disk usage
 │       │   ├── cache.py            # CacheManager (thread-safe, TTL)
-│       │   ├── user_manager.py     # UserManager (bcrypt, fcntl)
+│       │   ├── user_manager.py     # Пользователи (async, asyncpg)
 │       │   ├── ssh_key_manager.py  # Генерация SSH ключей
-│       │   ├── ssh_key_storage.py  # Хранение SSH ключей
+│       │   ├── ssh_key_storage.py  # Хранение SSH ключей (async, pgcrypto)
 │       │   └── audit_logger.py     # Аудит сессий (asyncpg)
-│       └── utils/
-│           └── crypto.py           # Fernet шифрование/расшифровка
 │
 ├── frontend/                       # React SPA
 │   ├── index.html                  # Точка входа
@@ -253,7 +250,7 @@ PostgreSQL-Activity-Monitor/
 ├── docs/
 │   └── DESIGN_SYSTEM.md            # Дизайн-система проекта
 │
-├── .env                            # SECRET_KEY
+├── .env                            # SECRET_KEY, ENCRYPTION_KEY
 ├── .gitignore
 ├── CLAUDE.md                       # Инструкции для Claude Code
 ├── LICENSE                         # MIT
@@ -287,57 +284,53 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3. Конфигурация
+### 3. Локальная база данных
 
 ```bash
-# Директория конфигурации
-sudo mkdir -p /etc/pg_activity_monitor
-sudo chown $USER:$USER /etc/pg_activity_monitor
-
-# Ключ шифрования
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" \
-  > /etc/pg_activity_monitor/encryption_key.key
-chmod 600 /etc/pg_activity_monitor/encryption_key.key
-
-# SECRET_KEY для JWT
-echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" > .env
+# Установите PostgreSQL (или PostgresPro) и создайте БД:
+sudo -u postgres createuser pam
+sudo -u postgres createdb -O pam pam_stats
+sudo -u postgres psql -c "ALTER USER pam WITH PASSWORD 'pam';"
 ```
 
-### 4. Создание администратора
+### 4. Конфигурация
 
 ```bash
+# SECRET_KEY и ENCRYPTION_KEY
+cat > .env << 'EOF'
+SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+LOCAL_DB_DSN=postgresql://pam:pam@/pam_stats?host=/tmp
+EOF
+```
+
+### 5. Первый запуск и создание администратора
+
+При первом запуске backend автоматически создаёт все таблицы в БД `pam_stats`.
+
+```bash
+# Запустить backend
+source venv/bin/activate
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# В другом терминале — создать администратора
+source venv/bin/activate
 python3 -c "
-import bcrypt, json
-password = input('Пароль для admin: ').encode()
-hashed = bcrypt.hashpw(password, bcrypt.gensalt()).decode()
-users = [{'login': 'admin', 'password': hashed, 'role': 'admin', 'is_active': True}]
-with open('/etc/pg_activity_monitor/users.json', 'w') as f:
-    json.dump(users, f, indent=2)
-print('Пользователь admin создан')
+import asyncio, bcrypt, asyncpg
+async def main():
+    pool = await asyncpg.create_pool('postgresql://pam:pam@/pam_stats?host=/tmp')
+    pw = bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode()
+    await pool.execute(
+        'INSERT INTO users (login, password_hash, role) VALUES (\$1, \$2, \$3) ON CONFLICT DO NOTHING',
+        'admin', pw, 'admin'
+    )
+    print('Администратор создан')
+    await pool.close()
+asyncio.run(main())
 "
 ```
 
-### 5. Добавление серверов
-
-Создайте `/etc/pg_activity_monitor/servers.json`:
-
-```json
-[
-  {
-    "name": "my-server",
-    "host": "10.0.1.10",
-    "port": 5432,
-    "user": "postgres",
-    "password": "password",
-    "ssh_user": "pgadmin",
-    "ssh_password": "ssh_password",
-    "ssh_port": 22,
-    "ssh_auth_type": "password"
-  }
-]
-```
-
-> Пароли будут автоматически зашифрованы при первом сохранении через API.
+Серверы добавляются через веб-интерфейс или API.
 
 ### 6. Frontend
 
@@ -503,11 +496,8 @@ server {
 
 | Файл | Описание |
 |------|----------|
-| `/etc/pg_activity_monitor/servers.json` | Серверы (пароли зашифрованы Fernet) |
-| `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
-| `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
-| `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
-| `backend/.env` | SECRET_KEY, LOG_LEVEL, LOCAL_DB_DSN |
+| `backend/.env` | SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN |
+| PostgreSQL `pam_stats` | Серверы, пользователи, SSH-ключи, статистика, аудит |
 
 ### Параметры (`backend/app/config.py`)
 
