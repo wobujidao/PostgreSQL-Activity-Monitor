@@ -31,6 +31,7 @@
 - **JWT авторизация** — access + refresh tokens, httpOnly cookies, token blacklist
 - **CSRF-защита** — SameSite=Strict cookies + проверка Origin header
 - **Аудит сессий** — журнал входов/выходов с IP, User-Agent, временем (admin)
+- **Системные логи** — журнал работы коллектора и системных событий с фильтрами по уровню, источнику, дате, тексту (admin)
 - **Rate limiting** — защита от brute force (slowapi)
 - **Тёмная тема** — полная поддержка light/dark режимов
 - **Command Palette** — быстрый поиск (`Ctrl+K`)
@@ -178,6 +179,7 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── users.py            # CRUD /users (admin)
 │       │   ├── ssh_keys.py         # CRUD /ssh-keys
 │       │   ├── audit.py            # GET /audit/sessions (admin)
+│       │   ├── logs.py             # GET /api/logs (admin)
 │       │   └── health.py           # /api/health, /api/pools/status
 │       ├── auth/                   # JWT авторизация
 │       │   ├── blacklist.py        # In-memory token blacklist
@@ -202,7 +204,8 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── user_manager.py     # Пользователи (async, asyncpg)
 │       │   ├── ssh_key_manager.py  # Генерация SSH ключей
 │       │   ├── ssh_key_storage.py  # Хранение SSH ключей (async, pgcrypto)
-│       │   └── audit_logger.py     # Аудит сессий (asyncpg)
+│       │   ├── audit_logger.py     # Аудит сессий (asyncpg)
+│       │   └── system_logger.py   # Системные логи (asyncpg)
 │
 ├── frontend/                       # React SPA
 │   ├── index.html                  # Точка входа
@@ -226,6 +229,7 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── UserManagement.jsx  # Управление пользователями
 │       │   ├── SSHKeyManagement.jsx# Управление SSH-ключами
 │       │   ├── SessionAudit.jsx   # Аудит сессий (admin)
+│       │   ├── SystemLogs.jsx    # Системные логи (admin)
 │       │   ├── PageHeader.jsx      # Заголовок + breadcrumbs
 │       │   ├── EmptyState.jsx      # Заглушка пустого состояния
 │       │   ├── LoadingSpinner.jsx  # Индикатор загрузки
@@ -481,6 +485,13 @@ server {
 | GET | `/audit/sessions` | Журнал событий (с фильтрами и пагинацией) |
 | GET | `/audit/sessions/stats` | Статистика: входы сегодня, уникальные за неделю |
 
+### Системные логи (admin)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/logs` | Журнал системных событий (фильтры: level, source, даты, текст, пагинация) |
+| GET | `/api/logs/stats` | Статистика логов по уровням |
+
 ### Служебные
 
 | Метод | Endpoint | Описание |
@@ -497,7 +508,7 @@ server {
 | Файл | Описание |
 |------|----------|
 | `backend/.env` | SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN |
-| PostgreSQL `pam_stats` | Серверы, пользователи, SSH-ключи, статистика, аудит |
+| PostgreSQL `pam_stats` | Серверы, пользователи, SSH-ключи, статистика, аудит, системные логи |
 
 ### Параметры (`backend/app/config.py`)
 
@@ -513,6 +524,7 @@ server {
 | `COLLECT_INTERVAL` | 600 сек | Интервал сбора статистики |
 | `SIZE_UPDATE_INTERVAL` | 1800 сек | Интервал обновления размеров |
 | `RETENTION_MONTHS` | 12 | Хранить данные N месяцев |
+| `LOGS_RETENTION_DAYS` | 30 дней | Хранение системных логов |
 | `POOL_CONFIGS` | default/high_load | Пулы для удалённых серверов |
 | `ALLOWED_ORIGINS` | list | CORS origins |
 
@@ -528,16 +540,19 @@ graph LR
     Admin -->|Полный доступ| Users["Пользователи"]
     Admin -->|Полный доступ| Keys["SSH-ключи"]
     Admin -->|Полный доступ| Audit["Аудит сессий"]
+    Admin -->|Полный доступ| Logs["Системные логи"]
 
     Operator -->|Полный доступ| Servers
     Operator -.->|Нет доступа| Users
     Operator -->|Создание/импорт| Keys
     Operator -.->|Нет доступа| Audit
+    Operator -.->|Нет доступа| Logs
 
     Viewer -->|Только чтение| Servers
     Viewer -.->|Нет доступа| Users
     Viewer -.->|Нет доступа| Keys
     Viewer -.->|Нет доступа| Audit
+    Viewer -.->|Нет доступа| Logs
 ```
 
 ## Использование

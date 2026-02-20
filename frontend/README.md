@@ -45,6 +45,7 @@ graph TD
     Content --> UM["UserManagement<br/>(admin)"]
     Content --> SK["SSHKeyManagement<br/>(admin/operator)"]
     Content --> SA["SessionAudit<br/>(admin)"]
+    Content --> SLogs["SystemLogs<br/>(admin)"]
 
     Content --> CMD["CommandPalette<br/>(Ctrl+K)"]
 ```
@@ -80,7 +81,7 @@ frontend/
     ├── index.css               # Tailwind + CSS-переменные (Steel Blue палитра)
     │
     ├── components/             # Страницы и бизнес-компоненты
-    │   ├── AppSidebar.jsx      # Sidebar навигация (серверы, пользователи, SSH)
+    │   ├── AppSidebar.jsx      # Sidebar навигация (серверы, пользователи, SSH, логи)
     │   ├── CommandPalette.jsx  # Поиск по Ctrl+K (cmdk)
     │   ├── ErrorBoundary.jsx   # Обработка ошибок React
     │   ├── Login.jsx           # Форма авторизации
@@ -91,6 +92,7 @@ frontend/
     │   ├── UserManagement.jsx  # CRUD пользователей (admin)
     │   ├── SSHKeyManagement.jsx# Генерация, импорт, управление SSH-ключами
     │   ├── SessionAudit.jsx   # Журнал аудита сессий (admin)
+    │   ├── SystemLogs.jsx    # Системные логи (admin)
     │   ├── PageHeader.jsx      # Заголовок + breadcrumbs
     │   ├── EmptyState.jsx      # Заглушка пустого состояния
     │   ├── LoadingSpinner.jsx  # Спиннер загрузки (Loader2)
@@ -143,6 +145,7 @@ frontend/
 | `/users` | `UserManagement` | admin | Управление пользователями |
 | `/ssh-keys` | `SSHKeyManagement` | admin, operator | Управление SSH-ключами |
 | `/audit` | `SessionAudit` | admin | Журнал аудита сессий |
+| `/logs` | `SystemLogs` | admin | Системные логи |
 
 ## Быстрый старт
 

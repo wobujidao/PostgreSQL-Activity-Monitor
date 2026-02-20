@@ -39,6 +39,7 @@ graph TD
         UserSvc["user_manager.py<br/>Пользователи"]
         KeySvc["ssh_key_manager.py<br/>SSH ключи"]
         AuditSvc["audit_logger.py<br/>Аудит сессий"]
+        LogSvc["system_logger.py<br/>Системные логи"]
     end
 
     subgraph Storage["Хранение"]
@@ -64,6 +65,7 @@ graph TD
     Pool -->|psycopg2| PG
     LocalDB -->|asyncpg| LocalPG
     AuditSvc --> LocalDB
+    LogSvc --> LocalDB
     Collector -->|psycopg2| PG
     Collector -->|paramiko| SSH
     Collector -->|asyncpg| LocalPG
@@ -103,6 +105,7 @@ backend/
     │   ├── users.py              # CRUD /users (admin only)
     │   ├── ssh_keys.py           # CRUD /ssh-keys (admin/operator)
     │   ├── audit.py              # GET /audit/sessions (admin)
+    │   ├── logs.py               # GET /api/logs (admin)
     │   └── health.py             # /api/health, /api/pools/status
     ├── auth/
     │   ├── blacklist.py          # In-memory token blacklist (thread-safe)
@@ -127,7 +130,8 @@ backend/
     │   ├── user_manager.py       # Пользователи (async, asyncpg)
     │   ├── ssh_key_manager.py    # Генерация SSH ключей (RSA, Ed25519)
     │   ├── ssh_key_storage.py    # Хранение ключей (async, pgcrypto)
-    │   └── audit_logger.py       # Аудит сессий (PostgreSQL asyncpg)
+    │   ├── audit_logger.py       # Аудит сессий (PostgreSQL asyncpg)
+    │   └── system_logger.py     # Системные логи (PostgreSQL asyncpg)
 ```
 
 ## Установка
@@ -196,6 +200,8 @@ sudo systemctl enable --now pgmon-backend
 | SSH Keys | GET | `/ssh-keys/{id}/download-public` | admin |
 | Audit | GET | `/audit/sessions` | admin |
 | Audit | GET | `/audit/sessions/stats` | admin |
+| Logs | GET | `/api/logs` | admin |
+| Logs | GET | `/api/logs/stats` | admin |
 | Health | GET | `/api/health` | — |
 | Health | GET | `/api/pools/status` | все |
 
@@ -216,6 +222,7 @@ sudo systemctl enable --now pgmon-backend
 | `SIZE_UPDATE_INTERVAL` | 1800 сек | Интервал обновления размеров БД |
 | `DB_CHECK_INTERVAL` | 1800 сек | Интервал проверки новых/удалённых БД |
 | `RETENTION_MONTHS` | 12 | Хранить данные N месяцев |
+| `LOGS_RETENTION_DAYS` | 30 дней | Хранение системных логов |
 | `POOL_CONFIGS.default` | min=1, max=5 | Пул для удалённых серверов |
 | `POOL_CONFIGS.high_load` | min=5, max=20 | Пул для нагруженных серверов |
 | `ALLOWED_ORIGINS` | list | CORS origins |
@@ -225,7 +232,7 @@ sudo systemctl enable --now pgmon-backend
 | Путь | Описание |
 |------|----------|
 | `.env` | SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN |
-| PostgreSQL `pam_stats` | users, servers, ssh_keys, statistics, db_info, audit_sessions |
+| PostgreSQL `pam_stats` | users, servers, ssh_keys, statistics, db_info, audit_sessions, system_log |
 
 ## Лицензия
 
