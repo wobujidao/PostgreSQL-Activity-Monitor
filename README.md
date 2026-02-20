@@ -374,50 +374,42 @@ server {
     ssl_certificate /path/to/cert.crt;
     ssl_certificate_key /path/to/cert.key;
 
-    # Frontend
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_min_length 1000;
+
+    # API — всё под /api/ идёт на backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Content-Type $http_content_type;
+        proxy_set_header Origin $http_origin;
+    }
+
+    # Фронтенд — всё остальное
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-    }
-
-    # Auth API
-    location /token {
-        proxy_pass http://127.0.0.1:8000/token;
-        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Content-Type $http_content_type;
-    }
-
-    location /refresh {
-        proxy_pass http://127.0.0.1:8000/refresh;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Origin $http_origin;
-    }
-
-    location /logout {
-        proxy_pass http://127.0.0.1:8000/logout;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Cookie $http_cookie;
-        proxy_set_header Authorization $http_authorization;
-    }
-
-    # Data API
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000/api/;
-        proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-    }
-
-    location ~ ^/(servers|users|ssh-keys|server_stats|audit|server/) {
-        proxy_pass http://127.0.0.1:8000$request_uri;
-        proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
