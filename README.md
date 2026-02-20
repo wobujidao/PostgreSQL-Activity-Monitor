@@ -1,6 +1,6 @@
-# PostgreSQL Activity Monitor
-
 <div align="center">
+
+# PostgreSQL Activity Monitor
 
 <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
 <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19"/>
@@ -14,6 +14,7 @@
 <img src="https://img.shields.io/github/license/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="License"/>
 <img src="https://img.shields.io/github/stars/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="Stars"/>
 <img src="https://img.shields.io/badge/version-3.0.0-blue?style=flat-square" alt="Version"/>
+<img src="https://img.shields.io/badge/API-v3.0-green?style=flat-square" alt="API v3.0"/>
 
 </div>
 
@@ -21,24 +22,51 @@
 
 ## Возможности
 
-- **Мониторинг серверов** — статус, версия, uptime, активные соединения, дисковое пространство
-- **Историческая статистика** — автоматический сбор каждые 10 мин, графики нагрузки, размеров БД, транзакций
-- **Анализ баз данных** — автоматическое выявление неактивных, статичных и малоактивных БД
-- **SSH мониторинг** — свободное место на дисках через SSH (пароль или ключ)
-- **Управление серверами** — добавление, редактирование, удаление через UI
-- **Управление пользователями** — ролевая модель (admin / operator / viewer)
-- **Управление SSH-ключами** — генерация, импорт, привязка к серверам
-- **JWT авторизация** — access + refresh tokens, httpOnly cookies, token blacklist
-- **CSRF-защита** — SameSite=Strict cookies + проверка Origin header
-- **Аудит сессий** — журнал входов/выходов с IP, User-Agent, временем (admin)
-- **Системные логи** — журнал работы коллектора и системных событий с фильтрами по уровню, источнику, дате, тексту (admin)
+<table>
+<tr><td width="50%">
+
+### Мониторинг
+- **Серверы** — статус, версия PostgreSQL, uptime, активные соединения
+- **Дисковое пространство** — свободное/занятое место через SSH
+- **Историческая статистика** — автоматический сбор каждые 10 мин
+- **Графики нагрузки** — подключения, размеры БД, транзакции
+- **Анализ баз данных** — выявление неактивных, статичных и малоактивных БД
+
+</td><td width="50%">
+
+### Управление
+- **Серверы** — добавление, редактирование, удаление, тест подключения (PG + SSH)
+- **Пользователи** — ролевая модель (admin / operator / viewer)
+- **SSH-ключи** — генерация (RSA, Ed25519), импорт, привязка к серверам
+- **Настройки** — интервалы коллектора, сроки хранения данных
+- **Аудит сессий** — журнал всех действий с фильтрами
+- **Системные логи** — события коллектора, ошибки, предупреждения
+
+</td></tr>
+<tr><td>
+
+### Безопасность
+- **JWT авторизация** — access + refresh tokens, httpOnly cookies
+- **CSRF-защита** — SameSite=Strict cookies + проверка Origin
+- **Шифрование** — pgcrypto (PGP-AES256) для credentials в БД
+- **Пароли** — bcrypt хэширование
 - **Rate limiting** — защита от brute force (slowapi)
+- **Security headers** — HSTS, X-Content-Type-Options, X-Frame-Options
+
+</td><td>
+
+### Интерфейс
 - **Тёмная тема** — полная поддержка light/dark режимов
 - **Command Palette** — быстрый поиск (`Ctrl+K`)
-- **Автосбор статистики** — бэкенд сам подключается к серверам и собирает данные (коллектор v3)
-- **Connection pooling** — psycopg2 для удалённых серверов, asyncpg для локальной БД
-- **Кэширование** — двухуровневое (статус серверов 5с, SSH 30с)
-- **Шифрование** — pgcrypto (PGP-AES256) для credentials в БД, bcrypt для паролей
+- **Responsive** — адаптивный Sidebar layout
+- **Skeleton-загрузка** — плавная подгрузка контента
+- **Toast-уведомления** — мгновенная обратная связь
+- **Дизайн-система** — Steel Blue палитра, shadcn/ui компоненты
+
+</td></tr>
+</table>
+
+---
 
 ## Архитектура
 
@@ -51,12 +79,12 @@ graph TB
     subgraph Proxy["Nginx (HTTPS)"]
         direction LR
         NF[":443 → :3000<br/>Frontend"]
-        NB[":443 → :8000<br/>API"]
+        NB[":443/api → :8000<br/>API"]
     end
 
     subgraph Backend["FastAPI Backend"]
         Auth["JWT Auth"]
-        API["REST API"]
+        API["REST API v3.0"]
         Cache["Cache Manager"]
         Pool["psycopg2 Pool"]
         SSHClient["SSH Client"]
@@ -80,7 +108,7 @@ graph TB
     API --> Cache
     API --> Pool
     API --> SSHClient
-    API -->|stats, audit| LocalPool
+    API -->|stats, audit, logs| LocalPool
     Pool -->|psycopg2| PG
     SSHClient -->|paramiko| SSH
     Collector -->|psycopg2| PG
@@ -88,6 +116,19 @@ graph TB
     Collector -->|asyncpg| LocalPG
     LocalPool -->|asyncpg| LocalPG
 ```
+
+### Ключевые принципы
+
+| Принцип | Реализация |
+|---------|-----------|
+| **Автосбор данных** | Коллектор v3 — бэкенд сам подключается к серверам по расписанию (asyncio loops) |
+| **Единая БД** | Все данные (серверы, пользователи, ключи, статистика, аудит, логи) в PostgresPro |
+| **Шифрование at rest** | Пароли и SSH-ключи зашифрованы pgcrypto (pgp_sym_encrypt) |
+| **Connection pooling** | psycopg2 для удалённых серверов, asyncpg для локальной БД |
+| **Кэширование** | Двухуровневое: статус серверов 5с, SSH 30с |
+| **Партиционирование** | Таблица statistics партиционирована по месяцам |
+
+---
 
 ## Поток авторизации
 
@@ -98,7 +139,7 @@ sequenceDiagram
     participant C as Cookie (httpOnly)
     participant S as localStorage
 
-    B->>F: POST /token (login + password)
+    B->>F: POST /api/token (login + password)
     F-->>B: access_token (JSON) + Set-Cookie: refresh_token
     B->>S: access_token
     F->>C: refresh_token (httpOnly, Secure, SameSite=Strict)
@@ -109,157 +150,177 @@ sequenceDiagram
     end
 
     Note over B: Access token истёк (401)
-    B->>F: POST /refresh (cookie автоматически)
+    B->>F: POST /api/refresh (cookie автоматически)
     F->>F: Ротация: старый refresh → blacklist
     F-->>B: Новый access_token + новый refresh cookie
 
     Note over B: За 5 мин до истечения
     B->>B: Модалка «Сессия истекает»
     alt Продолжить
-        B->>F: POST /refresh
+        B->>F: POST /api/refresh
         F-->>B: Новый access_token
     else Выйти
-        B->>F: POST /logout
+        B->>F: POST /api/logout
         F->>F: Оба токена → blacklist
         F-->>B: Cookie удалена
     end
 ```
 
+---
+
 ## Технологический стек
 
 ### Backend
+
 | Технология | Версия | Назначение |
 |-----------|--------|------------|
 | Python | 3.13 | Среда выполнения |
-| FastAPI | 0.129 | REST API фреймворк |
-| Pydantic | 2.12 | Валидация данных |
-| psycopg2 | 2.9 | PostgreSQL (удалённые серверы) |
-| asyncpg | 0.31 | PostgreSQL (локальная БД pam_stats) |
-| Paramiko | 3.5 | SSH клиент |
-| PyJWT + bcrypt | 2.11 / 4.3 | Авторизация |
-| cryptography | 46.0 | SSH-ключи (генерация, парсинг) |
-| slowapi | 0.1.9 | Rate limiting (защита от brute force) |
+| FastAPI | >=0.115 | REST API + автодокументация (Swagger / ReDoc) |
+| Pydantic | >=2.10 | Валидация данных и сериализация |
+| uvicorn | >=0.41 | ASGI-сервер |
+| psycopg2-binary | >=2.9.10 | PostgreSQL драйвер (удалённые серверы, пулы) |
+| asyncpg | >=0.30 | PostgreSQL async-драйвер (локальная БД pam_stats) |
+| Paramiko | >=3.5 | SSH клиент (подключения, disk usage) |
+| PyJWT | >=2.10 | JWT токены (access + refresh) |
+| bcrypt | >=4.2 | Хэширование паролей |
+| cryptography | >=46.0 | SSH-ключи (генерация RSA / Ed25519) |
+| slowapi | >=0.1.9 | Rate limiting (защита от brute force) |
+| python-dotenv | >=1.0 | Загрузка .env конфигурации |
 
 ### Frontend
+
 | Технология | Версия | Назначение |
 |-----------|--------|------------|
-| React | 19.2 | UI фреймворк |
-| Vite | 7.3 | Сборка и dev-сервер |
-| Tailwind CSS | 4.2 | Utility-first CSS |
-| shadcn/ui | 27 компонентов | UI-библиотека (Radix + Tailwind) |
-| Chart.js | 4.5 | Графики временных рядов |
-| React Router | 7.13 | SPA маршрутизация |
-| axios | 1.13 | HTTP клиент с JWT interceptors |
-| lucide-react | 0.575 | SVG иконки |
+| React | 19.2 | UI-фреймворк (хуки, Context API) |
+| Vite | 7.3 | Сборка и dev-сервер (HMR, ESBuild) |
+| Tailwind CSS | 4.2 | Utility-first CSS, CSS-переменные, тёмная тема |
+| shadcn/ui | 27 компонентов | UI-библиотека (Radix-примитивы + Tailwind) |
+| Chart.js | 4.5 | Canvas-графики временных рядов |
+| React Router | 7.13 | SPA-маршрутизация с защитой маршрутов |
+| axios | 1.13 | HTTP клиент с JWT interceptors + auto-refresh |
+| lucide-react | 0.575 | 1500+ SVG-иконок |
+| Sonner | 2.0 | Toast-уведомления (success / error / info) |
+| date-fns | 4.1 | Форматирование дат (локаль ru) |
+| next-themes | 0.4 | Переключение light / dark темы |
 
 ### Инфраструктура
+
 | Технология | Назначение |
 |-----------|------------|
 | PostgreSQL 9.6+ | Целевые серверы мониторинга |
-| PostgresPro 1C 17 | Локальная БД (статистика + аудит) |
-| Nginx | Reverse proxy + SSL termination |
-| systemd | Управление сервисами |
+| PostgresPro 1C 17 | Локальная БД (все данные приложения) |
+| Nginx | Reverse proxy + SSL termination + Security headers + Gzip |
+| systemd | Управление сервисами (pgmon-backend, pgmon-frontend) |
+
+---
 
 ## Структура проекта
 
 ```
 PostgreSQL-Activity-Monitor/
 ├── backend/                        # FastAPI REST API
-│   ├── main.py                     # Точка входа
-│   ├── requirements.txt            # Python зависимости
+│   ├── main.py                     # Точка входа, lifespan, CORS, rate limiting
+│   ├── requirements.txt            # Python зависимости (диапазоны версий)
 │   ├── pgmon-backend.service       # systemd сервис
 │   ├── README.md                   # Документация backend
-│   ├── USER_MANAGEMENT_API.md      # API управления пользователями
 │   └── app/
-│       ├── config.py               # Конфигурация (JWT, CORS, pools)
+│       ├── config.py               # Конфигурация: JWT, CORS, pools, collector
 │       ├── api/                    # REST endpoints
-│       │   ├── auth.py             # POST /token, /refresh, /logout
-│       │   ├── servers.py          # CRUD /servers + test-ssh
+│       │   ├── auth.py             # /api/token, /api/refresh, /api/logout
+│       │   ├── servers.py          # CRUD /api/servers + test-ssh, test-pg
 │       │   ├── stats.py            # Статистика серверов и БД
-│       │   ├── users.py            # CRUD /users (admin)
-│       │   ├── ssh_keys.py         # CRUD /ssh-keys
-│       │   ├── audit.py            # GET /audit/sessions (admin)
+│       │   ├── users.py            # CRUD /api/users (admin)
+│       │   ├── ssh_keys.py         # CRUD /api/ssh-keys (admin/operator)
+│       │   ├── audit.py            # GET /api/audit/sessions (admin)
 │       │   ├── logs.py             # GET /api/logs (admin)
+│       │   ├── settings.py         # GET/PUT /api/settings (admin)
 │       │   └── health.py           # /api/health, /api/pools/status
 │       ├── auth/                   # JWT авторизация
-│       │   ├── blacklist.py        # In-memory token blacklist
-│       │   ├── dependencies.py     # get_current_user (OAuth2)
-│       │   └── utils.py            # access/refresh токены, пароли
+│       │   ├── blacklist.py        # In-memory token blacklist (thread-safe)
+│       │   ├── dependencies.py     # get_current_user (OAuth2 + JWT + blacklist)
+│       │   └── utils.py            # Создание access/refresh токенов, пароли
 │       ├── collector/              # Автосбор статистики (v3)
-│       │   ├── scheduler.py       # asyncio loops: stats, sizes, db_info
-│       │   └── tasks.py           # Логика сбора данных
+│       │   ├── scheduler.py        # 4 asyncio loops: stats, sizes, db_info, maintenance
+│       │   └── tasks.py            # Логика сбора: pg_stat_database, sizes, disk, db_info
 │       ├── database/
-│       │   ├── pool.py             # psycopg2 Pool (удалённые серверы)
-│       │   └── local_db.py         # asyncpg Pool (локальная БД pam_stats)
-│       ├── repositories/          # async CRUD (asyncpg + pgcrypto)
+│       │   ├── pool.py             # DatabasePool (psycopg2, удалённые серверы)
+│       │   ├── local_db.py         # asyncpg pool + DDL (локальная БД pam_stats)
+│       │   └── repositories/       # async CRUD-репозитории (asyncpg + pgcrypto)
+│       │       ├── user_repo.py    # Пользователи
+│       │       ├── server_repo.py  # Серверы
+│       │       ├── ssh_key_repo.py # SSH-ключи
+│       │       └── settings_repo.py# Настройки
 │       ├── models/                 # Pydantic v2 модели
 │       │   ├── server.py           # Server
-│       │   ├── user.py             # User, UserCreate, UserUpdate
-│       │   ├── ssh_key.py          # SSHKey, SSHKeyCreate, SSHKeyImport
+│       │   ├── user.py             # User, UserCreate, UserUpdate, UserRole
+│       │   ├── ssh_key.py          # SSHKey, SSHKeyCreate, SSHKeyImport, SSHKeyType
 │       │   └── audit.py            # AuditEvent
-│       ├── services/               # Бизнес-логика
-│       │   ├── server.py           # Загрузка/сохранение серверов
-│       │   ├── ssh.py              # SSH подключения, disk usage
-│       │   ├── cache.py            # CacheManager (thread-safe, TTL)
-│       │   ├── user_manager.py     # Пользователи (async, asyncpg)
-│       │   ├── ssh_key_manager.py  # Генерация SSH ключей
-│       │   ├── ssh_key_storage.py  # Хранение SSH ключей (async, pgcrypto)
-│       │   ├── audit_logger.py     # Аудит сессий (asyncpg)
-│       │   └── system_logger.py   # Системные логи (asyncpg)
+│       └── services/               # Бизнес-логика
+│           ├── server.py           # load/save/update/delete серверов (asyncpg)
+│           ├── ssh.py              # SSH подключения, disk usage (paramiko)
+│           ├── cache.py            # CacheManager (thread-safe, TTL)
+│           ├── user_manager.py     # CRUD пользователей (async, asyncpg)
+│           ├── ssh_key_manager.py  # Генерация SSH-ключей (RSA, Ed25519)
+│           ├── ssh_key_storage.py  # Хранение SSH-ключей (async, pgcrypto)
+│           ├── audit_logger.py     # Аудит сессий и действий (asyncpg)
+│           └── system_logger.py    # Системные логи коллектора (asyncpg)
 │
 ├── frontend/                       # React SPA
-│   ├── index.html                  # Точка входа
-│   ├── vite.config.js              # Конфигурация Vite
+│   ├── index.html                  # Точка входа HTML
+│   ├── vite.config.js              # Конфигурация Vite (порт 3000, alias @/)
 │   ├── components.json             # Конфигурация shadcn/ui
-│   ├── package.json                # Node.js зависимости
+│   ├── package.json                # Node.js зависимости (v3.0.0)
 │   ├── README.md                   # Документация frontend
 │   └── src/
 │       ├── main.jsx                # Точка входа React
 │       ├── App.jsx                 # Роутинг, sidebar layout, модалы сессии
-│       ├── index.css               # Tailwind + CSS-переменные (Steel Blue)
+│       ├── index.css               # Tailwind + CSS-переменные (Steel Blue палитра)
 │       ├── components/
-│       │   ├── AppSidebar.jsx      # Боковая навигация
-│       │   ├── CommandPalette.jsx  # Ctrl+K поиск
+│       │   ├── AppSidebar.jsx      # Боковая навигация (по ролям)
+│       │   ├── CommandPalette.jsx  # Ctrl+K — быстрый поиск (cmdk)
 │       │   ├── ErrorBoundary.jsx   # Обработка ошибок React
-│       │   ├── Login.jsx           # Авторизация
-│       │   ├── ServerList.jsx      # Список серверов (главная)
-│       │   ├── ServerDetails.jsx   # Детали сервера + анализ БД
-│       │   ├── ServerEdit.jsx      # Редактирование сервера
-│       │   ├── DatabaseDetails.jsx # Статистика БД + графики
-│       │   ├── UserManagement.jsx  # Управление пользователями
-│       │   ├── SSHKeyManagement.jsx# Управление SSH-ключами
-│       │   ├── SessionAudit.jsx   # Аудит сессий (admin)
-│       │   ├── SystemLogs.jsx    # Системные логи (admin)
+│       │   ├── Login.jsx           # Форма авторизации
+│       │   ├── ServerList.jsx      # Главная — список серверов с фильтрами
+│       │   ├── ServerDetails.jsx   # Детали сервера + анализ БД + графики
+│       │   ├── ServerEdit.jsx      # Редактирование / добавление сервера
+│       │   ├── DatabaseDetails.jsx # Графики: подключения, размер, коммиты
+│       │   ├── UserManagement.jsx  # CRUD пользователей (admin)
+│       │   ├── SSHKeyManagement.jsx# Генерация, импорт, управление SSH-ключами
+│       │   ├── SessionAudit.jsx    # Журнал аудита сессий (admin)
+│       │   ├── SystemLogs.jsx      # Системные логи коллектора (admin)
+│       │   ├── Settings.jsx        # Настройки системы (admin)
 │       │   ├── PageHeader.jsx      # Заголовок + breadcrumbs
 │       │   ├── EmptyState.jsx      # Заглушка пустого состояния
-│       │   ├── LoadingSpinner.jsx  # Индикатор загрузки
+│       │   ├── LoadingSpinner.jsx  # Индикатор загрузки (Loader2)
 │       │   ├── ScrollToTop.jsx     # Кнопка «Наверх»
 │       │   ├── skeletons/          # Skeleton-загрузка страниц
 │       │   └── ui/                 # 27 shadcn/ui компонентов
 │       ├── contexts/
-│       │   ├── auth-context.jsx    # JWT lifecycle, cookie-based refresh
-│       │   └── servers-context.jsx # Глобальный список серверов
+│       │   ├── auth-context.jsx    # AuthProvider — JWT lifecycle, cookie refresh
+│       │   └── servers-context.jsx # ServersProvider — глобальный список серверов
 │       ├── hooks/
-│       │   ├── use-auth.js         # useAuth()
-│       │   ├── use-servers.js      # useServers()
-│       │   └── use-mobile.js       # useMobile() (responsive)
+│       │   ├── use-auth.js         # useAuth() — доступ к AuthContext
+│       │   ├── use-servers.js      # useServers() — доступ к ServersContext
+│       │   └── use-mobile.js       # useMobile() — responsive breakpoint
 │       └── lib/
-│           ├── api.js              # Axios + JWT interceptors + auto-refresh
-│           ├── chart-config.js     # Chart.js: цвета, опции, градиенты
+│           ├── api.js              # Axios + JWT interceptors + auto-refresh queue
+│           ├── chart-config.js     # Chart.js: цвета из CSS-переменных, градиенты
 │           ├── constants.js        # Все константы приложения
-│           ├── format.js           # Форматирование: bytes, uptime, даты
+│           ├── format.js           # Форматирование: bytes, uptime, даты, таймер
 │           ├── validation.js       # Валидация: hostname, port
-│           └── utils.js            # cn() для Tailwind классов
+│           └── utils.js            # cn() — утилита CSS-классов (tailwind-merge)
 │
 ├── docs/
-│   └── DESIGN_SYSTEM.md            # Дизайн-система проекта
+│   └── DESIGN_SYSTEM.md            # Дизайн-система: палитра, компоненты, правила
 │
-├── .env                            # SECRET_KEY, ENCRYPTION_KEY
+├── .env                            # SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN
 ├── .gitignore
 ├── CLAUDE.md                       # Инструкции для Claude Code
 ├── LICENSE                         # MIT
 └── README.md                       # Этот файл
 ```
+
+---
 
 ## Установка
 
@@ -269,6 +330,7 @@ PostgreSQL-Activity-Monitor/
 - Python 3.10+ (рекомендуется 3.13)
 - Node.js 20+
 - PostgreSQL 9.6+ на целевых серверах
+- PostgreSQL / PostgresPro для локальной БД
 - Nginx (для HTTPS)
 
 ### 1. Клонирование
@@ -278,7 +340,17 @@ git clone https://github.com/wobujidao/PostgreSQL-Activity-Monitor.git
 cd PostgreSQL-Activity-Monitor
 ```
 
-### 2. Backend
+### 2. Локальная база данных
+
+```bash
+# Установите PostgreSQL (или PostgresPro) и создайте БД:
+sudo -u postgres createuser pam
+sudo -u postgres createdb -O pam pam_stats
+sudo -u postgres psql -c "ALTER USER pam WITH PASSWORD 'pam';"
+sudo -u postgres psql -d pam_stats -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+```
+
+### 3. Backend
 
 ```bash
 cd backend
@@ -288,29 +360,23 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3. Локальная база данных
-
-```bash
-# Установите PostgreSQL (или PostgresPro) и создайте БД:
-sudo -u postgres createuser pam
-sudo -u postgres createdb -O pam pam_stats
-sudo -u postgres psql -c "ALTER USER pam WITH PASSWORD 'pam';"
-```
-
 ### 4. Конфигурация
 
 ```bash
-# SECRET_KEY и ENCRYPTION_KEY
-cat > .env << 'EOF'
-SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
-ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+# Сгенерируйте ключи
+SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+ENCKEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+
+cat > .env << EOF
+SECRET_KEY=$SECRET
+ENCRYPTION_KEY=$ENCKEY
 LOCAL_DB_DSN=postgresql://pam:pam@/pam_stats?host=/tmp
 EOF
 ```
 
 ### 5. Первый запуск и создание администратора
 
-При первом запуске backend автоматически создаёт все таблицы в БД `pam_stats`.
+При первом запуске backend автоматически создаёт все таблицы в БД `pam_stats` (8 таблиц + партиции + индексы + расширение pgcrypto).
 
 ```bash
 # Запустить backend
@@ -318,7 +384,7 @@ source venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8000
 
 # В другом терминале — создать администратора
-source venv/bin/activate
+cd backend && source venv/bin/activate
 python3 -c "
 import asyncio, bcrypt, asyncpg
 async def main():
@@ -328,7 +394,7 @@ async def main():
         'INSERT INTO users (login, password_hash, role) VALUES (\$1, \$2, \$3) ON CONFLICT DO NOTHING',
         'admin', pw, 'admin'
     )
-    print('Администратор создан')
+    print('Администратор создан (login: admin, password: admin)')
     await pool.close()
 asyncio.run(main())
 "
@@ -341,6 +407,7 @@ asyncio.run(main())
 ```bash
 cd frontend
 npm install
+npm run dev       # Dev-сервер на порту 3000
 ```
 
 ### 7. Systemd сервисы
@@ -414,113 +481,181 @@ server {
 }
 ```
 
+---
+
 ## API
 
-Все endpoints (кроме `/token` и `/api/health`) требуют JWT токен: `Authorization: Bearer <token>`
+Все endpoints находятся под префиксом `/api/`. Документация доступна по адресу `http://localhost:8000/docs` (Swagger UI) и `/redoc` (ReDoc).
+
+> Все endpoints (кроме `/api/token` и `/api/health`) требуют JWT токен: `Authorization: Bearer <token>`
 
 ### Авторизация
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| POST | `/token` | Логин: access token + refresh cookie |
-| POST | `/refresh` | Обновление access token (по refresh cookie) |
-| POST | `/logout` | Выход: blacklist токенов + удаление cookie |
+| POST | `/api/token` | Логин: access token + refresh cookie |
+| POST | `/api/refresh` | Обновление access token (по refresh cookie) |
+| POST | `/api/logout` | Выход: blacklist токенов + удаление cookie |
 
 ### Серверы
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | `/servers` | Список серверов с текущим статусом |
-| POST | `/servers` | Добавить сервер |
-| PUT | `/servers/{name}` | Обновить сервер |
-| DELETE | `/servers/{name}` | Удалить сервер |
-| POST | `/servers/{name}/test-ssh` | Тест SSH подключения |
+| GET | `/api/servers` | Список серверов с текущим статусом |
+| POST | `/api/servers` | Добавить сервер (с проверкой доступности) |
+| PUT | `/api/servers/{name}` | Обновить сервер |
+| DELETE | `/api/servers/{name}` | Удалить сервер (+ очистка исторических данных) |
+| POST | `/api/servers/{name}/test-ssh` | Тест SSH подключения (пароль или ключ) |
+| POST | `/api/servers/{name}/test-pg` | Тест PostgreSQL подключения (версия, соединения) |
 
 ### Статистика
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | `/server_stats/{name}` | Активные запросы (pg_stat_activity) |
-| GET | `/server/{name}/stats` | Историческая статистика сервера |
-| GET | `/server/{name}/db/{db}` | Краткая информация о БД |
-| GET | `/server/{name}/db/{db}/stats` | Детальная статистика БД за период |
+| GET | `/api/server_stats/{name}` | Активные запросы (pg_stat_activity) |
+| GET | `/api/server/{name}/stats` | Историческая статистика сервера за период |
+| GET | `/api/server/{name}/db/{db}` | Краткая информация о БД |
+| GET | `/api/server/{name}/db/{db}/stats` | Детальная статистика БД за период |
 
 ### Пользователи (admin)
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | `/users` | Список пользователей |
-| POST | `/users` | Создать пользователя |
-| GET | `/users/me` | Текущий пользователь |
-| GET | `/users/{login}` | Информация о пользователе |
-| PUT | `/users/{login}` | Обновить пользователя |
-| DELETE | `/users/{login}` | Удалить пользователя |
+| GET | `/api/users` | Список пользователей |
+| POST | `/api/users` | Создать пользователя |
+| GET | `/api/users/me` | Текущий пользователь |
+| GET | `/api/users/{login}` | Информация о пользователе |
+| PUT | `/api/users/{login}` | Обновить пользователя |
+| DELETE | `/api/users/{login}` | Удалить пользователя |
 
 ### SSH-ключи (admin / operator)
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | `/ssh-keys` | Список ключей |
-| GET | `/ssh-keys/{id}` | Информация о ключе |
-| POST | `/ssh-keys/generate` | Сгенерировать новый ключ |
-| POST | `/ssh-keys/import` | Импортировать ключ (текст) |
-| POST | `/ssh-keys/import-file` | Импортировать ключ (файл) |
-| PUT | `/ssh-keys/{id}` | Обновить имя/описание |
-| DELETE | `/ssh-keys/{id}` | Удалить ключ |
-| GET | `/ssh-keys/{id}/servers` | Серверы, использующие ключ |
-| GET | `/ssh-keys/{id}/download-public` | Скачать публичный ключ |
+| GET | `/api/ssh-keys` | Список ключей |
+| GET | `/api/ssh-keys/{id}` | Информация о ключе |
+| POST | `/api/ssh-keys/generate` | Сгенерировать новый ключ (RSA / Ed25519) |
+| POST | `/api/ssh-keys/import` | Импортировать ключ (текст) |
+| POST | `/api/ssh-keys/import-file` | Импортировать ключ (файл) |
+| PUT | `/api/ssh-keys/{id}` | Обновить имя / описание |
+| DELETE | `/api/ssh-keys/{id}` | Удалить ключ |
+| GET | `/api/ssh-keys/{id}/servers` | Серверы, использующие ключ |
+| GET | `/api/ssh-keys/{id}/download-public` | Скачать публичный ключ |
 
 ### Аудит (admin)
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | `/audit/sessions` | Журнал событий (с фильтрами и пагинацией) |
-| GET | `/audit/sessions/stats` | Статистика: входы сегодня, уникальные за неделю |
+| GET | `/api/audit/sessions` | Журнал событий (фильтры: тип, пользователь, даты, IP, пагинация) |
+| GET | `/api/audit/sessions/stats` | Статистика: входы сегодня, уникальные пользователи за неделю, действия |
 
 ### Системные логи (admin)
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
 | GET | `/api/logs` | Журнал системных событий (фильтры: level, source, даты, текст, пагинация) |
-| GET | `/api/logs/stats` | Статистика логов по уровням |
+| GET | `/api/logs/stats` | Статистика: всего, ошибки сегодня, предупреждения сегодня |
+
+### Настройки (admin)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/settings` | Все настройки с текущими значениями |
+| PUT | `/api/settings` | Обновить настройки (с валидацией диапазонов) |
 
 ### Служебные
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | `/api/health` | Состояние API (без авторизации) |
-| GET | `/api/pools/status` | Статус connection pools |
+| GET | `/api/health` | Состояние API: статус, версия, пулы (без авторизации) |
+| GET | `/api/pools/status` | Детальный статус connection pools |
 | GET | `/docs` | Swagger UI |
 | GET | `/redoc` | ReDoc |
 
+---
+
+## База данных
+
+Локальная БД `pam_stats` содержит 8 таблиц:
+
+| Таблица | Описание | Особенности |
+|---------|----------|-------------|
+| `statistics` | Историческая статистика серверов | Партиционирована по месяцам (RANGE по ts) |
+| `db_info` | Информация о базах данных | PK: server_name + datname |
+| `users` | Пользователи системы | Роли: admin / operator / viewer |
+| `servers` | Конфигурация серверов | Пароли зашифрованы pgcrypto |
+| `ssh_keys` | SSH-ключи | Приватные ключи зашифрованы pgcrypto |
+| `audit_sessions` | Аудит сессий и действий | Индексы: timestamp, username, event_type |
+| `system_log` | Системные логи коллектора | Индексы: timestamp, level |
+| `settings` | Настройки системы | KV-хранилище с типизацией |
+
+---
+
 ## Конфигурация
 
-### Файлы
+### Переменные окружения (`.env`)
 
-| Файл | Описание |
-|------|----------|
-| `backend/.env` | SECRET_KEY, ENCRYPTION_KEY, LOCAL_DB_DSN |
-| PostgreSQL `pam_stats` | Серверы, пользователи, SSH-ключи, статистика, аудит, системные логи |
+| Переменная | Обязательна | Описание |
+|-----------|-------------|----------|
+| `SECRET_KEY` | да | Ключ для подписи JWT токенов |
+| `ENCRYPTION_KEY` | да | Ключ для pgcrypto (шифрование credentials) |
+| `LOCAL_DB_DSN` | нет | DSN для локальной БД (по умолчанию: `postgresql://pam:pam@/pam_stats?host=/tmp`) |
+| `LOG_LEVEL` | нет | Уровень логирования (по умолчанию: `INFO`) |
+| `COLLECT_INTERVAL` | нет | Интервал сбора статистики в секундах (по умолчанию: `600`) |
+| `SIZE_UPDATE_INTERVAL` | нет | Интервал обновления размеров БД (по умолчанию: `1800`) |
+| `DB_CHECK_INTERVAL` | нет | Интервал проверки новых/удалённых БД (по умолчанию: `1800`) |
+| `RETENTION_MONTHS` | нет | Хранить данные N месяцев (по умолчанию: `12`) |
 
-### Параметры (`backend/app/config.py`)
+### Настройки в БД (таблица `settings`)
+
+Управляются через UI (`/settings`) или API (`PUT /api/settings`). Изменения применяются на следующем цикле коллектора.
+
+| Ключ | По умолчанию | Описание |
+|------|-------------|----------|
+| `collect_interval` | 600 сек (10 мин) | Интервал сбора статистики |
+| `size_update_interval` | 1800 сек (30 мин) | Интервал обновления размеров БД |
+| `db_check_interval` | 1800 сек (30 мин) | Интервал проверки новых/удалённых БД |
+| `retention_months` | 12 | Срок хранения статистики (месяцев) |
+| `audit_retention_days` | 90 | Срок хранения аудита (дней) |
+| `logs_retention_days` | 30 | Срок хранения системных логов (дней) |
+
+### Константы (`backend/app/config.py`)
 
 | Параметр | Значение | Описание |
 |----------|----------|----------|
-| `SECRET_KEY` | из .env | Ключ для JWT |
 | `TOKEN_EXPIRATION` | 60 мин | Время жизни access token |
 | `REFRESH_TOKEN_EXPIRATION_DAYS` | 7 дней | Время жизни refresh token |
-| `AUDIT_RETENTION_DAYS` | 90 дней | Хранение записей аудита |
-| `SERVER_STATUS_CACHE_TTL` | 5 сек | TTL кэша статуса |
-| `SSH_CACHE_TTL` | 30 сек | TTL кэша SSH |
-| `LOCAL_DB_DSN` | из .env | DSN для локальной БД pam_stats |
-| `COLLECT_INTERVAL` | 600 сек | Интервал сбора статистики |
-| `SIZE_UPDATE_INTERVAL` | 1800 сек | Интервал обновления размеров |
-| `RETENTION_MONTHS` | 12 | Хранить данные N месяцев |
-| `LOGS_RETENTION_DAYS` | 30 дней | Хранение системных логов |
-| `POOL_CONFIGS` | default/high_load | Пулы для удалённых серверов |
-| `ALLOWED_ORIGINS` | list | CORS origins |
+| `AUDIT_RETENTION_DAYS` | 90 дней | Хранение записей аудита (fallback) |
+| `SERVER_STATUS_CACHE_TTL` | 5 сек | TTL кэша статуса серверов |
+| `SSH_CACHE_TTL` | 30 сек | TTL кэша SSH данных |
+| `POOL_CONFIGS.default` | min=1, max=5 | Пул подключений (обычные серверы) |
+| `POOL_CONFIGS.high_load` | min=5, max=20 | Пул подключений (нагруженные серверы) |
 
-### Роли пользователей
+---
+
+## Коллектор
+
+Автономная подсистема сбора данных (v3). Запускается вместе с FastAPI как набор asyncio-задач.
+
+### Циклы
+
+| Цикл | Интервал | Действие |
+|------|----------|----------|
+| **stats_loop** | 10 мин | Сбор pg_stat_database + SSH disk usage со всех серверов |
+| **sizes_loop** | 30 мин | Обновление размеров БД (pg_database_size) |
+| **db_info_loop** | 30 мин | Синхронизация списка БД (новые / удалённые) |
+| **maintenance_loop** | 24 ч | Очистка старых партиций, аудита и логов |
+
+### Логирование
+
+Все события коллектора записываются в таблицу `system_log` и доступны на странице `/logs`:
+- **info** — успешный сбор, количество серверов, запуск/остановка
+- **warning** — таймауты, недоступные серверы
+- **error** — ошибки подключения, критические сбои
+
+---
+
+## Роли пользователей
 
 ```mermaid
 graph LR
@@ -531,51 +666,68 @@ graph LR
     Admin -->|Полный доступ| Servers["Серверы"]
     Admin -->|Полный доступ| Users["Пользователи"]
     Admin -->|Полный доступ| Keys["SSH-ключи"]
-    Admin -->|Полный доступ| Audit["Аудит сессий"]
-    Admin -->|Полный доступ| Logs["Системные логи"]
+    Admin -->|Полный доступ| Audit["Аудит"]
+    Admin -->|Полный доступ| Logs["Логи"]
+    Admin -->|Полный доступ| Settings["Настройки"]
 
     Operator -->|Полный доступ| Servers
     Operator -.->|Нет доступа| Users
     Operator -->|Создание/импорт| Keys
     Operator -.->|Нет доступа| Audit
     Operator -.->|Нет доступа| Logs
+    Operator -.->|Нет доступа| Settings
 
     Viewer -->|Только чтение| Servers
     Viewer -.->|Нет доступа| Users
     Viewer -.->|Нет доступа| Keys
     Viewer -.->|Нет доступа| Audit
     Viewer -.->|Нет доступа| Logs
+    Viewer -.->|Нет доступа| Settings
 ```
+
+| Роль | Серверы | Пользователи | SSH-ключи | Аудит | Логи | Настройки |
+|------|---------|--------------|-----------|-------|------|-----------|
+| **admin** | Полный | Полный | Полный | Чтение | Чтение | Полный |
+| **operator** | Полный | — | Создание | — | — | — |
+| **viewer** | Чтение | — | — | — | — | — |
+
+---
 
 ## Использование
 
+### CLI
+
 ```bash
 # Получение токена
-TOKEN=$(curl -s -X POST http://localhost:8000/token \
+TOKEN=$(curl -s -X POST http://localhost:8000/api/token \
   -d "username=admin&password=admin" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # Список серверов
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/servers
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/servers
 
 # Активные запросы
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/server_stats/my-server
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/server_stats/my-server
 
 # Статистика за период
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8000/server/my-server/stats?start_date=2026-01-01&end_date=2026-02-01"
+  "http://localhost:8000/api/server/my-server/stats?start_date=2026-01-01&end_date=2026-02-01"
 
 # Состояние API (без авторизации)
 curl http://localhost:8000/api/health
 ```
 
+### Swagger UI
+
 Интерактивная документация: `http://localhost:8000/docs`
+
+---
 
 ## Обслуживание
 
 ```bash
-# Логи
+# Логи сервисов
 sudo journalctl -u pgmon-backend -f
 sudo journalctl -u pgmon-frontend -f
 
@@ -590,6 +742,8 @@ sudo systemctl restart pgmon-backend
 cd ../frontend && npm install
 sudo systemctl restart pgmon-frontend
 ```
+
+---
 
 ## Лицензия
 

@@ -23,7 +23,7 @@ async def health_check():
         "status": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "pools_count": len(db_pool.pools),
-        "version": "2.2",
+        "version": "3.0",
     }
 
 @router.get("/favicon.ico", include_in_schema=False)
