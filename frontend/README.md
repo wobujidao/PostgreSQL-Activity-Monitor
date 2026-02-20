@@ -10,7 +10,7 @@
 
 **React SPA для мониторинга PostgreSQL серверов**
 
-<img src="https://img.shields.io/badge/version-2.2.0-blue?style=flat-square" alt="Version"/>
+<img src="https://img.shields.io/badge/version-3.0.0-blue?style=flat-square" alt="Version"/>
 <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"/>
 <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js"/>
 
@@ -73,7 +73,7 @@ frontend/
 ├── index.html                  # Точка входа HTML
 ├── vite.config.js              # Конфигурация Vite (порт 3000, alias @/)
 ├── components.json             # Конфигурация shadcn/ui
-├── package.json                # v2.2.0
+├── package.json                # v3.0.0
 └── src/
     ├── main.jsx                # Точка входа React
     ├── App.jsx                 # Sidebar layout, роутинг, модалы сессии

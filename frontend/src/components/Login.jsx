@@ -110,7 +110,7 @@ function Login({ onLogin, error: parentError, backendStatus }) {
               Бэкенд: {backendStatus === 'available' ? 'доступен' : backendStatus === 'unavailable' ? 'недоступен' : 'проверка...'}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v2.2</p>
+          <p className="text-xs text-muted-foreground">PostgreSQL Activity Monitor v3.0</p>
         </CardFooter>
       </Card>
     </div>
