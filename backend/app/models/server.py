@@ -5,7 +5,6 @@ from pydantic import BaseModel
 class Server(BaseModel):
     name: str
     host: str
-    stats_db: str | None = None
     user: str
     password: str
     port: int

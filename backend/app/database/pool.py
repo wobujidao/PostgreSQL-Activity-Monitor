@@ -16,23 +16,21 @@ class DatabasePool:
         
     def get_pool_key(self, server: Server, db_name: str = None) -> str:
         """Генерация уникального ключа для пула"""
-        database = db_name or server.stats_db or "postgres"
+        database = db_name or "postgres"
         return f"{server.host}:{server.port}:{server.user}:{database}"
-    
+
     def get_pool_config(self, server: Server) -> dict:
         """Получить конфигурацию пула для сервера"""
-        if server.stats_db:
-            return POOL_CONFIGS["stats_db"]
         return POOL_CONFIGS["default"]
-    
+
     def get_pool(self, server: Server, db_name: str = None) -> psycopg2.pool.ThreadedConnectionPool:
         """Получить или создать пул для сервера"""
         pool_key = self.get_pool_key(server, db_name)
-        
+
         with self.lock:
             if pool_key not in self.pools:
                 config = self.get_pool_config(server)
-                database = db_name or server.stats_db or "postgres"
+                database = db_name or "postgres"
                 
                 logger.info(f"Создание пула подключений для {server.name} ({database})")
                 try:

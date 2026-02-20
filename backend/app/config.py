@@ -22,14 +22,22 @@ USERS_FILE = CONFIG_DIR / "users.json"
 ENCRYPTION_KEY_FILE = CONFIG_DIR / "encryption_key.key"
 
 # Аудит сессий
-AUDIT_DB_FILE = CONFIG_DIR / "audit.db"
-AUDIT_LOG_FILE = CONFIG_DIR / "audit_log.json"  # для миграции из старого формата
 AUDIT_RETENTION_DAYS = 90  # хранить записи N дней
+
+# Локальная БД (asyncpg)
+LOCAL_DB_DSN = os.getenv("LOCAL_DB_DSN", "postgresql://pam:pam@127.0.0.1:5432/pam_stats")
+
+# Интервалы коллектора (секунды)
+COLLECT_INTERVAL = int(os.getenv("COLLECT_INTERVAL", "600"))           # 10 минут — основной сбор
+SIZE_UPDATE_INTERVAL = int(os.getenv("SIZE_UPDATE_INTERVAL", "1800"))  # 30 минут — размеры БД
+DB_CHECK_INTERVAL = int(os.getenv("DB_CHECK_INTERVAL", "1800"))       # 30 минут — новые/удалённые БД
+
+# Retention
+RETENTION_MONTHS = int(os.getenv("RETENTION_MONTHS", "12"))
 
 # Настройки пулов подключений
 POOL_CONFIGS = {
     "default": {"minconn": 1, "maxconn": 5},
-    "stats_db": {"minconn": 2, "maxconn": 10},
     "high_load": {"minconn": 5, "maxconn": 20}
 }
 

@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 const INITIAL_SERVER = {
   name: '', host: '', user: '', password: '', port: DEFAULT_PG_PORT,
   ssh_user: '', ssh_password: '', ssh_port: DEFAULT_SSH_PORT,
-  ssh_auth_type: DEFAULT_SSH_AUTH_TYPE, ssh_key_id: '', ssh_key_passphrase: '', stats_db: '',
+  ssh_auth_type: DEFAULT_SSH_AUTH_TYPE, ssh_key_id: '', ssh_key_passphrase: '',
 };
 
 function ServerList() {
@@ -391,10 +391,6 @@ function ServerList() {
                   <p className="text-xs text-destructive">Некорректный IP-адрес или hostname</p>
                 )}
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>База для статистики</Label>
-              <Input value={newServer.stats_db} onChange={(e) => setNewServer({ ...newServer, stats_db: e.target.value })} placeholder="stats_db (опционально)" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

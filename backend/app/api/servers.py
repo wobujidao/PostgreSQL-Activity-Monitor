@@ -9,6 +9,7 @@ from app.auth import get_current_user
 from app.services import load_servers, save_servers, connect_to_server, cache_manager, SSHKeyManager
 from app.services.ssh import is_host_reachable
 from app.database import db_pool
+from app.database.local_db import delete_server_data
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,6 @@ async def add_server(server: Server, current_user: dict = Depends(get_current_us
                 "total_space": None,
                 "connections": None,
                 "uptime_hours": None,
-                "stats_db": server.stats_db,
                 "data_dir": None
             }
         
@@ -145,12 +145,10 @@ async def update_server(
         cache_manager.invalidate_server_cache(cache_key)
         
         # Close old pools if connection params changed
-        if (old_server.host != updated_server.host or 
-            old_server.port != updated_server.port or 
+        if (old_server.host != updated_server.host or
+            old_server.port != updated_server.port or
             old_server.user != updated_server.user):
             db_pool.close_pool(old_server)
-            if old_server.stats_db:
-                db_pool.close_pool(old_server, old_server.stats_db)
         
         servers[server_index] = updated_server
         save_servers(servers)
@@ -179,13 +177,17 @@ async def delete_server(server_name: str, current_user: dict = Depends(get_curre
     
     # Close pools for deleted server
     db_pool.close_pool(server_to_delete)
-    if server_to_delete.stats_db:
-        db_pool.close_pool(server_to_delete, server_to_delete.stats_db)
-    
+
+    # Delete historical data from local DB
+    try:
+        await delete_server_data(server_name)
+    except Exception as e:
+        logger.warning(f"Ошибка очистки local_db для {server_name}: {e}")
+
     updated_servers = [s for s in servers if s.name != server_name]
     save_servers(updated_servers)
     logger.info("Deleted server: {}".format(server_name))
-    
+
     return {"message": "Server {} deleted".format(server_name)}
 
 @router.post("/{server_name}/test-ssh")

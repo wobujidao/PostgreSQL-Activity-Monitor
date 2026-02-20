@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
 from app.auth import get_current_user
 from app.models.user import User
-from app.services.audit_logger import audit_logger
+from app.services import audit_logger
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/audit", tags=["audit"])
@@ -26,7 +26,7 @@ async def get_sessions(
     current_user: User = Depends(_require_admin),
 ):
     """Список событий аудита (admin only)."""
-    return audit_logger.get_events(
+    return await audit_logger.get_events(
         limit=limit,
         offset=offset,
         username=username,
@@ -41,4 +41,4 @@ async def get_sessions_stats(
     current_user: User = Depends(_require_admin),
 ):
     """Статистика аудита (admin only)."""
-    return audit_logger.get_stats()
+    return await audit_logger.get_stats()

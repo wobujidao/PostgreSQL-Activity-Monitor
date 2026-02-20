@@ -12,7 +12,7 @@ from app.auth import (
     token_blacklist,
 )
 from app.config import TOKEN_EXPIRATION, REFRESH_TOKEN_EXPIRATION_DAYS, ALLOWED_ORIGINS
-from app.services.audit_logger import audit_logger
+from app.services import audit_logger
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +74,11 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
             logger.info(f"Успешная авторизация: {user['login']}")
             # Извлекаем jti из access token для аудита
             access_payload = decode_token(access_token)
-            audit_logger.log_event("login_success", user["login"], request, jti=access_payload.get("jti"))
+            await audit_logger.log_event("login_success", user["login"], request, jti=access_payload.get("jti"))
             return {"access_token": access_token, "token_type": "bearer"}
 
     logger.warning(f"Неудачная попытка авторизации: {form_data.username}")
-    audit_logger.log_event("login_failed", form_data.username, request, details="Неверный логин или пароль")
+    await audit_logger.log_event("login_failed", form_data.username, request, details="Неверный логин или пароль")
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
@@ -139,7 +139,7 @@ async def refresh(request: Request, response: Response, refresh_token: str | Non
 
     logger.info(f"Refresh token для {username}")
     new_access_payload = decode_token(new_access)
-    audit_logger.log_event("refresh", username, request, jti=new_access_payload.get("jti"))
+    await audit_logger.log_event("refresh", username, request, jti=new_access_payload.get("jti"))
     return {"access_token": new_access, "token_type": "bearer"}
 
 
@@ -184,6 +184,6 @@ async def logout(request: Request, response: Response, refresh_token: str | None
             pass
 
     _clear_refresh_cookie(response)
-    audit_logger.log_event("logout", logout_username, request)
+    await audit_logger.log_event("logout", logout_username, request)
     logger.info(f"Logout выполнен: {logout_username}")
     return {"detail": "Logged out"}

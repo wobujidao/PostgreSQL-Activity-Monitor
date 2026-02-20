@@ -37,7 +37,10 @@ def load_servers() -> list[Server]:
             # Устанавливаем значение по умолчанию для ssh_auth_type
             if "ssh_auth_type" not in item:
                 item["ssh_auth_type"] = "password"
-            
+
+            # Удаляем устаревшее поле stats_db (v2 → v3)
+            item.pop("stats_db", None)
+
             servers.append(Server(**item))
         
         logger.debug(f"Загружено {len(servers)} серверов")
@@ -53,7 +56,6 @@ def save_servers(servers: list[Server]):
             json.dump([{
                 "name": s.name,
                 "host": s.host,
-                "stats_db": s.stats_db,
                 "user": s.user,
                 "password": ensure_encrypted(s.password),
                 "port": s.port,
@@ -121,7 +123,6 @@ def connect_to_server(server: Server) -> dict[str, Any]:
         "total_space": None,
         "connections": None,
         "uptime_hours": None,
-        "stats_db": server.stats_db,
         "status": "pending",
         "data_dir": None
     }

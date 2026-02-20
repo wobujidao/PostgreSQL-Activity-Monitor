@@ -16,7 +16,8 @@ __all__ = [
     "ssh_key_storage"
 ]
 from .user_manager import UserManager
+from . import audit_logger
 
 user_manager = UserManager()
 
-__all__.extend(["UserManager", "user_manager"])
+__all__.extend(["UserManager", "user_manager", "audit_logger"])

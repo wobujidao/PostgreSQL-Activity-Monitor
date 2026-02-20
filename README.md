@@ -13,7 +13,7 @@
 
 <img src="https://img.shields.io/github/license/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="License"/>
 <img src="https://img.shields.io/github/stars/wobujidao/PostgreSQL-Activity-Monitor?style=flat-square" alt="Stars"/>
-<img src="https://img.shields.io/badge/version-2.2.0-blue?style=flat-square" alt="Version"/>
+<img src="https://img.shields.io/badge/version-3.0.0-blue?style=flat-square" alt="Version"/>
 
 </div>
 
@@ -22,7 +22,7 @@
 ## Возможности
 
 - **Мониторинг серверов** — статус, версия, uptime, активные соединения, дисковое пространство
-- **Историческая статистика** — графики нагрузки, размеров БД, транзакций за любой период
+- **Историческая статистика** — автоматический сбор каждые 10 мин, графики нагрузки, размеров БД, транзакций
 - **Анализ баз данных** — автоматическое выявление неактивных, статичных и малоактивных БД
 - **SSH мониторинг** — свободное место на дисках через SSH (пароль или ключ)
 - **Управление серверами** — добавление, редактирование, удаление через UI
@@ -34,7 +34,8 @@
 - **Rate limiting** — защита от brute force (slowapi)
 - **Тёмная тема** — полная поддержка light/dark режимов
 - **Command Palette** — быстрый поиск (`Ctrl+K`)
-- **Connection pooling** — переиспользование соединений к PostgreSQL
+- **Автосбор статистики** — бэкенд сам подключается к серверам и собирает данные (коллектор v3)
+- **Connection pooling** — psycopg2 для удалённых серверов, asyncpg для локальной БД
 - **Кэширование** — двухуровневое (статус серверов 5с, SSH 30с)
 - **Шифрование** — Fernet для хранения credentials, bcrypt для паролей
 
@@ -56,19 +57,20 @@ graph TB
         Auth["JWT Auth"]
         API["REST API"]
         Cache["Cache Manager"]
-        Pool["Connection Pool"]
+        Pool["psycopg2 Pool"]
         SSHClient["SSH Client"]
+        Collector["Коллектор<br/>(asyncio, 10/30 мин)"]
+        LocalPool["asyncpg Pool"]
     end
 
-    subgraph Data["Данные"]
+    subgraph Data["Удалённые серверы"]
         PG[("PostgreSQL<br/>серверы")]
         SSH["SSH<br/>серверы"]
-        Config["/etc/pg_activity_monitor/<br/>servers.json, users.json"]
     end
 
-    subgraph Stats["Статистика"]
-        Cron["cron (10 мин)"]
-        StatsDB[("stats_db")]
+    subgraph Local["Локальное хранение"]
+        LocalPG[("PostgresPro 17<br/>pam_stats")]
+        Config["/etc/pg_activity_monitor/"]
     end
 
     SPA -->|HTTPS| Proxy
@@ -78,11 +80,14 @@ graph TB
     API --> Cache
     API --> Pool
     API --> SSHClient
+    API -->|stats, audit| LocalPool
     Pool -->|psycopg2| PG
     SSHClient -->|paramiko| SSH
+    Collector -->|psycopg2| PG
+    Collector -->|paramiko| SSH
+    Collector -->|asyncpg| LocalPG
+    LocalPool -->|asyncpg| LocalPG
     API --> Config
-    Cron -->|stats_collection.sh| StatsDB
-    Pool -->|SELECT| StatsDB
 ```
 
 ## Поток авторизации
@@ -129,7 +134,8 @@ sequenceDiagram
 | Python | 3.13 | Среда выполнения |
 | FastAPI | 0.129 | REST API фреймворк |
 | Pydantic | 2.12 | Валидация данных |
-| psycopg2 | 2.9 | PostgreSQL драйвер + connection pooling |
+| psycopg2 | 2.9 | PostgreSQL (удалённые серверы) |
+| asyncpg | 0.31 | PostgreSQL (локальная БД pam_stats) |
 | Paramiko | 3.5 | SSH клиент |
 | PyJWT + bcrypt | 2.11 / 4.3 | Авторизация |
 | cryptography | 46.0 | Fernet шифрование |
@@ -151,9 +157,9 @@ sequenceDiagram
 | Технология | Назначение |
 |-----------|------------|
 | PostgreSQL 9.6+ | Целевые серверы мониторинга |
+| PostgresPro 1C 17 | Локальная БД (статистика + аудит) |
 | Nginx | Reverse proxy + SSL termination |
 | systemd | Управление сервисами |
-| cron | Автоматический сбор статистики |
 
 ## Структура проекта
 
@@ -179,8 +185,12 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── blacklist.py        # In-memory token blacklist
 │       │   ├── dependencies.py     # get_current_user (OAuth2)
 │       │   └── utils.py            # access/refresh токены, пароли
+│       ├── collector/              # Автосбор статистики (v3)
+│       │   ├── scheduler.py       # asyncio loops: stats, sizes, db_info
+│       │   └── tasks.py           # Логика сбора данных
 │       ├── database/
-│       │   └── pool.py             # DatabasePool (ThreadedConnectionPool)
+│       │   ├── pool.py             # psycopg2 Pool (удалённые серверы)
+│       │   └── local_db.py         # asyncpg Pool (локальная БД pam_stats)
 │       ├── models/                 # Pydantic v2 модели
 │       │   ├── server.py           # Server
 │       │   ├── user.py             # User, UserCreate, UserUpdate
@@ -193,7 +203,7 @@ PostgreSQL-Activity-Monitor/
 │       │   ├── user_manager.py     # UserManager (bcrypt, fcntl)
 │       │   ├── ssh_key_manager.py  # Генерация SSH ключей
 │       │   ├── ssh_key_storage.py  # Хранение SSH ключей
-│       │   └── audit_logger.py     # Аудит сессий (SQLite)
+│       │   └── audit_logger.py     # Аудит сессий (asyncpg)
 │       └── utils/
 │           └── crypto.py           # Fernet шифрование/расшифровка
 │
@@ -239,11 +249,6 @@ PostgreSQL-Activity-Monitor/
 │           ├── format.js           # Форматирование: bytes, uptime, даты
 │           ├── validation.js       # Валидация: hostname, port
 │           └── utils.js            # cn() для Tailwind классов
-│
-├── stats_db/                       # Сбор исторической статистики
-│   ├── create_stats_db.sh          # Создание таблиц
-│   ├── stats_collection.sh         # Скрипт сбора (cron)
-│   └── README.md                   # Документация
 │
 ├── docs/
 │   └── DESIGN_SYSTEM.md            # Дизайн-система проекта
@@ -327,8 +332,7 @@ print('Пользователь admin создан')
     "ssh_user": "pgadmin",
     "ssh_password": "ssh_password",
     "ssh_port": 22,
-    "ssh_auth_type": "password",
-    "stats_db": "stats_db"
+    "ssh_auth_type": "password"
   }
 ]
 ```
@@ -421,17 +425,6 @@ server {
 }
 ```
 
-### 9. Сбор статистики (опционально)
-
-```bash
-# Создаём базу stats_db на целевом сервере
-bash stats_db/create_stats_db.sh
-
-# Добавляем в cron (каждые 10 минут)
-sudo crontab -u postgres -e
-# */10 * * * * /path/to/stats_db/stats_collection.sh
-```
-
 ## API
 
 Все endpoints (кроме `/token` и `/api/health`) требуют JWT токен: `Authorization: Bearer <token>`
@@ -514,8 +507,7 @@ sudo crontab -u postgres -e
 | `/etc/pg_activity_monitor/users.json` | Пользователи (bcrypt хэши) |
 | `/etc/pg_activity_monitor/encryption_key.key` | Ключ Fernet |
 | `/etc/pg_activity_monitor/ssh_keys/` | SSH-ключи (metadata + encrypted files) |
-| `/etc/pg_activity_monitor/audit.db` | Журнал аудита сессий (SQLite) |
-| `backend/.env` | SECRET_KEY, LOG_LEVEL |
+| `backend/.env` | SECRET_KEY, LOG_LEVEL, LOCAL_DB_DSN |
 
 ### Параметры (`backend/app/config.py`)
 
@@ -527,7 +519,11 @@ sudo crontab -u postgres -e
 | `AUDIT_RETENTION_DAYS` | 90 дней | Хранение записей аудита |
 | `SERVER_STATUS_CACHE_TTL` | 5 сек | TTL кэша статуса |
 | `SSH_CACHE_TTL` | 30 сек | TTL кэша SSH |
-| `POOL_CONFIGS` | default/stats_db/high_load | Размеры connection pools |
+| `LOCAL_DB_DSN` | из .env | DSN для локальной БД pam_stats |
+| `COLLECT_INTERVAL` | 600 сек | Интервал сбора статистики |
+| `SIZE_UPDATE_INTERVAL` | 1800 сек | Интервал обновления размеров |
+| `RETENTION_MONTHS` | 12 | Хранить данные N месяцев |
+| `POOL_CONFIGS` | default/high_load | Пулы для удалённых серверов |
 | `ALLOWED_ORIGINS` | list | CORS origins |
 
 ### Роли пользователей

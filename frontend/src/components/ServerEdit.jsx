@@ -40,7 +40,7 @@ function ServerEdit() {
   const checkDirty = useCallback((current) => {
     if (!initialServerRef.current || !current) return false;
     const init = initialServerRef.current;
-    return ['host', 'port', 'user', 'password', 'stats_db', 'ssh_user', 'ssh_port', 'ssh_password', 'ssh_auth_type', 'ssh_key_id', 'ssh_key_passphrase']
+    return ['host', 'port', 'user', 'password', 'ssh_user', 'ssh_port', 'ssh_password', 'ssh_auth_type', 'ssh_key_id', 'ssh_key_passphrase']
       .some(k => String(current[k] ?? '') !== String(init[k] ?? ''));
   }, []);
 
@@ -61,7 +61,7 @@ function ServerEdit() {
         const [serversRes, keysRes] = await Promise.all([api.get('/servers'), api.get('/ssh-keys')]);
         const s = serversRes.data.find(s => s.name === serverName);
         if (!s) throw new Error('Сервер не найден');
-        const initial = { ...s, password: '', ssh_password: '', ssh_auth_type: s.ssh_auth_type || 'password', ssh_key_id: s.ssh_key_id || '', ssh_key_passphrase: '', stats_db: s.stats_db || '' };
+        const initial = { ...s, password: '', ssh_password: '', ssh_auth_type: s.ssh_auth_type || 'password', ssh_key_id: s.ssh_key_id || '', ssh_key_passphrase: '' };
         setServer(initial);
         initialServerRef.current = { ...initial };
         setSSHKeys(keysRes.data);
@@ -176,10 +176,6 @@ function ServerEdit() {
                     <p className="text-xs text-destructive">Порт: 1-65535</p>
                   )}
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>База для статистики</Label>
-                <Input value={server.stats_db} onChange={(e) => update('stats_db', e.target.value)} placeholder="stats_db (опционально)" />
               </div>
               <Separator />
               <h4 className="font-medium">Учетные данные PostgreSQL</h4>
